@@ -53,82 +53,225 @@ struct ProgramState {
     GLuint program = 0;
     GLint uniformLocMVP = -1;
 
+    ~ProgramState()
+    {
+        if (program > 0) {
+            glDeleteProgram(program);
+        }
+    }
+
     bool build(const std::string& vertSrc, const std::string& fragSrc)
     {
         program = util::CreateProgram(vertSrc.c_str(), fragSrc.c_str());
-        if (util::CheckGlError("CreateProgram")) {
-            return false;
-        }
+        util::CheckGlError("CreateProgram");
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         return uniformLocMVP >= 0;
     }
 };
 
-const std::vector<Vertex> Vertices = {
-    // -Z
-    { { -1, -1, -1 }, { +1, +1, +0 } },
-    { { +1, +1, -1 }, { +1, +1, +0 } },
-    { { +1, -1, -1 }, { +1, +1, +0 } },
+#pragma mark -
 
-    { { -1, -1, -1 }, { +1, +1, +0 } },
-    { { -1, +1, -1 }, { +1, +1, +0 } },
-    { { +1, +1, -1 }, { +1, +1, +0 } },
+class IndexedVertexStorage {
+private:
+    GLuint _vertexVboId = 0;
+    GLuint _indexVboId = 0;
+    GLuint _vboState = 0;
+    std::size_t _numIndices = 0;
+    std::size_t _numVertices = 0;
+    float _growthFactor;
+    bool _vboStateUpdateDeferred = false;
 
-    // +X
-    { { +1, -1, -1 }, { +1, +0, +1 } },
-    { { +1, +1, +1 }, { +1, +0, +1 } },
-    { { +1, -1, +1 }, { +1, +0, +1 } },
+public:
+    IndexedVertexStorage(float growthFactor = 1.5F)
+        : _growthFactor(growthFactor)
+    {
+    }
 
-    { { +1, -1, -1 }, { +1, +0, +1 } },
-    { { +1, +1, -1 }, { +1, +0, +1 } },
-    { { +1, +1, +1 }, { +1, +0, +1 } },
+    IndexedVertexStorage(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, float growthFactor = 1.5F)
+        : _growthFactor(growthFactor)
+    {
+        write(vertices, indices);
+    }
 
-    // +Z
-    { { +1, -1, +1 }, { +0, +1, +1 } },
-    { { -1, +1, +1 }, { +0, +1, +1 } },
-    { { -1, -1, +1 }, { +0, +1, +1 } },
+    ~IndexedVertexStorage()
+    {
+        if (_vboState > 0)
+            glDeleteVertexArrays(1, &_vboState);
+        if (_vertexVboId > 0)
+            glDeleteBuffers(1, &_vertexVboId);
+        if (_indexVboId > 0)
+            glDeleteBuffers(1, &_indexVboId);
+    }
 
-    { { +1, -1, +1 }, { +0, +1, +1 } },
-    { { +1, +1, +1 }, { +0, +1, +1 } },
-    { { -1, +1, +1 }, { +0, +1, +1 } },
+    void draw()
+    {
+        glBindVertexArray(_vboState);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(_numIndices), GL_UNSIGNED_INT, nullptr);
+    }
 
-    // -X
-    { { -1, -1, +1 }, { +1, +0, +0 } },
-    { { -1, +1, -1 }, { +1, +0, +0 } },
-    { { -1, -1, -1 }, { +1, +0, +0 } },
+    void write(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices)
+    {
+        _vboStateUpdateDeferred = true;
+        writeVertices(vertices);
+        writeIndices(indices);
+        _vboStateUpdateDeferred = false;
+        createVboState();
+    }
 
-    { { -1, -1, +1 }, { +1, +0, +0 } },
-    { { -1, +1, +1 }, { +1, +0, +0 } },
-    { { -1, +1, -1 }, { +1, +0, +0 } },
+    void writeVertices(const std::vector<Vertex>& vertices)
+    {
+        if (vertices.size() > _numVertices) {
+            // resize GPU storage
 
-    // +Y
-    { { -1, +1, -1 }, { +0, +1, +0 } },
-    { { +1, +1, +1 }, { +0, +1, +0 } },
-    { { +1, +1, -1 }, { +0, +1, +0 } },
+            auto storageSize = static_cast<std::size_t>(vertices.size() * _growthFactor);
+            std::cout << "IndexedVertexStorage::writeVertices resizing Vertex store from " << _numVertices << " to " << storageSize << std::endl;
+            _numVertices = vertices.size();
 
-    { { -1, +1, -1 }, { +0, +1, +0 } },
-    { { -1, +1, +1 }, { +0, +1, +0 } },
-    { { +1, +1, +1 }, { +0, +1, +0 } },
+            if (_vertexVboId > 0)
+                glDeleteBuffers(1, &_vertexVboId);
 
-    // -Y
-    { { -1, -1, -1 }, { +0, +0, +1 } },
-    { { +1, -1, -1 }, { +0, +0, +1 } },
-    { { +1, -1, +1 }, { +0, +0, +1 } },
+            glGenBuffers(1, &_vertexVboId);
+            glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                sizeof(Vertex) * storageSize,
+                vertices.data(),
+                GL_STREAM_DRAW);
 
-    { { -1, -1, -1 }, { +0, +0, +1 } },
-    { { +1, -1, +1 }, { +0, +0, +1 } },
-    { { -1, -1, +1 }, { +0, +0, +1 } },
+            util::CheckGlError("Updating new _vertexVboId");
+
+            if (!_vboStateUpdateDeferred) {
+                createVboState();
+
+                // TODO: Can we just update _vboState like this?
+                //glBindVertexArray(_vboState);
+                //glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
+                //glBindVertexArray(0);
+            }
+
+            util::CheckGlError("Updating _vboState with new _vertexVboId");
+        } else {
+            // GPU storage suffices, just copy data over
+            _numVertices = vertices.size();
+
+            // map
+            glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
+            auto* data = static_cast<Vertex*>(glMapBufferRange(
+                GL_ARRAY_BUFFER,
+                0, _numVertices * sizeof(Vertex),
+                GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+
+            // write
+            memcpy(data, vertices.data(), _numVertices * sizeof(Vertex));
+
+            // unmap
+            glUnmapBuffer(GL_ARRAY_BUFFER);
+        }
+    }
+
+    void writeIndices(const std::vector<GLuint>& indices)
+    {
+        if (indices.size() > _numIndices) {
+            // GPU storage
+
+            auto storageSize = static_cast<std::size_t>(indices.size() * _growthFactor);
+            std::cout << "IndexedVertexStorage::writeIndices resizing Index store from " << _numIndices << " to " << storageSize << std::endl;
+            _numIndices = indices.size();
+
+            if (_indexVboId > 0)
+                glDeleteBuffers(1, &_indexVboId);
+
+            glGenBuffers(1, &_indexVboId);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
+            glBufferData(
+                GL_ELEMENT_ARRAY_BUFFER,
+                sizeof(GLuint) * storageSize,
+                indices.data(),
+                GL_STREAM_DRAW);
+
+            util::CheckGlError("Creating new _indexVboId");
+
+            if (!_vboStateUpdateDeferred) {
+                // TODO: Can we just update _vboState like this?
+                createVboState();
+                
+                //glBindVertexArray(_vboState);
+                //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
+                //glBindVertexArray(0);
+            }
+
+            util::CheckGlError("Updating _vboState with new _vertexVboId");
+        } else {
+            // GPU storage suffices, just copy data over
+            _numIndices = indices.size();
+
+            // map
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
+            auto* data = static_cast<GLuint*>(glMapBufferRange(
+                GL_ELEMENT_ARRAY_BUFFER,
+                0, _numIndices * sizeof(GLuint),
+                GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+
+            // write
+            memcpy(data, indices.data(), _numIndices * sizeof(GLuint));
+
+            // unmap
+            glUnmapBuffer(GL_ARRAY_BUFFER);
+        }
+    }
+
+private:
+    void createVboState()
+    {
+        if (_vboState) {
+            glDeleteVertexArrays(1, &_vboState);
+        }
+
+        glGenVertexArrays(1, &_vboState);
+        glBindVertexArray(_vboState);
+        util::CheckGlError("Creating _vboState");
+
+        glVertexAttribPointer(
+            static_cast<GLuint>(Vertex::AttributeLayout::Pos),
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(Vertex),
+            (const GLvoid*)offsetof(Vertex, pos));
+
+        glVertexAttribPointer(
+            static_cast<GLuint>(Vertex::AttributeLayout::Color),
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(Vertex),
+            (const GLvoid*)offsetof(Vertex, color));
+
+        glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Pos));
+        glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Color));
+        util::CheckGlError("Configuring vertex attrib pointers");
+
+        glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
+
+        glBindVertexArray(0);
+    }
 };
 
 #pragma mark -
 
 class OpenGLCubeApplication {
 public:
-    void run()
+    OpenGLCubeApplication()
     {
         initWindow();
         initGl();
+    }
 
+    ~OpenGLCubeApplication() = default;
+
+    void run()
+    {
         while (!glfwWindowShouldClose(_window)) {
             glfwPollEvents();
             drawFrame();
@@ -136,20 +279,11 @@ public:
         }
     }
 
-    ~OpenGLCubeApplication()
-    {
-        if (_vboState > 0)
-            glDeleteVertexArrays(1, &_vboState);
-        if (_vertexVboId > 0)
-            glDeleteBuffers(1, &_vertexVboId);
-    }
-
 private:
     GLFWwindow* _window;
 
-    GLuint _vertexVboId = 0;
-    GLuint _vboState = 0;
     ProgramState _program;
+    std::shared_ptr<IndexedVertexStorage> _storage;
 
     mat4 _model = mat4(1);
     mat4 _view = mat4(1);
@@ -202,38 +336,7 @@ private:
             throw std::runtime_error("Unable to build program");
         }
 
-        //
-        // create VBOs
-        //
-
-        glGenBuffers(1, &_vertexVboId);
-        glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * Vertices.size(),
-            Vertices.data(),
-            GL_STATIC_DRAW);
-
-        util::CheckGlError("Creating _vertexVboId");
-
-        glGenVertexArrays(1, &_vboState);
-        glBindVertexArray(_vboState);
-        util::CheckGlError("Creating _vboState");
-
-        glVertexAttribPointer(static_cast<GLuint>(Vertex::AttributeLayout::Pos), 3, GL_FLOAT,
-            GL_FALSE,
-            sizeof(Vertex),
-            (const GLvoid*)offsetof(Vertex, pos));
-
-        glVertexAttribPointer(static_cast<GLuint>(Vertex::AttributeLayout::Color), 3, GL_FLOAT,
-            GL_FALSE,
-            sizeof(Vertex),
-            (const GLvoid*)offsetof(Vertex, color));
-
-        glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Pos));
-        glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Color));
-        util::CheckGlError("Configuring vertex attrib pointers");
-
-        glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
-        glBindVertexArray(0);
+        buildGeometry();
 
         //
         // some constant GL state
@@ -242,7 +345,7 @@ private:
         glClearColor(0.2f, 0.2f, 0.22f, 0.0f);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
-        glEnable(GL_CULL_FACE);
+        glDisable(GL_CULL_FACE);
 
         //
         // force update of the _proj matrix
@@ -267,19 +370,20 @@ private:
         float elapsedSeconds = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         //
-        //  Position cube at origin, spinning a bit
+        //  Position target at origin, spinning a bit
         //
-        const float xAngle = elapsedSeconds * M_PI * 0.1F;
-        const float yAngle = elapsedSeconds * M_PI * 0.3F;
-        const float zAngle = elapsedSeconds * M_PI * -0.2F;
-        const vec3 cubePos(0, 0, 0);
-        _model = rotate(rotate(rotate(translate(mat4(1), cubePos), zAngle, vec3(0, 0, 1)), yAngle, vec3(0, 1, 0)), xAngle, vec3(1, 0, 0));
+
+        const float xAngle = elapsedSeconds * M_PI * 0;
+        const float yAngle = elapsedSeconds * M_PI * 0;
+        const float zAngle = elapsedSeconds * M_PI * 0;
+        const vec3 target(0, 0, 0);
+        _model = rotate(rotate(rotate(translate(mat4(1), target), zAngle, vec3(0, 0, 1)), yAngle, vec3(0, 1, 0)), xAngle, vec3(1, 0, 0));
 
         //
         //  Make camera look at cube
         //
 
-        _view = lookAt(vec3(0, 1, -4), cubePos, vec3(0, 1, 0));
+        _view = lookAt(vec3(0, 1, -4), target, vec3(0, 1, 0));
         const mat4 mvp = _proj * _view * _model;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -287,8 +391,23 @@ private:
         glUseProgram(_program.program);
         glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
 
-        glBindVertexArray(_vboState);
-        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(Vertices.size()));
+        _storage->draw();
+    }
+
+    void buildGeometry()
+    {
+        auto vertices = std::vector<Vertex> {
+            { { -0.5f, -0.5f, 0 }, { 1.0f, 0.0f, 0.0f } },
+            { { 0.5f, -0.5f, 0 }, { 0.0f, 1.0f, 0.0f } },
+            { { 0.5f, 0.5f, 0 }, { 0.0f, 0.0f, 1.0f } },
+            { { -0.5f, 0.5f, 0 }, { 1.0f, 1.0f, 1.0f } }
+        };
+
+        auto indices = std::vector<GLuint> {
+            0, 1, 2, 2, 3, 0
+        };
+
+        _storage = std::make_shared<IndexedVertexStorage>(vertices, indices);
     }
 };
 

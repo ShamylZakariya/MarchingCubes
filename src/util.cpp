@@ -47,17 +47,15 @@ GLuint LoadTexture(const std::string& filename)
     return texture;
 }
 
-bool CheckGlError(const char* ctx)
+void CheckGlError(const char* ctx)
 {
 #ifndef NDEBUG
     GLint err = glGetError();
     if (err != GL_NO_ERROR) {
         std::cerr << "GL error at " << ctx << " err: " << err << std::endl;
-        return true;
+        throw std::runtime_error("CheckGLError");
     }
-    return false;
 #endif
-    return false;
 }
 
 GLuint CreateShader(GLenum shader_type, const char* src)

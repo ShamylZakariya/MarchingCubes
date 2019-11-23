@@ -42,9 +42,9 @@ std::string ReadFile(const std::string& filename);
 GLuint LoadTexture(const std::string& filename);
 
 /**
- Checks for GL error; If there is an error state, prints it to std error, and returns true. If no error state returns false.
+ Checks for GL error, throwing if there is one
  */
-bool CheckGlError(const char* ctx);
+void CheckGlError(const char* ctx);
 
 /**
  Creates a shader of specified type from provided source
