@@ -77,9 +77,15 @@ private:
     GLuint _vao = 0;
     std::size_t _numIndices = 0;
     std::size_t _numVertices = 0;
+    std::size_t _vertexStorageSize = 0;
+    std::size_t _indexStorageSize = 0;
     float _growthFactor;
 
 public:
+    IndexedVertexStorage(float growthFactor = 1.5F)
+    : _growthFactor(growthFactor)
+    {}
+    
     IndexedVertexStorage(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, float growthFactor = 1.5F)
         : _growthFactor(growthFactor)
     {
@@ -130,9 +136,9 @@ private:
     void _updateVertices(const std::vector<Vertex>& vertices)
     {
         util::CheckGlError("IndexedVertexStorage::_updateVertices enter");
-        if (vertices.size() > _numVertices) {
-            auto storageSize = static_cast<std::size_t>(vertices.size() * _growthFactor);
-            std::cout << "IndexedVertexStorage::writeVertices resizing Vertex store from " << _numVertices << " to " << storageSize << " to hold " << vertices.size() << " vertices" << std::endl;
+        if (vertices.size() > _vertexStorageSize) {
+            _vertexStorageSize = static_cast<std::size_t>(vertices.size() * _growthFactor);
+            std::cout << "IndexedVertexStorage::writeVertices resizing Vertex store from " << _numVertices << " to " << _vertexStorageSize << " to hold " << vertices.size() << " vertices" << std::endl;
             _numVertices = vertices.size();
 
 
@@ -146,7 +152,7 @@ private:
 
             glBufferData(
                 GL_ARRAY_BUFFER,
-                sizeof(Vertex) * storageSize,
+                sizeof(Vertex) * _vertexStorageSize,
                 nullptr,
                 GL_STREAM_DRAW);
 
@@ -188,11 +194,9 @@ private:
     void _updateIndices(const std::vector<GLuint>& indices)
     {
         util::CheckGlError("IndexedVertexStorage::_updateIndices enter");
-        if (indices.size() > _numIndices) {
-            // GPU storage
-
-            auto storageSize = static_cast<std::size_t>(indices.size() * _growthFactor);
-            std::cout << "IndexedVertexStorage::writeIndices resizing Index store from " << _numIndices << " to " << storageSize << " to hold " << indices.size() << " indices" << std::endl;
+        if (indices.size() > _indexStorageSize) {
+            _indexStorageSize = static_cast<std::size_t>(indices.size() * _growthFactor);
+            std::cout << "IndexedVertexStorage::writeIndices resizing Index store from " << _numIndices << " to " << _indexStorageSize << " to hold " << indices.size() << " indices" << std::endl;
 
             _numIndices = indices.size();
 
@@ -205,7 +209,7 @@ private:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
             glBufferData(
                 GL_ELEMENT_ARRAY_BUFFER,
-                sizeof(GLuint) * storageSize,
+                sizeof(GLuint) * _indexStorageSize,
                 nullptr,
                 GL_STREAM_DRAW);
 
@@ -250,7 +254,7 @@ private:
     GLFWwindow* _window;
 
     ProgramState _program;
-    std::shared_ptr<IndexedVertexStorage> _storage;
+    IndexedVertexStorage _storage;
 
     mat4 _model = mat4(1);
     mat4 _view = mat4(1);
@@ -396,7 +400,7 @@ private:
         glUseProgram(_program.program);
         glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
 
-        _storage->draw();
+        _storage.draw();
     }
 
     void appendGeometry(vec3 offset)
@@ -423,12 +427,7 @@ private:
 
         _vertices.insert(_vertices.end(), vertices.begin(), vertices.end());
         _indices.insert(_indices.end(), indices.begin(), indices.end());
-
-        if (_storage) {
-            _storage->update(_vertices, _indices);
-        } else {
-            _storage = std::make_shared<IndexedVertexStorage>(_vertices, _indices);
-        }
+        _storage.update(_vertices, _indices);
     }
 
     void modifyExistingGeometry()
@@ -437,7 +436,7 @@ private:
             v.pos.x += 0.1f;
         }
 
-        _storage->update(_vertices);
+        _storage.update(_vertices);
     }
 };
 
