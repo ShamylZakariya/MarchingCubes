@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		63101B8D2389DF9B00AEC8FD /* util.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63101B8C2389DF9B00AEC8FD /* util.cpp */; };
+		63101B90238A2ABC00AEC8FD /* storage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63101B8E238A2ABC00AEC8FD /* storage.cpp */; };
+		63101B93238A2F4900AEC8FD /* triangle_soup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63101B91238A2F4900AEC8FD /* triangle_soup.cpp */; };
 		634674672374BD1A00275DAC /* libglfw.3.4.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 633D34BE23557844001CF7FD /* libglfw.3.4.dylib */; };
 		6346746B2374BD1A00275DAC /* shaders in CopyFiles */ = {isa = PBXBuildFile; fileRef = 633D34D2235B8492001CF7FD /* shaders */; };
 		6346746C2374BD1A00275DAC /* textures in CopyFiles */ = {isa = PBXBuildFile; fileRef = 633D34D4235E0B74001CF7FD /* textures */; };
@@ -31,8 +33,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		63101B8B2389DF6000AEC8FD /* util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = util.h; sourceTree = "<group>"; };
+		63101B8B2389DF6000AEC8FD /* util.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = util.hpp; sourceTree = "<group>"; };
 		63101B8C2389DF9B00AEC8FD /* util.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = util.cpp; sourceTree = "<group>"; };
+		63101B8E238A2ABC00AEC8FD /* storage.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = storage.cpp; sourceTree = "<group>"; };
+		63101B8F238A2ABC00AEC8FD /* storage.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = storage.hpp; sourceTree = "<group>"; };
+		63101B91238A2F4900AEC8FD /* triangle_soup.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = triangle_soup.cpp; sourceTree = "<group>"; };
+		63101B92238A2F4900AEC8FD /* triangle_soup.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = triangle_soup.hpp; sourceTree = "<group>"; };
 		633D34BE23557844001CF7FD /* libglfw.3.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libglfw.3.4.dylib; path = "../../../../../../usr/local/Cellar/glfw/HEAD-d252483/lib/libglfw.3.4.dylib"; sourceTree = "<group>"; };
 		633D34C0235578BB001CF7FD /* libvulkan.1.1.121.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libvulkan.1.1.121.dylib; path = ../../../../../../usr/local/lib/libvulkan.1.1.121.dylib; sourceTree = "<group>"; };
 		633D34D2235B8492001CF7FD /* shaders */ = {isa = PBXFileReference; lastKnownFileType = folder; path = shaders; sourceTree = "<group>"; };
@@ -91,8 +97,12 @@
 			isa = PBXGroup;
 			children = (
 				634674712374BD4D00275DAC /* main.cpp */,
-				63101B8B2389DF6000AEC8FD /* util.h */,
+				63101B8B2389DF6000AEC8FD /* util.hpp */,
 				63101B8C2389DF9B00AEC8FD /* util.cpp */,
+				63101B8E238A2ABC00AEC8FD /* storage.cpp */,
+				63101B8F238A2ABC00AEC8FD /* storage.hpp */,
+				63101B91238A2F4900AEC8FD /* triangle_soup.cpp */,
+				63101B92238A2F4900AEC8FD /* triangle_soup.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";
@@ -149,7 +159,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				63101B90238A2ABC00AEC8FD /* storage.cpp in Sources */,
 				634674722374BD4D00275DAC /* main.cpp in Sources */,
+				63101B93238A2F4900AEC8FD /* triangle_soup.cpp in Sources */,
 				63101B8D2389DF9B00AEC8FD /* util.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

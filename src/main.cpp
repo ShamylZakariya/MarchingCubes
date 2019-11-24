@@ -6,7 +6,9 @@
 //  Copyright © 2019 Shamyl Zakariya. All rights reserved.
 //
 
-#include "util.h"
+#include "storage.hpp"
+#include "triangle_soup.hpp"
+#include "util.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -24,34 +26,10 @@ const float FOV_DEGREES = 50.0F;
 
 #pragma mark - Data
 
-struct Vertex {
-    vec3 pos;
-    vec3 color;
-
-    enum class AttributeLayout : GLuint {
-        Pos = 0,
-        Color = 1
-    };
-
-    bool operator==(const Vertex& other) const
-    {
-        return pos == other.pos && color == other.color;
-    }
-};
-
-namespace std {
-template <>
-struct hash<Vertex> {
-    size_t operator()(Vertex const& vertex) const
-    {
-        return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1);
-    }
-};
-}
-
 struct ProgramState {
     GLuint program = 0;
     GLint uniformLocMVP = -1;
+    GLint uniformLocModel = -1;
 
     ~ProgramState()
     {
@@ -64,170 +42,14 @@ struct ProgramState {
     {
         program = util::CreateProgram(vertSrc.c_str(), fragSrc.c_str());
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
-        return uniformLocMVP >= 0;
+        uniformLocModel = glGetUniformLocation(program, "uModel");
+
+        // we're not using uniformLocModel (yet) so it is -1 here
+        return uniformLocMVP >= 0; // && uniformLocModel >= 0;
     }
 };
 
 #pragma mark -
-
-class IndexedVertexStorage {
-private:
-    GLuint _vertexVboId = 0;
-    GLuint _indexVboId = 0;
-    GLuint _vao = 0;
-    std::size_t _numIndices = 0;
-    std::size_t _numVertices = 0;
-    std::size_t _vertexStorageSize = 0;
-    std::size_t _indexStorageSize = 0;
-    float _growthFactor;
-
-public:
-    IndexedVertexStorage(float growthFactor = 1.5F)
-    : _growthFactor(growthFactor)
-    {}
-    
-    IndexedVertexStorage(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, float growthFactor = 1.5F)
-        : _growthFactor(growthFactor)
-    {
-        update(vertices, indices);
-    }
-
-    ~IndexedVertexStorage()
-    {
-        if (_vao > 0)
-            glDeleteVertexArrays(1, &_vao);
-        if (_vertexVboId > 0)
-            glDeleteBuffers(1, &_vertexVboId);
-        if (_indexVboId > 0)
-            glDeleteBuffers(1, &_indexVboId);
-    }
-
-    void draw()
-    {
-        glBindVertexArray(_vao);
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(_numIndices), GL_UNSIGNED_INT, nullptr);
-    }
-
-    std::size_t numVertices() const { return _numVertices; }
-    std::size_t numIndices() const { return _numIndices; }
-
-    void update(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices)
-    {
-        if (_vao == 0) {
-            glGenVertexArrays(1, &_vao);
-        }
-        glBindVertexArray(_vao);
-        _updateVertices(vertices);
-        _updateIndices(indices);
-        glBindVertexArray(0);
-    }
-
-    void update(const std::vector<Vertex>& vertices)
-    {
-        if (_vao == 0) {
-            throw std::runtime_error("Can't call updateVertices() without having already assigned indices");
-        }
-        glBindVertexArray(_vao);
-        _updateVertices(vertices);
-        glBindVertexArray(0);
-    }
-
-private:
-    void _updateVertices(const std::vector<Vertex>& vertices)
-    {
-        util::CheckGlError("IndexedVertexStorage::_updateVertices enter");
-        if (vertices.size() > _vertexStorageSize) {
-            _vertexStorageSize = static_cast<std::size_t>(vertices.size() * _growthFactor);
-            std::cout << "IndexedVertexStorage::writeVertices resizing Vertex store from " << _numVertices << " to " << _vertexStorageSize << " to hold " << vertices.size() << " vertices" << std::endl;
-            _numVertices = vertices.size();
-
-
-            if (_vertexVboId > 0) {
-                glDeleteBuffers(1, &_vertexVboId);
-                _vertexVboId = 0;
-            }
-
-            glGenBuffers(1, &_vertexVboId);
-            glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
-
-            glBufferData(
-                GL_ARRAY_BUFFER,
-                sizeof(Vertex) * _vertexStorageSize,
-                nullptr,
-                GL_STREAM_DRAW);
-
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertex) * _numVertices, vertices.data());
-
-            glVertexAttribPointer(
-                static_cast<GLuint>(Vertex::AttributeLayout::Pos),
-                3,
-                GL_FLOAT,
-                GL_FALSE,
-                sizeof(Vertex),
-                (const GLvoid*)offsetof(Vertex, pos));
-            glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Pos));
-
-            glVertexAttribPointer(
-                static_cast<GLuint>(Vertex::AttributeLayout::Color),
-                3,
-                GL_FLOAT,
-                GL_TRUE,
-                sizeof(Vertex),
-                (const GLvoid*)offsetof(Vertex, color));
-            glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Color));
-
-        } else {
-            // GPU storage suffices, just copy data over
-            _numVertices = vertices.size();
-            if (_numVertices > 0) {
-                glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
-                glBufferSubData(
-                    GL_ARRAY_BUFFER,
-                    0,
-                    sizeof(Vertex) * _numVertices,
-                    vertices.data());
-            }
-        }
-        util::CheckGlError("IndexedVertexStorage::_updateVertices exit");
-    }
-
-    void _updateIndices(const std::vector<GLuint>& indices)
-    {
-        util::CheckGlError("IndexedVertexStorage::_updateIndices enter");
-        if (indices.size() > _indexStorageSize) {
-            _indexStorageSize = static_cast<std::size_t>(indices.size() * _growthFactor);
-            std::cout << "IndexedVertexStorage::writeIndices resizing Index store from " << _numIndices << " to " << _indexStorageSize << " to hold " << indices.size() << " indices" << std::endl;
-
-            _numIndices = indices.size();
-
-            if (_indexVboId > 0) {
-                glDeleteBuffers(1, &_indexVboId);
-                _indexVboId = 0;
-            }
-
-            glGenBuffers(1, &_indexVboId);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
-            glBufferData(
-                GL_ELEMENT_ARRAY_BUFFER,
-                sizeof(GLuint) * _indexStorageSize,
-                nullptr,
-                GL_STREAM_DRAW);
-
-            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(GLuint) * _numIndices, indices.data());
-        } else {
-            // GPU storage suffices, just copy data over
-            _numIndices = indices.size();
-            if (_numIndices > 0) {
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
-                glBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
-                    0,
-                    sizeof(GLuint) * _numIndices,
-                    indices.data());
-            }
-        }
-        util::CheckGlError("IndexedVertexStorage::_updateIndices exit");
-    }
-};
 
 #pragma mark -
 
@@ -254,16 +76,11 @@ private:
     GLFWwindow* _window;
 
     ProgramState _program;
-    IndexedVertexStorage _storage;
+    TriangleConsumer _rawTriangleConsumer;
+    IndexedTriangleConsumer _indexedTriangleConsumer { IndexedTriangleConsumer::Strategy::Basic };
+    int _wedges = 10;
 
-    mat4 _model = mat4(1);
-    mat4 _view = mat4(1);
     mat4 _proj = mat4(1);
-
-    float _createOffset = 0;
-    bool _buildAnother = false;
-    std::vector<Vertex> _vertices;
-    std::vector<GLuint> _indices;
 
 private:
     void initWindow()
@@ -275,7 +92,7 @@ private:
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        _window = glfwCreateWindow(WIDTH, HEIGHT, "OpenGL", nullptr, nullptr);
+        _window = glfwCreateWindow(WIDTH, HEIGHT, "Marching Cubes", nullptr, nullptr);
         glfwSetWindowUserPointer(_window, this);
         glfwSetFramebufferSizeCallback(_window, [](GLFWwindow* window, int width, int height) {
             auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
@@ -324,7 +141,8 @@ private:
             throw std::runtime_error("Unable to build program");
         }
 
-        appendGeometry(vec3(0));
+        buildTriangleData(_rawTriangleConsumer, _wedges);
+        buildTriangleData(_indexedTriangleConsumer, _wedges);
 
         //
         // some constant GL state
@@ -353,13 +171,10 @@ private:
 
     void onKeyPress(int key, int scancode, int mods)
     {
-        const int space = glfwGetKeyScancode(GLFW_KEY_SPACE);
-        const int enter = glfwGetKeyScancode(GLFW_KEY_ENTER);
-        if (scancode == space) {
-            _createOffset += 1.1;
-            _buildAnother = true;
-        } else if (scancode == enter) {
-            modifyExistingGeometry();
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
+            ++_wedges;
+            buildTriangleData(_rawTriangleConsumer, _wedges);
+            buildTriangleData(_indexedTriangleConsumer, _wedges);
         }
     }
 
@@ -369,74 +184,54 @@ private:
 
     void drawFrame()
     {
-        if (_buildAnother) {
-            appendGeometry(vec3(_createOffset, 0, 0));
-            _buildAnother = false;
-        }
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float elapsedSeconds = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-        //
-        //  Position target at origin, spinning a bit
-        //
-
-        const float xAngle = elapsedSeconds * M_PI * 0;
-        const float yAngle = elapsedSeconds * M_PI * 0;
-        const float zAngle = elapsedSeconds * M_PI * 0;
-        const vec3 target(0, 0, 0);
-        _model = rotate(rotate(rotate(translate(mat4(1), target), zAngle, vec3(0, 0, 1)), yAngle, vec3(0, 1, 0)), xAngle, vec3(1, 0, 0));
-
-        //
-        //  Make camera look at cube
-        //
-
-        _view = lookAt(vec3(0, 1, -4), target, vec3(0, 1, 0));
-        const mat4 mvp = _proj * _view * _model;
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        auto view = lookAt(vec3(0, 1, -4), vec3(0, 0, 0), vec3(0, 1, 0));
+        auto model = translate(mat4(1), vec3(-1.2, 0, 0));
+        auto mvp = _proj * view * model;
 
         glUseProgram(_program.program);
         glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        _rawTriangleConsumer.draw();
 
-        _storage.draw();
+        model = translate(mat4(1), vec3(+1.2, 0, 0));
+        mvp = _proj * view * model;
+        glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        _indexedTriangleConsumer.draw();
     }
 
-    void appendGeometry(vec3 offset)
+    void buildTriangleData(ITriangleConsumer& consumer, int wedges)
     {
-        auto vertices = std::vector<Vertex> {
-            { { -0.5f, -0.5f, 0 }, { 1.0f, 0.0f, 0.0f } },
-            { { 0.5f, -0.5f, 0 }, { 0.0f, 1.0f, 0.0f } },
-            { { 0.5f, 0.5f, 0 }, { 0.0f, 0.0f, 1.0f } },
-            { { -0.5f, 0.5f, 0 }, { 1.0f, 1.0f, 1.0f } }
-        };
+        Vertex center = { { 0, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } };
+        float wedgeAngle = static_cast<float>(M_PI * 2 / wedges);
+        float angle = 0;
+        float radius = 1;
+        float hue = 0;
+        float hueIncrement = 360.0F / static_cast<float>(wedges - 1);
 
-        for (auto& v : vertices) {
-            v.pos += offset;
+        consumer.start();
+
+        for (int i = 0; i < wedges; i++) {
+
+            vec3 a = vec3(cos(angle), sin(angle), 0) * radius;
+            vec3 aColor = static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F }));
+
+            angle += wedgeAngle;
+            hue += hueIncrement;
+
+            vec3 b = vec3(cos(angle), sin(angle), 0) * radius;
+            vec3 bColor = static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F }));
+            Vertex av = { a, aColor, { 0, 0, 1 } };
+            Vertex bv = { b, bColor, { 0, 0, 1 } };
+
+            consumer.addTriangle(Triangle { center, av, bv });
         }
 
-        auto indices = std::vector<GLuint> {
-            0, 1, 2, 2, 3, 0
-        };
-
-        GLuint indexOffset = static_cast<GLuint>(_vertices.size());
-        for (auto& i : indices) {
-            i += indexOffset;
-        }
-
-        _vertices.insert(_vertices.end(), vertices.begin(), vertices.end());
-        _indices.insert(_indices.end(), indices.begin(), indices.end());
-        _storage.update(_vertices, _indices);
-    }
-
-    void modifyExistingGeometry()
-    {
-        for (auto& v : _vertices) {
-            v.pos.x += 0.1f;
-        }
-
-        _storage.update(_vertices);
+        consumer.finish();
     }
 };
 
