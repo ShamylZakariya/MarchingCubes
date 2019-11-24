@@ -19,6 +19,9 @@ struct Triangle {
         , b(b)
         , c(c)
     {
+        this->a.barycentric = {1,0,0};
+        this->b.barycentric = {0,1,0};
+        this->c.barycentric = {0,0,1};
     }
 
     Triangle(const Triangle& other)

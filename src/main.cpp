@@ -215,7 +215,7 @@ private:
 
     void buildTriangleData(ITriangleConsumer& consumer, int wedges)
     {
-        Vertex center = { { 0, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, {1,0,0} };
+        Vertex center = { { 0, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } };
         float wedgeAngle = static_cast<float>(M_PI * 2 / wedges);
         float angle = 0;
         float radius = 1;
@@ -234,8 +234,8 @@ private:
 
             vec3 b = vec3(cos(angle), sin(angle), 0) * radius;
             vec3 bColor = static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F }));
-            Vertex av = { a, aColor, { 0, 0, 1 }, {0,1,0} };
-            Vertex bv = { b, bColor, { 0, 0, 1 }, {0,0,1} };
+            Vertex av = { a, aColor, { 0, 0, 1 } };
+            Vertex bv = { b, bColor, { 0, 0, 1 } };
 
             consumer.addTriangle(Triangle { center, av, bv });
         }
