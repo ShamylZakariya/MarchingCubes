@@ -79,9 +79,13 @@ private:
 
     ProgramState _program;
     TriangleConsumer _rawTriangleConsumer;
-    IndexedTriangleConsumer _indexedTriangleConsumer { IndexedTriangleConsumer::Strategy::Basic };
+    IndexedTriangleConsumer _indexedTriangleConsumer_Basic { IndexedTriangleConsumer::Strategy::Basic };
+    IndexedTriangleConsumer _indexedTriangleConsumer_NormalSmoothing { IndexedTriangleConsumer::Strategy::NormalSmoothing };
+    std::vector<ITriangleConsumer*> _consumers = { &_rawTriangleConsumer, &_indexedTriangleConsumer_Basic, &_indexedTriangleConsumer_NormalSmoothing };
+    
     int _wedges = 4;
     bool _wireframe = true;
+    bool _smoothColor = true;
 
     mat4 _proj = mat4(1);
 
@@ -144,8 +148,7 @@ private:
             throw std::runtime_error("Unable to build program");
         }
 
-        buildTriangleData(_rawTriangleConsumer, _wedges);
-        buildTriangleData(_indexedTriangleConsumer, _wedges);
+        buildTriangleData();
 
         //
         // some constant GL state
@@ -178,10 +181,12 @@ private:
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
             ++_wedges;
-            buildTriangleData(_rawTriangleConsumer, _wedges);
-            buildTriangleData(_indexedTriangleConsumer, _wedges);
+            buildTriangleData();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_W)) {
             _wireframe = !_wireframe;
+        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_S)) {
+            _smoothColor = !_smoothColor;
+            buildTriangleData();
         }
     }
 
@@ -197,30 +202,39 @@ private:
         auto currentTime = std::chrono::high_resolution_clock::now();
         float elapsedSeconds = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-        auto view = lookAt(vec3(0, 1, -4), vec3(0, 0, 0), vec3(0, 1, 0));
-        auto model = translate(mat4(1), vec3(-1.2, 0, 0));
-        auto mvp = _proj * view * model;
-
+        auto view = lookAt(vec3(0, 0, -6), vec3(0, 0, 0), vec3(0, 1, 0));
+        
         glUseProgram(_program.program);
         glUniform1f(_program.uniformLocWireframe, _wireframe ? 1 : 0);
         
-        glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-        _rawTriangleConsumer.draw();
-
-        model = translate(mat4(1), vec3(+1.2, 0, 0));
-        mvp = _proj * view * model;
-        glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-        _indexedTriangleConsumer.draw();
+        float sidestep = 2.2;
+        float left = -(sidestep * (_consumers.size() - 1)) / 2;
+        for (auto &c : _consumers) {
+            auto model = translate(mat4(1), vec3(left, 0, 0));
+            auto mvp = _proj * view * model;
+            
+            glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+            c->draw();
+            
+            left += sidestep;
+        }
+    }
+    
+    void buildTriangleData() {
+        for (auto c : _consumers) {
+            buildTriangleData(*c, _wedges, _smoothColor);
+        }
     }
 
-    void buildTriangleData(ITriangleConsumer& consumer, int wedges)
+    void buildTriangleData(ITriangleConsumer& consumer, int wedges, bool smoothColor)
     {
-        Vertex center = { { 0, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } };
+        vec3 centerColor = {1,0,1};
+        Vertex center = { { 0, 0, 0 }, centerColor, { 0, 0, 1 } };
         float wedgeAngle = static_cast<float>(M_PI * 2 / wedges);
         float angle = 0;
         float radius = 1;
         float hue = 0;
-        float hueIncrement = 360.0F / static_cast<float>(wedges - 1);
+        float hueIncrement = 360.0F / static_cast<float>(wedges);
 
         consumer.start();
 
@@ -233,11 +247,12 @@ private:
             hue += hueIncrement;
 
             vec3 b = vec3(cos(angle), sin(angle), 0) * radius;
-            vec3 bColor = static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F }));
+            vec3 bColor = smoothColor ? static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F })) : aColor;
             Vertex av = { a, aColor, { 0, 0, 1 } };
             Vertex bv = { b, bColor, { 0, 0, 1 } };
+            Vertex cv = { center.pos, smoothColor ? centerColor : aColor, center.normal };
 
-            consumer.addTriangle(Triangle { center, av, bv });
+            consumer.addTriangle(Triangle { cv, av, bv });
         }
 
         consumer.finish();
