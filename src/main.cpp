@@ -30,6 +30,7 @@ struct ProgramState {
     GLuint program = 0;
     GLint uniformLocMVP = -1;
     GLint uniformLocModel = -1;
+    GLint uniformLocWireframe = -1;
 
     ~ProgramState()
     {
@@ -43,9 +44,10 @@ struct ProgramState {
         program = util::CreateProgram(vertSrc.c_str(), fragSrc.c_str());
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         uniformLocModel = glGetUniformLocation(program, "uModel");
+        uniformLocWireframe = glGetUniformLocation(program, "uWireframe");
 
         // we're not using uniformLocModel (yet) so it is -1 here
-        return uniformLocMVP >= 0; // && uniformLocModel >= 0;
+        return uniformLocMVP >= 0 && uniformLocWireframe >= 0; // && uniformLocModel >= 0;
     }
 };
 
@@ -78,7 +80,8 @@ private:
     ProgramState _program;
     TriangleConsumer _rawTriangleConsumer;
     IndexedTriangleConsumer _indexedTriangleConsumer { IndexedTriangleConsumer::Strategy::Basic };
-    int _wedges = 10;
+    int _wedges = 4;
+    bool _wireframe = true;
 
     mat4 _proj = mat4(1);
 
@@ -152,6 +155,8 @@ private:
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
         glDisable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         //
         // force update of the _proj matrix
@@ -175,6 +180,8 @@ private:
             ++_wedges;
             buildTriangleData(_rawTriangleConsumer, _wedges);
             buildTriangleData(_indexedTriangleConsumer, _wedges);
+        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_W)) {
+            _wireframe = !_wireframe;
         }
     }
 
@@ -195,6 +202,8 @@ private:
         auto mvp = _proj * view * model;
 
         glUseProgram(_program.program);
+        glUniform1f(_program.uniformLocWireframe, _wireframe ? 1 : 0);
+        
         glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
         _rawTriangleConsumer.draw();
 
@@ -206,7 +215,7 @@ private:
 
     void buildTriangleData(ITriangleConsumer& consumer, int wedges)
     {
-        Vertex center = { { 0, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } };
+        Vertex center = { { 0, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, {1,0,0} };
         float wedgeAngle = static_cast<float>(M_PI * 2 / wedges);
         float angle = 0;
         float radius = 1;
@@ -225,8 +234,8 @@ private:
 
             vec3 b = vec3(cos(angle), sin(angle), 0) * radius;
             vec3 bColor = static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F }));
-            Vertex av = { a, aColor, { 0, 0, 1 } };
-            Vertex bv = { b, bColor, { 0, 0, 1 } };
+            Vertex av = { a, aColor, { 0, 0, 1 }, {0,1,0} };
+            Vertex bv = { b, bColor, { 0, 0, 1 }, {0,0,1} };
 
             consumer.addTriangle(Triangle { center, av, bv });
         }
