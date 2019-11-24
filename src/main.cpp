@@ -63,7 +63,6 @@ struct ProgramState {
     bool build(const std::string& vertSrc, const std::string& fragSrc)
     {
         program = util::CreateProgram(vertSrc.c_str(), fragSrc.c_str());
-        util::CheckGlError("CreateProgram");
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         return uniformLocMVP >= 0;
     }
@@ -99,11 +98,8 @@ public:
 
     void draw()
     {
-        util::CheckGlError("About to bind _vao");
         glBindVertexArray(_vao);
-        util::CheckGlError("About to draw");
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(_numIndices), GL_UNSIGNED_INT, nullptr);
-        util::CheckGlError("Completed drawing");
     }
 
     std::size_t numVertices() const { return _numVertices; }
@@ -133,38 +129,28 @@ public:
 private:
     void _updateVertices(const std::vector<Vertex>& vertices)
     {
+        util::CheckGlError("IndexedVertexStorage::_updateVertices enter");
         if (vertices.size() > _numVertices) {
             auto storageSize = static_cast<std::size_t>(vertices.size() * _growthFactor);
             std::cout << "IndexedVertexStorage::writeVertices resizing Vertex store from " << _numVertices << " to " << storageSize << " to hold " << vertices.size() << " vertices" << std::endl;
             _numVertices = vertices.size();
 
-            util::CheckGlError("About to create new _vertexVboId");
 
             if (_vertexVboId > 0) {
                 glDeleteBuffers(1, &_vertexVboId);
                 _vertexVboId = 0;
-                util::CheckGlError("Deleting old _vertexVboId");
             }
 
             glGenBuffers(1, &_vertexVboId);
-            util::CheckGlError("Creating new _vertexVboId");
-
             glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
-            util::CheckGlError("Binding new _vertexVboId");
 
             glBufferData(
                 GL_ARRAY_BUFFER,
                 sizeof(Vertex) * storageSize,
                 nullptr,
                 GL_STREAM_DRAW);
-            util::CheckGlError("Creating new _vertexVboId");
 
-            glBufferData(
-                GL_ARRAY_BUFFER,
-                sizeof(Vertex) * _numVertices,
-                vertices.data(),
-                GL_STREAM_DRAW);
-            util::CheckGlError("Copying to new _vertexVboId");
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertex) * _numVertices, vertices.data());
 
             glVertexAttribPointer(
                 static_cast<GLuint>(Vertex::AttributeLayout::Pos),
@@ -173,9 +159,7 @@ private:
                 GL_FALSE,
                 sizeof(Vertex),
                 (const GLvoid*)offsetof(Vertex, pos));
-            util::CheckGlError("Configuring Vertex::AttributeLayout::Pos");
             glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Pos));
-            util::CheckGlError("Enabling Vertex::AttributeLayout::Pos");
 
             glVertexAttribPointer(
                 static_cast<GLuint>(Vertex::AttributeLayout::Color),
@@ -184,28 +168,26 @@ private:
                 GL_TRUE,
                 sizeof(Vertex),
                 (const GLvoid*)offsetof(Vertex, color));
-            util::CheckGlError("Configuring Vertex::AttributeLayout::Color");
             glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Color));
-            util::CheckGlError("Enabling Vertex::AttributeLayout::Color");
 
         } else {
             // GPU storage suffices, just copy data over
             _numVertices = vertices.size();
             if (_numVertices > 0) {
-                util::CheckGlError("About update _vertexVboId data with glBufferData");
                 glBindBuffer(GL_ARRAY_BUFFER, _vertexVboId);
-                glBufferData(
+                glBufferSubData(
                     GL_ARRAY_BUFFER,
+                    0,
                     sizeof(Vertex) * _numVertices,
-                    vertices.data(),
-                    GL_STREAM_DRAW);
-                util::CheckGlError("Copied _vertexVboId data with glBufferData");
+                    vertices.data());
             }
         }
+        util::CheckGlError("IndexedVertexStorage::_updateVertices exit");
     }
 
     void _updateIndices(const std::vector<GLuint>& indices)
     {
+        util::CheckGlError("IndexedVertexStorage::_updateIndices enter");
         if (indices.size() > _numIndices) {
             // GPU storage
 
@@ -227,26 +209,19 @@ private:
                 nullptr,
                 GL_STREAM_DRAW);
 
-            glBufferData(
-                GL_ELEMENT_ARRAY_BUFFER,
-                sizeof(GLuint) * _numIndices,
-                indices.data(),
-                GL_STREAM_DRAW);
-
-            util::CheckGlError("Creating new _indexVboId");
+            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(GLuint) * _numIndices, indices.data());
         } else {
             // GPU storage suffices, just copy data over
             _numIndices = indices.size();
             if (_numIndices > 0) {
-                util::CheckGlError("About to update _indexVboId using glBufferData");
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexVboId);
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                glBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
+                    0,
                     sizeof(GLuint) * _numIndices,
-                    indices.data(),
-                    GL_STREAM_DRAW);
-                util::CheckGlError("Updated _indexVboId using glBufferData");
+                    indices.data());
             }
         }
+        util::CheckGlError("IndexedVertexStorage::_updateIndices exit");
     }
 };
 
