@@ -82,7 +82,7 @@ private:
     IndexedTriangleConsumer _indexedTriangleConsumer_Basic { IndexedTriangleConsumer::Strategy::Basic };
     IndexedTriangleConsumer _indexedTriangleConsumer_NormalSmoothing { IndexedTriangleConsumer::Strategy::NormalSmoothing };
     std::vector<ITriangleConsumer*> _consumers = { &_rawTriangleConsumer, &_indexedTriangleConsumer_Basic, &_indexedTriangleConsumer_NormalSmoothing };
-    
+
     int _wedges = 4;
     bool _wireframe = true;
     bool _smoothColor = true;
@@ -203,24 +203,25 @@ private:
         float elapsedSeconds = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         auto view = lookAt(vec3(0, 0, -6), vec3(0, 0, 0), vec3(0, 1, 0));
-        
+
         glUseProgram(_program.program);
         glUniform1f(_program.uniformLocWireframe, _wireframe ? 1 : 0);
-        
+
         float sidestep = 2.2;
         float left = -(sidestep * (_consumers.size() - 1)) / 2;
-        for (auto &c : _consumers) {
+        for (auto& c : _consumers) {
             auto model = translate(mat4(1), vec3(left, 0, 0));
             auto mvp = _proj * view * model;
-            
+
             glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
             c->draw();
-            
+
             left += sidestep;
         }
     }
-    
-    void buildTriangleData() {
+
+    void buildTriangleData()
+    {
         for (auto c : _consumers) {
             buildTriangleData(*c, _wedges, _smoothColor);
         }
@@ -228,7 +229,7 @@ private:
 
     void buildTriangleData(ITriangleConsumer& consumer, int wedges, bool smoothColor)
     {
-        vec3 centerColor = {1,0,1};
+        vec3 centerColor = { 1, 0, 1 };
         Vertex center = { { 0, 0, 0 }, centerColor, { 0, 0, 1 } };
         float wedgeAngle = static_cast<float>(M_PI * 2 / wedges);
         float angle = 0;

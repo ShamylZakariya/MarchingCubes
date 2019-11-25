@@ -19,9 +19,9 @@ struct Triangle {
         , b(b)
         , c(c)
     {
-        this->a.barycentric = {1,0,0};
-        this->b.barycentric = {0,1,0};
-        this->c.barycentric = {0,0,1};
+        this->a.barycentric = { 1, 0, 0 };
+        this->b.barycentric = { 0, 1, 0 };
+        this->c.barycentric = { 0, 0, 1 };
     }
 
     Triangle(const Triangle& other)
@@ -92,13 +92,14 @@ public:
     enum class Strategy {
         // does nothing clever; only merges vertexes if identical
         // this means that adjacent triangles with differing normals
-        // will not be merged.
+        // or colors will not be merged.
         Basic,
 
-        // attempts to merge shared triangle vertexes if their
-        // normal dot products are within a threshold; the color
-        // value of these vertexes will be averaged
-        // TODO(shamyl@gmail.com): Unimplemented!
+        // attempts to merge shared triangle vertexes if the
+        // colors are same but normals are within a threshold.
+        // if normals are within a threshold, the generated
+        // shared vertex will have the average of the contributing
+        // normals
         NormalSmoothing
     };
 
@@ -106,6 +107,7 @@ private:
     std::vector<Vertex> _vertices;
     IndexedVertexStorage _gpuStorage { GL_TRIANGLES };
     Strategy _strategy;
+    float _normalSmoothingDotThreshold = 0.96F; // ~15°
 
 public:
     IndexedTriangleConsumer(Strategy strategy)
@@ -121,6 +123,15 @@ public:
 
     const IndexedVertexStorage& storage() const { return _gpuStorage; }
     IndexedVertexStorage& storage() { return _gpuStorage; }
+
+    /**
+     If triangles share a point, the point will be shared iff the triangle's normals for that point
+     are within this angular difference. In short, this allows automatic smoothing of normals when
+     triangles touch if they have similar normals; but if not, unique vertices will be used.
+     Only applies to Strategy::NormalSmoothing
+     */
+    void setNormalSmoothingCreaseThresholdRadians(float normalSmoothingCreaseThresholdRadians);
+    float normalSmoothingThresholdRadians() const;
 
 private:
     void _stitch_Basic();

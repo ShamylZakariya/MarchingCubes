@@ -28,10 +28,7 @@ struct Vertex {
 
     bool operator==(const Vertex& other) const
     {
-        return pos == other.pos &&
-            color == other.color &&
-            normal == other.normal &&
-            barycentric == other.barycentric;
+        return pos == other.pos && color == other.color && normal == other.normal && barycentric == other.barycentric;
     }
 
     static void bindVertexAttributes();
@@ -48,7 +45,7 @@ struct hash<Vertex> {
         std::size_t h1 = hash<glm::vec3>()(vertex.color);
         std::size_t h2 = hash<glm::vec3>()(vertex.normal);
         std::size_t h3 = hash<glm::vec3>()(vertex.barycentric);
-        
+
         std::size_t r = (h0 ^ (h1 << 1));
         r = (r ^ (h2 << 1));
         r = (r ^ (h3 << 1));
