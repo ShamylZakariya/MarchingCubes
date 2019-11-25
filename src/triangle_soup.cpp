@@ -70,7 +70,7 @@ void IndexedTriangleConsumer::draw() const
 void IndexedTriangleConsumer::setNormalSmoothingCreaseThresholdRadians(float normalSmoothingCreaseThresholdRadians)
 {
     normalSmoothingCreaseThresholdRadians = min(max(normalSmoothingCreaseThresholdRadians, 0.0F), static_cast<float>(M_PI_2));
-    _normalSmoothingDotThreshold = 1.0F - cos(normalSmoothingCreaseThresholdRadians);
+    _normalSmoothingDotThreshold = cos(normalSmoothingCreaseThresholdRadians);
 }
 
 float IndexedTriangleConsumer::normalSmoothingThresholdRadians() const
