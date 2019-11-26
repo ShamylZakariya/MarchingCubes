@@ -6,6 +6,7 @@
 //  Copyright © 2019 Shamyl Zakariya. All rights reserved.
 //
 
+#include "marching_cubes.hpp"
 #include "storage.hpp"
 #include "triangle_soup.hpp"
 #include "util.hpp"
@@ -51,9 +52,71 @@ struct ProgramState {
     }
 };
 
-#pragma mark -
+#pragma mark - Simple IsoSurface Sampler
 
-#pragma mark -
+class Volume : public mc::IIsoSurface {
+public:
+    Volume(vec3 sphereCenter, float sphereRadius, float threshold)
+        : _center(sphereCenter)
+        , _radius(sphereRadius)
+        , _threshold(threshold)
+    {
+    }
+
+    ivec3 size() const override
+    {
+        return _center + vec3(_radius);
+    }
+
+    float valueAt(const vec3& p) const override
+    {
+        float d2 = distance2(p, _center);
+        float min2 = _radius * _radius;
+        if (d2 < min2) {
+            return 1;
+        }
+
+        float max2 = (_radius + _threshold) * (_radius + _threshold);
+        if (d2 > max2) {
+            return 0;
+        }
+
+        float d = sqrt(d2) - _radius;
+        return 1 - (d / _threshold);
+    }
+
+private:
+    vec3 _center;
+    float _radius;
+    float _threshold;
+};
+
+class DummyConsumer : public ITriangleConsumer {
+public:
+    DummyConsumer() = default;
+
+    void start() override
+    {
+        _triangleCount = 0;
+    }
+
+    void addTriangle(const Triangle& t) override
+    {
+        _triangleCount++;
+    }
+
+    void finish() override
+    {
+        std::cout << "Consumed " << _triangleCount << " triangles" << std::endl;
+    }
+
+    void draw() const override {}
+
+private:
+    size_t _triangleCount = 0;
+};
+
+#pragma mark - App
 
 class OpenGLCubeApplication {
 public:
@@ -61,6 +124,7 @@ public:
     {
         initWindow();
         initGl();
+        buildMesh();
     }
 
     ~OpenGLCubeApplication() = default;
@@ -78,16 +142,16 @@ private:
     GLFWwindow* _window;
 
     ProgramState _program;
-    TriangleConsumer _rawTriangleConsumer;
-    IndexedTriangleConsumer _indexedTriangleConsumer_Basic { IndexedTriangleConsumer::Strategy::Basic };
-    IndexedTriangleConsumer _indexedTriangleConsumer_NormalSmoothing { IndexedTriangleConsumer::Strategy::NormalSmoothing };
-    std::vector<ITriangleConsumer*> _consumers = { &_rawTriangleConsumer, &_indexedTriangleConsumer_Basic, &_indexedTriangleConsumer_NormalSmoothing };
+    TriangleConsumer _mcTriangleConsumer;
 
-    int _wedges = 4;
+    bool _mouseButtonState[3] = { false, false, false };
+    vec2 _lastMousePosition { -1 };
     bool _wireframe = true;
     bool _smoothColor = true;
 
-    mat4 _proj = mat4(1);
+    mat4 _proj { 1 };
+    mat4 _model { 1 };
+    float _cameraZPosition = -4;
 
 private:
     void initWindow()
@@ -116,6 +180,35 @@ private:
                 app->onKeyRelease(key, scancode, mods);
                 break;
             }
+        });
+
+        glfwSetMouseButtonCallback(_window, [](GLFWwindow* window, int button, int action, int mods) {
+            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            switch (action) {
+            case GLFW_PRESS:
+                app->onMouseDown(button, mods);
+                break;
+            case GLFW_RELEASE:
+                app->onMouseUp(button, mods);
+                break;
+            }
+        });
+
+        glfwSetScrollCallback(_window, [](GLFWwindow* window, double xOffset, double yOffset) {
+            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            app->onMouseWheel(vec2(xOffset, yOffset));
+        });
+
+        glfwSetCursorPosCallback(_window, [](GLFWwindow* window, double xPos, double yPos) {
+            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            vec2 pos { xPos, yPos };
+            if (app->_lastMousePosition != vec2 { -1 }) {
+                vec2 delta = pos - app->_lastMousePosition;
+                app->onMouseMove(pos, delta);
+            } else {
+                app->onMouseMove(pos, vec2 { 0 });
+            }
+            app->_lastMousePosition = pos;
         });
 
         glfwMakeContextCurrent(_window);
@@ -148,8 +241,6 @@ private:
             throw std::runtime_error("Unable to build program");
         }
 
-        buildTriangleData();
-
         //
         // some constant GL state
         //
@@ -157,7 +248,7 @@ private:
         glClearColor(0.2f, 0.2f, 0.22f, 0.0f);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
-        glDisable(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -180,13 +271,11 @@ private:
     void onKeyPress(int key, int scancode, int mods)
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
-            ++_wedges;
-            buildTriangleData();
+            // do something
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_W)) {
             _wireframe = !_wireframe;
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_S)) {
             _smoothColor = !_smoothColor;
-            buildTriangleData();
         }
     }
 
@@ -194,69 +283,62 @@ private:
     {
     }
 
+    void onMouseMove(const vec2& pos, const vec2& delta)
+    {
+        if (_mouseButtonState[0]) {
+            // simple x/y trackball
+            float trackballSpeed = 0.004 * M_PI;
+            mat4 xRot = rotate(mat4(1), -1 * delta.y * trackballSpeed, vec3(1, 0, 0));
+            mat4 yRot = rotate(mat4(1), 1 * delta.x * trackballSpeed, vec3(0, 1, 0));
+            _model = xRot * yRot * _model;
+        }
+    }
+
+    void onMouseDown(int button, int mods)
+    {
+        if (button < 3) {
+            _mouseButtonState[button] = true;
+        }
+    }
+
+    void onMouseUp(int button, int mods)
+    {
+        if (button < 3) {
+            _mouseButtonState[button] = false;
+        }
+    }
+
+    void onMouseWheel(const vec2& scrollOffset)
+    {
+        // move camera forward/backward
+        float cameraDollySpeed = 0.1F;
+        _cameraZPosition += cameraDollySpeed * -scrollOffset.y;
+        _cameraZPosition = min(_cameraZPosition, 0.01F);
+    }
+
     void drawFrame()
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        static auto startTime = std::chrono::high_resolution_clock::now();
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float elapsedSeconds = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        auto view = lookAt(vec3(0, 0, -6), vec3(0, 0, 0), vec3(0, 1, 0));
-
         glUseProgram(_program.program);
         glUniform1f(_program.uniformLocWireframe, _wireframe ? 1 : 0);
 
-        float sidestep = 2.2;
-        float left = -(sidestep * (_consumers.size() - 1)) / 2;
-        for (auto& c : _consumers) {
-            auto model = translate(mat4(1), vec3(left, 0, 0));
-            auto mvp = _proj * view * model;
+        auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
+        auto mvp = _proj * view * _model;
 
-            glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-            c->draw();
-
-            left += sidestep;
-        }
+        glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        _mcTriangleConsumer.draw();
     }
 
-    void buildTriangleData()
+    void buildMesh()
     {
-        for (auto c : _consumers) {
-            buildTriangleData(*c, _wedges, _smoothColor);
-        }
-    }
+        auto volume = Volume { vec3(50), 10.0F, 1.0F };
+        auto transform = glm::scale(mat4(1), vec3(1 / 20.0F)) * glm::translate(mat4(1), vec3(-50));
 
-    void buildTriangleData(ITriangleConsumer& consumer, int wedges, bool smoothColor)
-    {
-        vec3 centerColor = { 1, 0, 1 };
-        Vertex center = { { 0, 0, 0 }, centerColor, { 0, 0, 1 } };
-        float wedgeAngle = static_cast<float>(M_PI * 2 / wedges);
-        float angle = 0;
-        float radius = 1;
-        float hue = 0;
-        float hueIncrement = 360.0F / static_cast<float>(wedges);
-
-        consumer.start();
-
-        for (int i = 0; i < wedges; i++) {
-
-            vec3 a = vec3(cos(angle), sin(angle), 0) * radius;
-            vec3 aColor = static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F }));
-
-            angle += wedgeAngle;
-            hue += hueIncrement;
-
-            vec3 b = vec3(cos(angle), sin(angle), 0) * radius;
-            vec3 bColor = smoothColor ? static_cast<vec3>(util::color::Hsv2Rgb(util::color::hsv { hue, 0.8F, 0.8F })) : aColor;
-            Vertex av = { a, aColor, { 0, 0, 1 } };
-            Vertex bv = { b, bColor, { 0, 0, 1 } };
-            Vertex cv = { center.pos, smoothColor ? centerColor : aColor, center.normal };
-
-            consumer.addTriangle(Triangle { cv, av, bv });
-        }
-
-        consumer.finish();
+        auto start = glfwGetTime();
+        mc::march(volume, _mcTriangleConsumer, 0.5F, transform, true);
+        auto end = glfwGetTime();
+        std::cout << "Marching took " << (end - start) << " seconds" << std::endl;
     }
 };
 

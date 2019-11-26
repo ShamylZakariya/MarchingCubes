@@ -115,9 +115,8 @@ struct Vertex_PosColor {
     }
 };
 
-/**
-Looks for best match by normal for v to be merged with one of the vertices referred to by search indices; if none is a good match,
- adds vertex to vertices. Returns the index to use.
+/*
+Looks for best match by normal for v to be merged with one of the vertices referred to by search indices; if none is a good match, adds vertex to vertices. Returns the index to use.
  */
 GLuint addVertex(std::vector<Vertex>& vertices,
     std::vector<uint32_t>& searchIndices,

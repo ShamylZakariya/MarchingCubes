@@ -373,7 +373,6 @@ public:
     }
 
 public:
-    
     vec<3, T, Q> min, max;
 };
 

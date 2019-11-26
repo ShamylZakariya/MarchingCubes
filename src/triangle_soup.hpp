@@ -14,6 +14,13 @@
 struct Triangle {
     Vertex a, b, c;
 
+    Triangle()
+    {
+        a.barycentric = { 1, 0, 0 };
+        b.barycentric = { 0, 1, 0 };
+        c.barycentric = { 0, 0, 1 };
+    }
+
     Triangle(const Vertex& a, const Vertex& b, const Vertex& c)
         : a(a)
         , b(b)
@@ -45,28 +52,28 @@ public:
     ITriangleConsumer() = default;
     virtual ~ITriangleConsumer() = default;
 
-    /**
+    /*
      Signal that a batch of triangles will begin. Clears internal storage.
      */
     virtual void start() = 0;
 
-    /**
+    /*
      Add a triangle to storage
      */
     virtual void addTriangle(const Triangle& t) = 0;
 
-    /**
+    /*
      Signal that batch addition has completed; submits new triangles to GPU
      */
     virtual void finish() = 0;
 
-    /**
+    /*
      Draw the internal storage of triangles
      */
     virtual void draw() const = 0;
 };
 
-/**
+/*
  Consumes triangles and maintaining a non-indexed vertex storage
  */
 class TriangleConsumer : public ITriangleConsumer {
@@ -124,7 +131,7 @@ public:
     const IndexedVertexStorage& storage() const { return _gpuStorage; }
     IndexedVertexStorage& storage() { return _gpuStorage; }
 
-    /**
+    /*
      If triangles share a point, the point will be shared iff the triangle's normals for that point
      are within this angular difference. In short, this allows automatic smoothing of normals when
      triangles touch if they have similar normals; but if not, unique vertices will be used.

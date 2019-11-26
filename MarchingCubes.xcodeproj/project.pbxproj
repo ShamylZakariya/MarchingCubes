@@ -16,6 +16,7 @@
 		634674722374BD4D00275DAC /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 634674712374BD4D00275DAC /* main.cpp */; };
 		6346747A2374D75300275DAC /* libGLEW.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 634674792374D75300275DAC /* libGLEW.dylib */; };
 		6346747C2374D88D00275DAC /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6346747B2374D88D00275DAC /* OpenGL.framework */; };
+		63D4899B238C8DDF0067922E /* marching_cubes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63D48999238C8DDF0067922E /* marching_cubes.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -48,6 +49,8 @@
 		634674712374BD4D00275DAC /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		634674792374D75300275DAC /* libGLEW.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libGLEW.dylib; path = ../../../../../../usr/local/lib/libGLEW.dylib; sourceTree = "<group>"; };
 		6346747B2374D88D00275DAC /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		63D48999238C8DDF0067922E /* marching_cubes.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = marching_cubes.cpp; sourceTree = "<group>"; };
+		63D4899A238C8DDF0067922E /* marching_cubes.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = marching_cubes.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,6 +108,8 @@
 				63101B91238A2F4900AEC8FD /* triangle_soup.cpp */,
 				63101B92238A2F4900AEC8FD /* triangle_soup.hpp */,
 				63101B94238C611500AEC8FD /* aabb.hpp */,
+				63D48999238C8DDF0067922E /* marching_cubes.cpp */,
+				63D4899A238C8DDF0067922E /* marching_cubes.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";
@@ -164,6 +169,7 @@
 				63101B90238A2ABC00AEC8FD /* storage.cpp in Sources */,
 				634674722374BD4D00275DAC /* main.cpp in Sources */,
 				63101B93238A2F4900AEC8FD /* triangle_soup.cpp in Sources */,
+				63D4899B238C8DDF0067922E /* marching_cubes.cpp in Sources */,
 				63101B8D2389DF9B00AEC8FD /* util.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
