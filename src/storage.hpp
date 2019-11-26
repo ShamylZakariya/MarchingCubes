@@ -15,7 +15,7 @@
 
 struct Vertex {
     vec3 pos;
-    vec3 color{1};
+    vec3 color { 1 };
     vec3 normal;
 
     enum class AttributeLayout : GLuint {
