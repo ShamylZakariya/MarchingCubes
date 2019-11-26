@@ -16,9 +16,6 @@ struct Triangle {
 
     Triangle()
     {
-        a.barycentric = { 1, 0, 0 };
-        b.barycentric = { 0, 1, 0 };
-        c.barycentric = { 0, 0, 1 };
     }
 
     Triangle(const Vertex& a, const Vertex& b, const Vertex& c)
@@ -26,9 +23,6 @@ struct Triangle {
         , b(b)
         , c(c)
     {
-        this->a.barycentric = { 1, 0, 0 };
-        this->b.barycentric = { 0, 1, 0 };
-        this->c.barycentric = { 0, 0, 1 };
     }
 
     Triangle(const Triangle& other)

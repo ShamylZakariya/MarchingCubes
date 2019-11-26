@@ -31,7 +31,6 @@ struct ProgramState {
     GLuint program = 0;
     GLint uniformLocMVP = -1;
     GLint uniformLocModel = -1;
-    GLint uniformLocWireframe = -1;
 
     ~ProgramState()
     {
@@ -40,15 +39,11 @@ struct ProgramState {
         }
     }
 
-    bool build(const std::string& vertSrc, const std::string& fragSrc)
+    void build(const std::string& vertSrc, const std::string& fragSrc)
     {
         program = util::CreateProgram(vertSrc.c_str(), fragSrc.c_str());
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         uniformLocModel = glGetUniformLocation(program, "uModel");
-        uniformLocWireframe = glGetUniformLocation(program, "uWireframe");
-
-        // we're not using uniformLocModel (yet) so it is -1 here
-        return uniformLocMVP >= 0 && uniformLocWireframe >= 0; // && uniformLocModel >= 0;
     }
 };
 
@@ -142,12 +137,10 @@ private:
     GLFWwindow* _window;
 
     ProgramState _program;
-    TriangleConsumer _mcTriangleConsumer;
+    IndexedTriangleConsumer _mcTriangleConsumer { IndexedTriangleConsumer::Strategy::Basic };
 
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
-    bool _wireframe = true;
-    bool _smoothColor = true;
 
     mat4 _proj { 1 };
     mat4 _model { 1 };
@@ -237,9 +230,7 @@ private:
         auto fragFile = "shaders/gl/frag.glsl";
         auto vertSrc = util::ReadFile(vertFile);
         auto fragSrc = util::ReadFile(fragFile);
-        if (!_program.build(vertSrc, fragSrc)) {
-            throw std::runtime_error("Unable to build program");
-        }
+        _program.build(vertSrc, fragSrc);
 
         //
         // some constant GL state
@@ -271,11 +262,7 @@ private:
     void onKeyPress(int key, int scancode, int mods)
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
-            // do something
-        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_W)) {
-            _wireframe = !_wireframe;
-        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_S)) {
-            _smoothColor = !_smoothColor;
+            // TODO(shamyl@gmail.com): Modulate the isosurface i guess
         }
     }
 
@@ -321,12 +308,12 @@ private:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(_program.program);
-        glUniform1f(_program.uniformLocWireframe, _wireframe ? 1 : 0);
 
         auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
         auto mvp = _proj * view * _model;
 
         glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        glUniformMatrix4fv(_program.uniformLocModel, 1, GL_FALSE, value_ptr(_model));
         _mcTriangleConsumer.draw();
     }
 

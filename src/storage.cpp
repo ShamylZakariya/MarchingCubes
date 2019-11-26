@@ -39,15 +39,6 @@ void Vertex::bindVertexAttributes()
         sizeof(Vertex),
         (const GLvoid*)offsetof(Vertex, normal));
     glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Normal));
-
-    glVertexAttribPointer(
-        static_cast<GLuint>(Vertex::AttributeLayout::Barycentric),
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        sizeof(Vertex),
-        (const GLvoid*)offsetof(Vertex, barycentric));
-    glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Barycentric));
 }
 
 #pragma mark - Vertex Storage
