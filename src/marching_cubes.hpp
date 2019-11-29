@@ -11,6 +11,7 @@
 
 #include "aabb.hpp"
 #include "triangle_soup.hpp"
+#include "unowned_ptr.hpp"
 #include "util.hpp"
 
 namespace mc {
@@ -45,6 +46,15 @@ public:
 void march(const IIsoSurface& surface,
     ITriangleConsumer& tc,
     float isolevel = 0.5f,
+    const mat4& transform = mat4(1),
+    bool computeNormals = true);
+
+void march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, float isolevel = 0.5, const mat4& transform = mat4(1), bool computeNormals = true);
+
+
+void march_multithreaded(const IIsoSurface& surface,
+    const std::vector<unowned_ptr<ITriangleConsumer>>& tc,
+    float isoLevel = 0.5f,
     const mat4& transform = mat4(1),
     bool computeNormals = true);
 

@@ -10,6 +10,8 @@
 #include "storage.hpp"
 #include "triangle_soup.hpp"
 #include "util.hpp"
+#include "volume.hpp"
+#include "volume_samplers.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -47,140 +49,6 @@ struct ProgramState {
     }
 };
 
-#pragma mark - Simple IsoSurface Sampler
-
-class IVolumeSampler {
-public:
-    enum class Mode {
-        Additive,
-        Subtractive
-    };
-
-public:
-    IVolumeSampler(Mode mode)
-        : _mode(mode)
-    {
-    }
-
-    virtual ~IVolumeSampler() = default;
-
-    Mode mode() const { return _mode; }
-
-    virtual AABB bounds(float falloffThreshold) const = 0;
-    virtual float valueAt(const vec3& p, float falloffThreshold) const = 0;
-
-private:
-    Mode _mode;
-};
-
-class SphereVolumeSampler : public IVolumeSampler {
-public:
-    SphereVolumeSampler(vec3 center, float radius, Mode mode)
-        : IVolumeSampler(mode)
-        , _center(center)
-        , _radius(radius)
-    {
-    }
-    
-    ~SphereVolumeSampler() override = default;
-
-    AABB bounds(float falloffThreshold) const override
-    {
-        return AABB(_center, _radius + falloffThreshold);
-    }
-
-    float valueAt(const vec3& p, float falloffThreshold) const override
-    {
-        float d2 = distance2(p, _center);
-        float min2 = _radius * _radius;
-        if (d2 < min2) {
-            return 1;
-        }
-
-        float max2 = (_radius + falloffThreshold) * (_radius + falloffThreshold);
-        if (d2 > max2) {
-            return 0;
-        }
-
-        float d = sqrt(d2) - _radius;
-        return 1 - (d / falloffThreshold);
-    }
-
-private:
-    vec3 _center;
-    float _radius;
-};
-
-class Volume : public mc::IIsoSurface {
-public:
-    Volume(ivec3 size, float falloffThreshold)
-        : _size(size)
-        , _falloffThreshold(falloffThreshold)
-    {
-    }
-
-    void add(std::unique_ptr<IVolumeSampler>&& sampler)
-    {
-        switch (sampler->mode()) {
-        case IVolumeSampler::Mode::Additive:
-            _additiveSamplers.push_back(std::move(sampler));
-            break;
-        case IVolumeSampler::Mode::Subtractive:
-            _subtractiveSamplers.push_back(std::move(sampler));
-            break;
-        }
-    }
-
-    ivec3 size() const override
-    {
-        return _size;
-    }
-
-    float valueAt(const vec3& p) const override
-    {
-        float v = 0;
-        for (auto& s : _additiveSamplers) {
-            v += s->valueAt(p, _falloffThreshold);
-        }
-
-        for (auto& s : _subtractiveSamplers) {
-            v -= s->valueAt(p, _falloffThreshold);
-        }
-
-        return min(max(v, 0.0F), 1.0F);
-    }
-
-private:
-    ivec3 _size;
-    float _falloffThreshold;
-    std::vector<std::unique_ptr<IVolumeSampler>> _additiveSamplers, _subtractiveSamplers;
-};
-
-class DummyConsumer : public ITriangleConsumer {
-public:
-    DummyConsumer() = default;
-
-    void start() override
-    {
-        _triangleCount = 0;
-    }
-
-    void addTriangle(const Triangle& t) override
-    {
-        _triangleCount++;
-    }
-
-    void finish() override
-    {
-        std::cout << "Consumed " << _triangleCount << " triangles" << std::endl;
-    }
-
-    void draw() const override {}
-
-private:
-    size_t _triangleCount = 0;
-};
-
 #pragma mark - App
 
 class OpenGLCubeApplication {
@@ -189,15 +57,22 @@ public:
     {
         initWindow();
         initGl();
-        buildMesh();
+        buildVolume();
     }
 
     ~OpenGLCubeApplication() = default;
 
     void run()
     {
+        double lastTime = glfwGetTime();
         while (!glfwWindowShouldClose(_window)) {
             glfwPollEvents();
+
+            double now = glfwGetTime();
+            double elapsed = now - lastTime;
+            lastTime = now;
+            step(static_cast<float>(now), static_cast<float>(elapsed));
+
             drawFrame();
             glfwSwapBuffers(_window);
         }
@@ -207,7 +82,7 @@ private:
     GLFWwindow* _window;
 
     ProgramState _program;
-    IndexedTriangleConsumer _mcTriangleConsumer { IndexedTriangleConsumer::Strategy::Basic };
+    TriangleConsumer _mcTriangleConsumer;
 
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
@@ -216,6 +91,12 @@ private:
     mat4 _model { 1 };
     float _cameraZPosition = -4;
     float _falloffThreshold = 1;
+
+    Volume _volume { vec3(50), _falloffThreshold };
+    unowned_ptr<SphereVolumeSampler> _mainShere;
+    unowned_ptr<PlaneVolumeSampler> _plane;
+
+    bool _animateVolume = false;
 
 private:
     void initWindow()
@@ -335,10 +216,12 @@ private:
         if (scancode == glfwGetKeyScancode(GLFW_KEY_LEFT_BRACKET)) {
             _falloffThreshold -= 0.1f;
             _falloffThreshold = max<float>(_falloffThreshold, 0);
-            buildMesh();
+            marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_RIGHT_BRACKET)) {
             _falloffThreshold += 0.1f;
-            buildMesh();
+            marchVolume();
+        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
+            _animateVolume = !_animateVolume;
         }
     }
 
@@ -379,6 +262,24 @@ private:
         _cameraZPosition = min(_cameraZPosition, 0.01F);
     }
 
+    void step(float now, float deltaT)
+    {
+        if (_animateVolume) {
+            const float planeSpeed = 5;
+            auto origin = _plane->planeOrigin();
+            if (origin.y < 0) {
+                origin.y = _volume.size().y;
+            }
+            _plane->setPlaneOrigin(origin + vec3(0, -1, 0) * planeSpeed * deltaT);
+                        
+            float angle = static_cast<float>(2 * M_PI * origin.y / _volume.size().y);
+            vec3 normal { rotate(mat4(1), angle, vec3(1,0,0)) * vec4(0,1,0,1) };
+            _plane->setPlaneNormal(normal);
+            
+            marchVolume();
+        }
+    }
+
     void drawFrame()
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -393,20 +294,25 @@ private:
         _mcTriangleConsumer.draw();
     }
 
-    void buildMesh()
+    void buildVolume()
     {
-        auto volume = Volume { vec3(50), _falloffThreshold };
+        auto size = vec3(_volume.size());
+        auto center = size / 2.0F;
+        _mainShere = _volume.add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
+        _plane = _volume.add(std::make_unique<PlaneVolumeSampler>(center, vec3(0, 1, 0), 4, IVolumeSampler::Mode::Subtractive));
+        updateVolume();
+        marchVolume();
+    }
 
-        volume.add(std::make_unique<SphereVolumeSampler>(vec3(25), 10.0F, SphereVolumeSampler::Mode::Additive));
-        volume.add(std::make_unique<SphereVolumeSampler>(vec3(20), 10.0F, SphereVolumeSampler::Mode::Subtractive));
-        volume.add(std::make_unique<SphereVolumeSampler>(vec3(30,18,20), 7.0F, SphereVolumeSampler::Mode::Subtractive));
+    void updateVolume()
+    {
+    }
 
-        auto transform = glm::scale(mat4(1), vec3(1 / 20.0F)) * glm::translate(mat4(1), -vec3(volume.size()) / 2.0F);
-
-        auto start = glfwGetTime();
-        mc::march(volume, _mcTriangleConsumer, 0.5F, transform, false);
-        auto end = glfwGetTime();
-        std::cout << "Marching took " << (end - start) << " seconds" << std::endl;
+    void marchVolume()
+    {
+        auto size = length(vec3(_volume.size()));
+        auto transform = glm::scale(mat4(1), vec3(2.5 / size)) * glm::translate(mat4(1), -vec3(_volume.size()) / 2.0F);
+        mc::march(_volume, _mcTriangleConsumer, 0.5F, transform, false);
     }
 };
 

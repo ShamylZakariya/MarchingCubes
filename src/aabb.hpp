@@ -379,12 +379,6 @@ public:
 typedef AABB_<float, defaultp> AABB;
 typedef AABB_<int32, defaultp> AABBi;
 
-template <typename T, qualifier Q = defaultp>
-inline bool operator==(const AABB_<T, Q>& a, const AABB_<T, Q>& b)
-{
-    return a.min == b.min && a.max == b.max;
-}
-
 namespace std {
 template <typename T, qualifier Q>
 struct hash<AABB_<T, Q>> {

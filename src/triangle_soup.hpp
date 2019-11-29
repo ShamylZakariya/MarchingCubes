@@ -68,6 +68,36 @@ public:
 };
 
 /*
+ TriangleConsumer which does nothing but record how many triangles were delivered between start() and end();
+ meant for profiling, testing, etc.
+ */
+class CountingTriangleConsumer : public ITriangleConsumer {
+public:
+    CountingTriangleConsumer() = default;
+
+    void start() override
+    {
+        _triangleCount = 0;
+    }
+
+    void addTriangle(const Triangle& t) override
+    {
+        _triangleCount++;
+    }
+
+    void finish() override
+    {
+    }
+
+    void draw() const override {}
+
+    size_t numTriangles() const { return _triangleCount; }
+
+private:
+    size_t _triangleCount = 0;
+};
+
+/*
  Consumes triangles and maintaining a non-indexed vertex storage
  */
 class TriangleConsumer : public ITriangleConsumer {

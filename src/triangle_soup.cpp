@@ -96,7 +96,7 @@ void IndexedTriangleConsumer::_stitch_Basic()
         }
     }
 
-    std::cout << "IndexedTriangleConsumer::_stitch_Basic raw vertex count: " << _vertices.size() << " unique: " << vertices.size() << " indices: " << indices.size() << std::endl;
+    //    std::cout << "IndexedTriangleConsumer::_stitch_Basic raw vertex count: " << _vertices.size() << " unique: " << vertices.size() << " indices: " << indices.size() << std::endl;
 
     _gpuStorage.update(vertices, indices);
 }
@@ -199,7 +199,7 @@ void IndexedTriangleConsumer::_stitch_NormalSmoothing()
         vertices[idx].normal = normalize(vertices[idx].normal);
     }
 
-    std::cout << "IndexedTriangleConsumer::_stitch_NormalSmoothing raw vertex count: " << _vertices.size() << " unique: " << vertices.size() << " indices: " << indices.size() << std::endl;
+    //    std::cout << "IndexedTriangleConsumer::_stitch_NormalSmoothing raw vertex count: " << _vertices.size() << " unique: " << vertices.size() << " indices: " << indices.size() << std::endl;
 
     _gpuStorage.update(vertices, indices);
 }
