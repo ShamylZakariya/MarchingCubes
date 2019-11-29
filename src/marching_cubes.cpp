@@ -6,10 +6,11 @@
 //  Copyright © 2019 Shamyl Zakariya. All rights reserved.
 //
 
-#include <thread>
-
 #include "marching_cubes.hpp"
 #include "marching_cubes_detail.hpp"
+
+#include <chrono>
+#include <iostream>
 
 #pragma mark - IsoSurface
 
@@ -59,7 +60,7 @@ void mc::march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& t
     }
 }
 
-void mc::march_multithreaded(const IIsoSurface& volume,
+void mc::march(const IIsoSurface& volume,
     const std::vector<unowned_ptr<ITriangleConsumer>>& tc,
     float isoLevel,
     const mat4& transform,
@@ -67,25 +68,64 @@ void mc::march_multithreaded(const IIsoSurface& volume,
 {
     auto region = AABBi(ivec3(0), volume.size());
     auto nThreads = tc.size();
-    
+
     // split volume into nThreads slices along Y axis
     int sliceSize = static_cast<int>(ceil(static_cast<float>(volume.size().y) / static_cast<float>(nThreads)));
-    
+
     // start threads to render slices
     std::vector<std::thread> threads;
     threads.reserve(nThreads);
     for (auto i = 0; i < nThreads; i++) {
         tc[i]->start();
-        threads.emplace_back([i, sliceSize,&volume,&tc,region, isoLevel, &transform, computeNormals](){
+        threads.emplace_back([i, sliceSize, &volume, &tc, region, isoLevel, &transform, computeNormals]() {
             AABBi slice = region;
             slice.min.y = i * sliceSize;
             slice.max.y = slice.min.y + sliceSize;
             march(volume, slice, *tc[i], isoLevel, transform, computeNormals);
         });
     }
-    
+
     for (auto i = 0; i < nThreads; i++) {
         threads[i].join();
         tc[i]->finish();
-    }    
+    }
+}
+
+void mc::ThreadedMarcher::march()
+{
+    if (_threads.empty()) {
+        auto region = AABBi(ivec3(0), _surface.size());
+        auto nThreads = _consumers.size();
+
+        // split volume into nThreads slices along Y axis
+        int sliceSize = static_cast<int>(ceil(static_cast<float>(_surface.size().y) / static_cast<float>(nThreads)));
+
+        for (auto i = 0; i < nThreads; i++) {
+            _threads.push_back(std::make_unique<LooperThread>([this, region, sliceSize, i]() {
+                AABBi slice = region;
+                slice.min.y = i * sliceSize;
+                slice.max.y = slice.min.y + sliceSize;
+                ::mc::march(_surface, slice, *_consumers[i], _isoLevel, _transform, _computeNormals);
+            }));
+        }
+        
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(5s);
+    }
+
+    for (auto& tc : _consumers) {
+        tc->start();
+    }
+
+    for (auto& t : _threads) {
+        t->runOnce();
+    }
+
+    for (auto& t : _threads) {
+        t->wait();
+    }
+
+    for (auto& tc : _consumers) {
+        tc->finish();
+    }
 }

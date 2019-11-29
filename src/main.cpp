@@ -17,6 +17,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #pragma mark - Constants
@@ -82,7 +83,7 @@ private:
     GLFWwindow* _window;
 
     ProgramState _program;
-    TriangleConsumer _mcTriangleConsumer;
+    std::vector<std::unique_ptr<ITriangleConsumer>> _triangleConsumers;
 
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
@@ -90,13 +91,14 @@ private:
     mat4 _proj { 1 };
     mat4 _model { 1 };
     float _cameraZPosition = -4;
-    float _falloffThreshold = 1;
 
-    Volume _volume { vec3(50), _falloffThreshold };
+    Volume _volume { vec3(50), 1 };
     unowned_ptr<SphereVolumeSampler> _mainShere;
     unowned_ptr<PlaneVolumeSampler> _plane;
+    std::unique_ptr<mc::ThreadedMarcher> _marcher;
 
-    bool _animateVolume = false;
+    bool _animateVolume = true;
+    bool _useThreadedMarcher = false;
 
 private:
     void initWindow()
@@ -214,11 +216,10 @@ private:
     void onKeyPress(int key, int scancode, int mods)
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_LEFT_BRACKET)) {
-            _falloffThreshold -= 0.1f;
-            _falloffThreshold = max<float>(_falloffThreshold, 0);
+            _volume.setFalloffThreshold(_volume.falloffThreshold() - 0.1F);
             marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_RIGHT_BRACKET)) {
-            _falloffThreshold += 0.1f;
+            _volume.setFalloffThreshold(_volume.falloffThreshold() + 0.1F);
             marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
             _animateVolume = !_animateVolume;
@@ -271,11 +272,11 @@ private:
                 origin.y = _volume.size().y;
             }
             _plane->setPlaneOrigin(origin + vec3(0, -1, 0) * planeSpeed * deltaT);
-                        
+
             float angle = static_cast<float>(2 * M_PI * origin.y / _volume.size().y);
-            vec3 normal { rotate(mat4(1), angle, vec3(1,0,0)) * vec4(0,1,0,1) };
+            vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
             _plane->setPlaneNormal(normal);
-            
+
             marchVolume();
         }
     }
@@ -291,7 +292,9 @@ private:
 
         glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
         glUniformMatrix4fv(_program.uniformLocModel, 1, GL_FALSE, value_ptr(_model));
-        _mcTriangleConsumer.draw();
+        for (auto& tc : _triangleConsumers) {
+            tc->draw();
+        }
     }
 
     void buildVolume()
@@ -300,19 +303,45 @@ private:
         auto center = size / 2.0F;
         _mainShere = _volume.add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
         _plane = _volume.add(std::make_unique<PlaneVolumeSampler>(center, vec3(0, 1, 0), 4, IVolumeSampler::Mode::Subtractive));
-        updateVolume();
-        marchVolume();
-    }
 
-    void updateVolume()
-    {
+        auto nThreads = std::thread::hardware_concurrency();
+        std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
+        
+        for (auto i = 0; i < nThreads; i++) {
+            _triangleConsumers.push_back(std::make_unique<TriangleConsumer>());
+        }
+
+        if (_useThreadedMarcher){
+            auto size = length(vec3(_volume.size()));
+            auto transform = glm::scale(mat4(1), vec3(2.5 / size)) * glm::translate(mat4(1), -vec3(_volume.size()) / 2.0F);
+
+            auto count = _triangleConsumers.size();
+            std::vector<unowned_ptr<ITriangleConsumer>> tcs(count);
+            for (auto i = 0; i < count; i++) {
+                tcs[i] = _triangleConsumers[i].get();
+            }
+
+            _marcher = std::make_unique<mc::ThreadedMarcher>(
+                _volume, tcs, 0.5F, transform, false);
+        }
+        marchVolume();
     }
 
     void marchVolume()
     {
-        auto size = length(vec3(_volume.size()));
-        auto transform = glm::scale(mat4(1), vec3(2.5 / size)) * glm::translate(mat4(1), -vec3(_volume.size()) / 2.0F);
-        mc::march(_volume, _mcTriangleConsumer, 0.5F, transform, false);
+        if (_useThreadedMarcher) {
+            _marcher->march();
+        } else {
+            auto size = length(vec3(_volume.size()));
+            auto transform = glm::scale(mat4(1), vec3(2.5 / size)) * glm::translate(mat4(1), -vec3(_volume.size()) / 2.0F);
+
+            auto count = _triangleConsumers.size();
+            std::vector<unowned_ptr<ITriangleConsumer>> tcs(count);
+            for (auto i = 0; i < count; i++) {
+                tcs[i] = _triangleConsumers[i].get();
+            }
+            mc::march(_volume, tcs, 0.5F, transform, false);
+        }
     }
 };
 

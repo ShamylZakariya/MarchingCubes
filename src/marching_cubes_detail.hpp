@@ -11,7 +11,6 @@
 
 #include "util.hpp"
 
-
 namespace mc::detail {
 
 /*

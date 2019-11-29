@@ -87,6 +87,9 @@ public:
         return min(max(v, 0.0F), 1.0F);
     }
 
+    void setFalloffThreshold(float ft) { _falloffThreshold = max<float>(ft, 0); }
+    float falloffThreshold() const { return _falloffThreshold; }
+
 private:
     ivec3 _size;
     float _falloffThreshold;
