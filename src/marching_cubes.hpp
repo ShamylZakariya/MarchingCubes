@@ -9,14 +9,8 @@
 #ifndef marching_cubes_hpp
 #define marching_cubes_hpp
 
-#include <iostream>
-#include <condition_variable>
-#include <mutex>
-#include <thread>
-
 #include "aabb.hpp"
 #include "triangle_soup.hpp"
-#include "unowned_ptr.hpp"
 #include "util.hpp"
 
 namespace mc {
@@ -48,130 +42,62 @@ public:
 
 #pragma mark - Marching
 
-void march(const IIsoSurface& surface,
-    ITriangleConsumer& tc,
-    float isolevel = 0.5f,
+/*
+ March entire volume passing generated triangles into triangleConsumer
+ volume: The volume to march
+ triangleConsumer: Receives each generated triangle
+ transform: A transform to apply to each generated vertex
+ computeNormals: If true, vertex normals will be computed via IIsoSurface::normalAt; else, generated triangle normals will be used
+ */
+void march(const IIsoSurface& volume,
+    ITriangleConsumer& triangleConsumer,
     const mat4& transform = mat4(1),
     bool computeNormals = true);
 
-void march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, float isolevel = 0.5, const mat4& transform = mat4(1), bool computeNormals = true);
+/*
+ March subregion of a volume passing generated triangles into triangleConsumer
+ volume: The volume to march
+ region: The subregion to march
+ triangleConsumer: Receives each generated triangle
+ transform: A transform to apply to each generated vertex
+ computeNormals: If true, vertex normals will be computed via IIsoSurface::normalAt; else, generated triangle normals will be used
+ */
+void march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, const mat4& transform = mat4(1), bool computeNormals = true);
 
-void march(const IIsoSurface& surface,
-    const std::vector<unowned_ptr<ITriangleConsumer>>& tc,
-    float isoLevel = 0.5f,
-    const mat4& transform = mat4(1),
-    bool computeNormals = true);
-
-namespace {
-    class LooperThread {
-    public:
-        LooperThread(std::function<void()> &&work, int affinity = -1)
-            : _work(std::move(work))
-            , _affinity(affinity)
-        {
-            launchThread();
-        }
-
-        ~LooperThread()
-        {
-            std::lock_guard<std::mutex> threadLock(_threadMutex);
-            terminateThread();
-        }
-
-        void runOnce()
-        {
-            std::cout << "runOnce()" << std::endl;
-            std::lock_guard<std::mutex> lock(_workMutex);
-            _runRequested = true;
-            std::cout << "runOnce() - set runRequested, notifying..." << std::endl;
-            _workCondition.notify_all();
-        }
-
-        void wait()
-        {
-            std::unique_lock<std::mutex> lock(_waitMutex);
-            _waitCondition.wait(lock);
-        }
-
-    private:
-        void launchThread()
-        {
-            std::lock_guard<std::mutex> threadLock(_threadMutex);
-            if (_thread.joinable()) {
-                terminateThread();
-            }
-            _thread = std::thread([this]() {
-                if (_affinity >= 0) {
-                    // not available on macos!?
-                }
-                threadLoop();
-            });
-        }
-
-        void terminateThread()
-        {
-            {
-                std::lock_guard<std::mutex> workLock(_workMutex);
-                _isActive = false;
-                _workCondition.notify_all();
-            }
-            _thread.join();
-        }
-
-        void threadLoop()
-        {
-            std::lock_guard<std::mutex> lock(_workMutex);
-            while (_isActive) {
-                std::cout << "Waiting on _workCondition" << std::endl;
-                _workCondition.wait(_workMutex, [this](){ return _runRequested || !_isActive; });
-
-                _work();
-                _runRequested = false;
-                _waitCondition.notify_all();
-            }
-        }
-
-        int _affinity = -1;
-        std::mutex _threadMutex;
-        std::thread _thread;
-
-        std::mutex _workMutex;
-        std::function<void()> _work;
-        bool _isActive = true;
-        bool _runRequested = false;
-        std::condition_variable_any _workCondition;
-
-        std::mutex _waitMutex;
-        std::condition_variable_any _waitCondition;
-    };
-}
-
+/*
+ Marches a volume using a thread pool where each thread processes one "slice" of the volume.
+ volume: The volume to march
+ triangleConsumers: Each consumer receives a slice of the marched volume
+ transform: A transform to apply to each generated vertex
+ computeNormals: If true, vertex normals will be computed via IIsoSurface::normalAt; else, generated triangle normals will be used
+ */
 class ThreadedMarcher {
 public:
-    ThreadedMarcher(const IIsoSurface& surface,
-        const std::vector<unowned_ptr<ITriangleConsumer>>& tc,
-        float isoLevel = 0.5f,
+    ThreadedMarcher(const IIsoSurface& volume,
+        const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers,
         const mat4& transform = mat4(1),
-        bool computeNormals = true)
-        : _surface(surface)
-        , _consumers(tc)
-        , _isoLevel(isoLevel)
-        , _transform(transform)
-        , _computeNormals(computeNormals)
-    {
-    }
+        bool computeNormals = true);
 
     ~ThreadedMarcher() = default;
 
+    /*
+     March the current state of the volume; the triangle consumers
+     which were passed during construction will be updated with new
+     geometry.
+     Note: ITriangleConsumer::start() and ITriangleConsumer::finish()
+     will be called on the calling thread; ITriangleConsumer::addTriangle()
+     will be called via a dedicated thread owned by the internal pool.
+     */
     void march();
 
 private:
-    const IIsoSurface& _surface;
+    const IIsoSurface& _volume;
     std::vector<unowned_ptr<ITriangleConsumer>> _consumers;
-    std::vector<std::unique_ptr<LooperThread>> _threads;
-    float _isoLevel;
+    std::unique_ptr<ThreadPool> _threads;
     mat4 _transform;
     bool _computeNormals;
+    std::size_t _nThreads;
+    std::vector<AABBi> _slices;
 };
 
 }

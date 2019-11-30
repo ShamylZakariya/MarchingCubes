@@ -28,6 +28,9 @@
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/norm.hpp>
 
+#include "unowned_ptr.hpp"
+#include "thread_pool.hpp"
+
 using namespace glm;
 
 namespace util {

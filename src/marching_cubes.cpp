@@ -9,12 +9,13 @@
 #include "marching_cubes.hpp"
 #include "marching_cubes_detail.hpp"
 
-#include <chrono>
-#include <iostream>
+namespace mc {
+
+constexpr float IsoLevel = 0.5F;
 
 #pragma mark - IsoSurface
 
-vec3 mc::IIsoSurface::normalAt(const vec3& p) const
+vec3 IIsoSurface::normalAt(const vec3& p) const
 {
     // from GPUGems 3 Chap 1 -- compute normal of voxel space
     const float d = 0.1f;
@@ -28,18 +29,18 @@ vec3 mc::IIsoSurface::normalAt(const vec3& p) const
 
 #pragma mark - March!
 
-void mc::march(const mc::IIsoSurface& volume, ITriangleConsumer& tc, float isolevel, const mat4& transform, bool computeNormals)
+void march(const IIsoSurface& volume, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
 {
     tc.start();
-    march(volume, AABBi(ivec3(0), volume.size()), tc, isolevel, transform, computeNormals);
+    march(volume, AABBi(ivec3(0), volume.size()), tc, transform, computeNormals);
     tc.finish();
 }
 
-void mc::march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, float isolevel, const mat4& transform, bool computeNormals)
+void march(const IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
 {
-    using mc::detail::GetGridCell;
-    using mc::detail::GridCell;
-    using mc::detail::Polygonise;
+    using detail::GetGridCell;
+    using detail::GridCell;
+    using detail::Polygonise;
 
     Triangle triangles[5];
     GridCell cell;
@@ -51,7 +52,7 @@ void mc::march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& t
         for (int y = region.min.y; y < region.max.y; y++) {
             for (int x = region.min.x; x < region.max.x; x++) {
                 if (GetGridCell(x, y, z, volume, cell, transform)) {
-                    for (int t = 0, nTriangles = Polygonise(cell, isolevel, volume, triangles, computeNormals); t < nTriangles; t++) {
+                    for (int t = 0, nTriangles = Polygonise(cell, IsoLevel, volume, triangles, computeNormals); t < nTriangles; t++) {
                         tc.addTriangle(triangles[t]);
                     }
                 }
@@ -60,72 +61,50 @@ void mc::march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& t
     }
 }
 
-void mc::march(const IIsoSurface& volume,
+
+#pragma mark - ThreadedMarcher
+
+ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     const std::vector<unowned_ptr<ITriangleConsumer>>& tc,
-    float isoLevel,
     const mat4& transform,
     bool computeNormals)
+    : _volume(volume)
+    , _consumers(tc)
+    , _transform(transform)
+    , _computeNormals(computeNormals)
+    , _nThreads(_consumers.size())
+    , _slices(_nThreads)
 {
-    auto region = AABBi(ivec3(0), volume.size());
-    auto nThreads = tc.size();
+    // build thread pool with _nThreads and CPU pinning
+    _threads = std::make_unique<ThreadPool>(_nThreads, true);
 
-    // split volume into nThreads slices along Y axis
-    int sliceSize = static_cast<int>(ceil(static_cast<float>(volume.size().y) / static_cast<float>(nThreads)));
-
-    // start threads to render slices
-    std::vector<std::thread> threads;
-    threads.reserve(nThreads);
-    for (auto i = 0; i < nThreads; i++) {
-        tc[i]->start();
-        threads.emplace_back([i, sliceSize, &volume, &tc, region, isoLevel, &transform, computeNormals]() {
-            AABBi slice = region;
-            slice.min.y = i * sliceSize;
-            slice.max.y = slice.min.y + sliceSize;
-            march(volume, slice, *tc[i], isoLevel, transform, computeNormals);
-        });
-    }
+    // cut _volume into _slices
+    auto region = AABBi(ivec3(0), _volume.size());
+    auto nThreads = _consumers.size();
+    auto sliceSize = static_cast<int>(ceil(static_cast<float>(_volume.size().y) / static_cast<float>(nThreads)));
 
     for (auto i = 0; i < nThreads; i++) {
-        threads[i].join();
-        tc[i]->finish();
+        AABBi slice = region;
+        slice.min.y = i * sliceSize;
+        slice.max.y = slice.min.y + sliceSize;
+        _slices[i] = slice;
     }
 }
 
-void mc::ThreadedMarcher::march()
+void ThreadedMarcher::march()
 {
-    if (_threads.empty()) {
-        auto region = AABBi(ivec3(0), _surface.size());
-        auto nThreads = _consumers.size();
-
-        // split volume into nThreads slices along Y axis
-        int sliceSize = static_cast<int>(ceil(static_cast<float>(_surface.size().y) / static_cast<float>(nThreads)));
-
-        for (auto i = 0; i < nThreads; i++) {
-            _threads.push_back(std::make_unique<LooperThread>([this, region, sliceSize, i]() {
-                AABBi slice = region;
-                slice.min.y = i * sliceSize;
-                slice.max.y = slice.min.y + sliceSize;
-                ::mc::march(_surface, slice, *_consumers[i], _isoLevel, _transform, _computeNormals);
-            }));
-        }
-        
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(5s);
+    for (auto i = 0; i < _nThreads; i++) {
+        _consumers[i]->start();
+        _threads->enqueue([this, i]() {
+            mc::march(_volume, _slices[i], *_consumers[i], _transform, _computeNormals);
+        });
     }
 
-    for (auto& tc : _consumers) {
-        tc->start();
-    }
+    _threads->wait();
 
-    for (auto& t : _threads) {
-        t->runOnce();
+    for (auto i = 0; i < _nThreads; i++) {
+        _consumers[i]->finish();
     }
+}
 
-    for (auto& t : _threads) {
-        t->wait();
-    }
-
-    for (auto& tc : _consumers) {
-        tc->finish();
-    }
 }

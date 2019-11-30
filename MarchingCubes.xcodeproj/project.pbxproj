@@ -49,6 +49,7 @@
 		634674712374BD4D00275DAC /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		634674792374D75300275DAC /* libGLEW.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libGLEW.dylib; path = ../../../../../../usr/local/lib/libGLEW.dylib; sourceTree = "<group>"; };
 		6346747B2374D88D00275DAC /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		6391A8792392DB2400485562 /* thread_pool.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = thread_pool.hpp; sourceTree = "<group>"; };
 		63D48999238C8DDF0067922E /* marching_cubes.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = marching_cubes.cpp; sourceTree = "<group>"; };
 		63D4899A238C8DDF0067922E /* marching_cubes.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = marching_cubes.hpp; sourceTree = "<group>"; };
 		63D4899E238EDB740067922E /* volume.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = volume.hpp; sourceTree = "<group>"; };
@@ -118,6 +119,7 @@
 				63101B8B2389DF6000AEC8FD /* util.hpp */,
 				63D489A2238EDFF00067922E /* volume_samplers.hpp */,
 				63D4899E238EDB740067922E /* volume.hpp */,
+				6391A8792392DB2400485562 /* thread_pool.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";

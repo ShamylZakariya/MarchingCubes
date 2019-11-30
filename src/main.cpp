@@ -98,7 +98,6 @@ private:
     std::unique_ptr<mc::ThreadedMarcher> _marcher;
 
     bool _animateVolume = true;
-    bool _useThreadedMarcher = false;
 
 private:
     void initWindow()
@@ -306,42 +305,30 @@ private:
 
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
-        
+
         for (auto i = 0; i < nThreads; i++) {
             _triangleConsumers.push_back(std::make_unique<TriangleConsumer>());
         }
 
-        if (_useThreadedMarcher){
+        {
+            // create a transform to map our _volume to the origin, and be of reasonable size
             auto size = length(vec3(_volume.size()));
             auto transform = glm::scale(mat4(1), vec3(2.5 / size)) * glm::translate(mat4(1), -vec3(_volume.size()) / 2.0F);
 
-            auto count = _triangleConsumers.size();
-            std::vector<unowned_ptr<ITriangleConsumer>> tcs(count);
-            for (auto i = 0; i < count; i++) {
-                tcs[i] = _triangleConsumers[i].get();
+            // make a vector of unowned for _marcher to access
+            std::vector<unowned_ptr<ITriangleConsumer>> tcs;
+            for (auto& tc : _triangleConsumers) {
+                tcs.push_back(tc.get());
             }
 
             _marcher = std::make_unique<mc::ThreadedMarcher>(
-                _volume, tcs, 0.5F, transform, false);
+                _volume, tcs, transform, false);
         }
-        marchVolume();
     }
 
     void marchVolume()
     {
-        if (_useThreadedMarcher) {
-            _marcher->march();
-        } else {
-            auto size = length(vec3(_volume.size()));
-            auto transform = glm::scale(mat4(1), vec3(2.5 / size)) * glm::translate(mat4(1), -vec3(_volume.size()) / 2.0F);
-
-            auto count = _triangleConsumers.size();
-            std::vector<unowned_ptr<ITriangleConsumer>> tcs(count);
-            for (auto i = 0; i < count; i++) {
-                tcs[i] = _triangleConsumers[i].get();
-            }
-            mc::march(_volume, tcs, 0.5F, transform, false);
-        }
+        _marcher->march();
     }
 };
 
