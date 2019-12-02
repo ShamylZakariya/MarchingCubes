@@ -272,7 +272,7 @@ private:
             }
             _plane->setPlaneOrigin(origin + vec3(0, -1, 0) * planeSpeed * deltaT);
 
-            float angle = static_cast<float>(2 * M_PI * origin.y / _volume.size().y);
+            float angle = static_cast<float>(M_PI * origin.y / _volume.size().y);
             vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
             _plane->setPlaneNormal(normal);
 
