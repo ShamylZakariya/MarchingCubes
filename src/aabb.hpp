@@ -9,11 +9,7 @@
 #ifndef AABB_h
 #define AABB_h
 
-#define GLM_FORCE_RADIANS
-#define GLM_ENABLE_EXPERIMENTAL
-
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
 
 #include <algorithm>
@@ -311,28 +307,6 @@ public:
     {
         min += p;
         max += p;
-    }
-
-    /*
-        Translate this AABB_ by m
-        What this means is translate the box represented and create a new
-        AABB_ which contains that box.
-    */
-    void transform(const mat<4, 4, T, Q>& m)
-    {
-        vec<3, T, Q> points[8];
-        boundaryPoints(points);
-
-        invalidate();
-
-        add(m * points[0]);
-        add(m * points[1]);
-        add(m * points[2]);
-        add(m * points[3]);
-        add(m * points[4]);
-        add(m * points[5]);
-        add(m * points[6]);
-        add(m * points[7]);
     }
 
     /*

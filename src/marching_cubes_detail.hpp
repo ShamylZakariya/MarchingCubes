@@ -68,9 +68,6 @@ public:
 
 vec3 VertexInterp(float isolevel, const vec3& p1, const vec3& p2, float valp1, float valp2)
 {
-    float mu;
-    vec3 p;
-
     if (std::abs(isolevel - valp1) < EPSILON)
         return p1;
 
@@ -80,12 +77,8 @@ vec3 VertexInterp(float isolevel, const vec3& p1, const vec3& p2, float valp1, f
     if (std::abs(valp1 - valp2) < EPSILON)
         return p1;
 
-    mu = (isolevel - valp1) / (valp2 - valp1);
-    p.x = p1.x + mu * (p2.x - p1.x);
-    p.y = p1.y + mu * (p2.y - p1.y);
-    p.z = p1.z + mu * (p2.z - p1.z);
-
-    return p;
+    auto mu = (isolevel - valp1) / (valp2 - valp1);
+    return mix(p1, p2, mu);
 }
 
 constexpr int edgeTable[256] = {
