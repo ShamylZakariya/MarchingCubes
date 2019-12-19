@@ -32,11 +32,11 @@ vec3 IIsoSurface::normalAt(const vec3& p) const
 void march(const IIsoSurface& volume, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
 {
     tc.start();
-    march(volume, AABBi(ivec3(0), volume.size()), tc, transform, computeNormals);
+    march(volume, iAABB(ivec3(0), volume.size()), tc, transform, computeNormals);
     tc.finish();
 }
 
-void march(const IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
+void march(const IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
 {
     using detail::GetGridCell;
     using detail::GridCell;
@@ -61,7 +61,6 @@ void march(const IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, const
     }
 }
 
-
 #pragma mark - ThreadedMarcher
 
 ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
@@ -79,12 +78,12 @@ ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     _threads = std::make_unique<ThreadPool>(_nThreads, true);
 
     // cut _volume into _slices
-    auto region = AABBi(ivec3(0), _volume.size());
+    auto region = iAABB(ivec3(0), _volume.size());
     auto nThreads = _consumers.size();
     auto sliceSize = static_cast<int>(ceil(static_cast<float>(_volume.size().y) / static_cast<float>(nThreads)));
 
     for (auto i = 0; i < nThreads; i++) {
-        AABBi slice = region;
+        iAABB slice = region;
         slice.min.y = i * sliceSize;
         slice.max.y = slice.min.y + sliceSize;
         _slices[i] = slice;

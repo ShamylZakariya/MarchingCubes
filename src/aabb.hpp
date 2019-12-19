@@ -351,7 +351,7 @@ public:
 };
 
 typedef AABB_<float, defaultp> AABB;
-typedef AABB_<int32, defaultp> AABBi;
+typedef AABB_<int32, defaultp> iAABB;
 
 namespace std {
 template <typename T, qualifier Q>

@@ -92,7 +92,7 @@ private:
     mat4 _model { 1 };
     float _cameraZPosition = -4;
 
-    Volume _volume { vec3(50), 1 };
+    std::unique_ptr<OctreeVolume> _volume;
     unowned_ptr<SphereVolumeSampler> _mainShere;
     unowned_ptr<PlaneVolumeSampler> _plane;
     std::unique_ptr<mc::ThreadedMarcher> _marcher;
@@ -215,10 +215,10 @@ private:
     void onKeyPress(int key, int scancode, int mods)
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_LEFT_BRACKET)) {
-            _volume.setFalloffThreshold(_volume.falloffThreshold() - 0.1F);
+            _volume->setFalloffThreshold(_volume->falloffThreshold() - 0.1F);
             marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_RIGHT_BRACKET)) {
-            _volume.setFalloffThreshold(_volume.falloffThreshold() + 0.1F);
+            _volume->setFalloffThreshold(_volume->falloffThreshold() + 0.1F);
             marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
             _animateVolume = !_animateVolume;
@@ -267,12 +267,13 @@ private:
         if (_animateVolume) {
             const float planeSpeed = 5;
             auto origin = _plane->planeOrigin();
+            auto height = _volume->size().y;
             if (origin.y < 0) {
-                origin.y = _volume.size().y;
+                origin.y = height;
             }
             _plane->setPlaneOrigin(origin + vec3(0, -1, 0) * planeSpeed * deltaT);
 
-            float angle = static_cast<float>(M_PI * origin.y / _volume.size().y);
+            float angle = static_cast<float>(M_PI * origin.y / height);
             vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
             _plane->setPlaneNormal(normal);
 
@@ -298,10 +299,12 @@ private:
 
     void buildVolume()
     {
-        auto size = vec3(_volume.size());
+        _volume = std::make_unique<OctreeVolume>(64, 1, 4);
+
+        auto size = vec3(_volume->size());
         auto center = size / 2.0F;
-        _mainShere = _volume.add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
-        _plane = _volume.add(std::make_unique<PlaneVolumeSampler>(center, vec3(0, 1, 0), 4, IVolumeSampler::Mode::Subtractive));
+        _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
+        _plane = _volume->add(std::make_unique<PlaneVolumeSampler>(center, vec3(0, 1, 0), 4, IVolumeSampler::Mode::Subtractive));
 
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
@@ -312,8 +315,8 @@ private:
 
         {
             // create a transform to map our _volume to the origin, and be of reasonable size
-            auto size = length(vec3(_volume.size()));
-            auto transform = glm::scale(mat4(1), vec3(2.5 / size)) * glm::translate(mat4(1), -vec3(_volume.size()) / 2.0F);
+            auto diagonal = length(vec3(size));
+            auto transform = glm::scale(mat4(1), vec3(2.5 / diagonal)) * glm::translate(mat4(1), -vec3(diagonal) / 2.0F);
 
             // make a vector of unowned for _marcher to access
             std::vector<unowned_ptr<ITriangleConsumer>> tcs;
@@ -321,8 +324,7 @@ private:
                 tcs.push_back(tc.get());
             }
 
-            _marcher = std::make_unique<mc::ThreadedMarcher>(
-                _volume, tcs, transform, false);
+            _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), tcs, transform, false);
         }
     }
 

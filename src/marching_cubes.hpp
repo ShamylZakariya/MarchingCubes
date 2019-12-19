@@ -62,7 +62,7 @@ void march(const IIsoSurface& volume,
  transform: A transform to apply to each generated vertex
  computeNormals: If true, vertex normals will be computed via IIsoSurface::normalAt; else, generated triangle normals will be used
  */
-void march(const mc::IIsoSurface& volume, AABBi region, ITriangleConsumer& tc, const mat4& transform = mat4(1), bool computeNormals = true);
+void march(const mc::IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const mat4& transform = mat4(1), bool computeNormals = true);
 
 /*
  Marches a volume using a thread pool where each thread processes one "slice" of the volume.
@@ -97,7 +97,7 @@ private:
     mat4 _transform;
     bool _computeNormals;
     std::size_t _nThreads;
-    std::vector<AABBi> _slices;
+    std::vector<iAABB> _slices;
 };
 
 }
