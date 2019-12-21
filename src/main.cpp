@@ -304,7 +304,7 @@ private:
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
         _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
-        _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(center, vec3(0, 1, 0), 4, IVolumeSampler::Mode::Subtractive));
+        _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
 
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
@@ -326,6 +326,8 @@ private:
 
             _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), tcs, transform, false);
         }
+
+        _volume->update();
     }
 
     void marchVolume()

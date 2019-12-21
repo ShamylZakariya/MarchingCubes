@@ -10,7 +10,9 @@
 #define volume_hpp
 
 #include <array>
+#include <map>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "aabb.hpp"
@@ -40,7 +42,7 @@ public:
      Return true iff bounds intersects the region affected by this sampler
     */
     virtual bool test(const AABB bounds) const = 0;
-    
+
     /*
      Return the amount a given point in space is "inside" the volume. The
      fuzziness is a gradient to allow for smoothing. For
@@ -92,16 +94,16 @@ public:
 
     float valueAt(const vec3& p) const override
     {
-// TODO(shamyl@gmail.com): Adapt the smooth-min functions; they're meant
-// for SDF; but the idea is applicable here.
-//        float v = 0;
-//        for (auto& s : _additiveSamplers) {
-//            v = smin(v, s->valueAt(p, _falloffThreshold), 10.0f);
-//        }
-//
-//        for (auto& s : _subtractiveSamplers) {
-//            v = smin(v, -s->valueAt(p, _falloffThreshold), 10.0f);
-//        }
+        // TODO(shamyl@gmail.com): Adapt the smooth-min functions; they're meant
+        // for SDF; but the idea is applicable here.
+        //        float v = 0;
+        //        for (auto& s : _additiveSamplers) {
+        //            v = smin(v, s->valueAt(p, _falloffThreshold), 10.0f);
+        //        }
+        //
+        //        for (auto& s : _subtractiveSamplers) {
+        //            v = smin(v, -s->valueAt(p, _falloffThreshold), 10.0f);
+        //        }
 
         float v = 0;
         for (auto& s : _additiveSamplers) {
@@ -119,7 +121,6 @@ public:
     float fuzziness() const { return _fuzziness; }
 
 protected:
-
     // polynomial smooth min
     // https://www.iquilezles.org/www/articles/smin/smin.htm
     static inline float smin(float a, float b, float k)
@@ -138,7 +139,7 @@ protected:
 
     virtual void onVolumeSamplerAdded(IVolumeSampler* sampler) {}
 
-private:
+protected:
     ivec3 _size;
     float _fuzziness;
     std::vector<IVolumeSampler*> _additiveSamplers, _subtractiveSamplers;
@@ -155,9 +156,24 @@ public:
 
     void update()
     {
-        // perform a postorder traversal; starting with leaves, for each
-        // leaf set its march to true iff it intersects a sampler; then
-        // on the up-pass, for each node, set march == all-8-children march == true
+        // find the nodes which should be marched
+        _nodesToMarch.clear();
+        collect(_root.get(), _nodesToMarch);
+
+        int totalToMarch = 0;
+        std::map<int, int> hist;
+        for (auto node : _nodesToMarch) {
+            hist[node->depth]++;
+            auto bb = node->bounds;
+            totalToMarch += bb.size().x * bb.size().y * bb.size().z;
+        }
+
+        int totalVoxels = size().x * size().y * size().z;
+        std::cout << "Would march " << totalToMarch << " voxels of max " << totalVoxels << std::endl;
+
+        for (auto p : hist) {
+            std::cout << p.second << " nodes at depth: " << p.first << std::endl;
+        }
     }
 
 protected:
@@ -170,9 +186,62 @@ protected:
 
         iAABB bounds;
         int depth;
-        bool march = false;
+        bool isLeaf = false;
         std::array<std::unique_ptr<Node>, 8> children;
+        std::unordered_set<IVolumeSampler*> additiveSamplers;
+        std::unordered_set<IVolumeSampler*> subtractiveSamplers;
     };
+
+    bool collect(Node* currentNode, std::vector<Node*>& nodesToMarch) const
+    {
+        currentNode->additiveSamplers.clear();
+        currentNode->subtractiveSamplers.clear();
+
+        if (currentNode->isLeaf) {
+            // only perform tests on leaf nodes
+            for (const auto sampler : _additiveSamplers) {
+                if (sampler->test(currentNode->bounds)) {
+                    currentNode->additiveSamplers.insert(sampler);
+                }
+            }
+
+            for (const auto sampler : _subtractiveSamplers) {
+                if (sampler->test(currentNode->bounds)) {
+                    currentNode->subtractiveSamplers.insert(sampler);
+                }
+            }
+        } else {
+            int occupied = 0;
+            for (auto& child : currentNode->children) {
+                if (collect(child.get(), nodesToMarch)) {
+                    occupied++;
+                }
+            }
+
+            if (occupied == 8) {
+                // all 8 children have intersected samplers; which means we
+                // can just march the currentNode, and skip the 8 children
+
+                // remove the 8 children from nodesToMarch
+                for (int i = 0; i < 8; i++) {
+                    nodesToMarch.pop_back();
+                }
+
+                // copy up their samplers
+                for (auto& child : currentNode->children) {
+                    currentNode->additiveSamplers.insert(std::begin(child->additiveSamplers), std::end(child->additiveSamplers));
+                    currentNode->subtractiveSamplers.insert(std::begin(child->subtractiveSamplers), std::end(child->subtractiveSamplers));
+                }
+            }
+        }
+
+        if (!currentNode->additiveSamplers.empty() || !currentNode->subtractiveSamplers.empty()) {
+            nodesToMarch.push_back(currentNode);
+            return true;
+        }
+
+        return false;
+    }
 
     static std::unique_ptr<Node> buildOctreeNode(iAABB bounds, int minNodeSize, int depth)
     {
@@ -181,10 +250,13 @@ protected:
         // we're working on cubes, so only one bounds size is checked
         int size = bounds.size().x;
         if (size / 2 >= minNodeSize) {
+            node->isLeaf = false;
             auto childBounds = octreeSubdivide(bounds);
             for (size_t i = 0, N = childBounds.size(); i < N; i++) {
                 node->children[i] = buildOctreeNode(childBounds[i], minNodeSize, depth + 1);
             }
+        } else {
+            node->isLeaf = true;
         }
 
         return node;
@@ -209,6 +281,7 @@ protected:
 
 private:
     std::unique_ptr<Node> _root;
+    std::vector<Node*> _nodesToMarch;
 };
 
 #endif /* volume_hpp */

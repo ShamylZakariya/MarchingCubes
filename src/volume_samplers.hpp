@@ -28,14 +28,16 @@ public:
 
     ~SphereVolumeSampler() override = default;
 
-    bool test(const AABB bounds) const override {
+    bool test(const AABB bounds) const override
+    {
         return _bounds.intersect(bounds) != AABB::Intersection::Outside;
     }
-    
+
     float valueAt(const vec3& p, float fuzziness) const override
     {
         float d2 = distance2(p, _position);
-        float min2 = (_radius - fuzziness) * (_radius - fuzziness);
+        float innerRadius = _radius - fuzziness;
+        float min2 = innerRadius * innerRadius;
         if (d2 < min2) {
             return 1;
         }
@@ -45,23 +47,30 @@ public:
             return 0;
         }
 
-        float d = sqrt(d2) - _radius;
+        float d = sqrt(d2) - innerRadius;
         return 1 - (d / fuzziness);
     }
 
-    void setPosition(const vec3& center) { _position = center; updateBounds(); }
-    void setRadius(float radius) { _radius = max<float>(radius, 0); updateBounds(); }
+    void setPosition(const vec3& center)
+    {
+        _position = center;
+        updateBounds();
+    }
+    void setRadius(float radius)
+    {
+        _radius = max<float>(radius, 0);
+        updateBounds();
+    }
     vec3 position() const { return _position; }
     float radius() const { return _radius; }
 
 private:
-    
-    void updateBounds() {
+    void updateBounds()
+    {
         _bounds = AABB(_position, _radius);
     }
-    
+
 private:
-    
     vec3 _position;
     float _radius;
     AABB _bounds;
@@ -82,20 +91,21 @@ public:
     {
     }
 
-    bool test(const AABB bounds) const override {
+    bool test(const AABB bounds) const override
+    {
         float halfThickness = _thickness * 0.5F;
-        
+
         // quick test for early exit
         float dist = abs(dot(_normal, bounds.center() - _origin)) - halfThickness;
         float dist2 = dist * dist;
         if (dist2 > bounds.radius2()) {
             return false;
         }
-        
+
         // we need to see if the bounds actually intersects
         int onPositiveSide = 0;
         int onNegativeSide = 0;
-        for (const auto &v : bounds.vertices()) {
+        for (const auto& v : bounds.vertices()) {
             float signedDistance = dot(_normal, v - _origin);
 
             if (abs(signedDistance) < halfThickness) {
@@ -107,14 +117,14 @@ public:
             } else {
                 onNegativeSide++;
             }
-            
+
             // if we have vertices on both sides of the plane
             // we have an intersection
             if (onPositiveSide && onNegativeSide) {
                 return true;
             }
         }
-        
+
         return false;
     }
 
@@ -122,15 +132,16 @@ public:
     {
         // distance of p from plane
         float dist = abs(dot(_normal, p - _origin));
-        float halfThickness = _thickness * 0.5F;
+        float outerDist = _thickness * 0.5F;
+        float innerDist = outerDist - fuzziness;
 
-        if (dist <= halfThickness - fuzziness) {
+        if (dist <= innerDist) {
             return 1;
-        } else if (dist > halfThickness) {
+        } else if (dist > outerDist) {
             return 0;
         }
-        dist -= halfThickness;
-        return 1 - (dist / fuzziness);
+
+        return 1 - ((dist - innerDist) / fuzziness);
     }
 
     void setPlaneOrigin(const vec3 planeOrigin) { _origin = planeOrigin; }

@@ -10,11 +10,11 @@
 #define AABB_h
 
 #include <glm/glm.hpp>
-#include <glm/gtx/norm.hpp>
 #include <glm/gtx/hash.hpp>
+#include <glm/gtx/norm.hpp>
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <limits>
 
 using namespace glm;
@@ -40,13 +40,12 @@ public:
     {
     }
 
-    template<typename V>
+    template <typename V>
     AABB_(const AABB_<V, Q>& other)
         : min(other.min)
         , max(other.max)
     {
     }
-
 
     AABB_(const vec<3, T, Q>& min, const vec<3, T, Q>& max)
         : min(min)
@@ -121,7 +120,7 @@ public:
     {
         return glm::length((max - min) * 0.5F);
     }
-    
+
     /*
         return the squared radius of the sphere that would exactly enclose this AABB_
     */
@@ -322,7 +321,7 @@ public:
     {
         return (point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y && point.z >= min.z && point.z <= max.z);
     }
-    
+
     std::array<vec<3, T, Q>, 8> vertices() const
     {
         return std::array<vec<3, T, Q>, 8> {
