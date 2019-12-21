@@ -94,7 +94,7 @@ private:
 
     std::unique_ptr<OctreeVolume> _volume;
     unowned_ptr<SphereVolumeSampler> _mainShere;
-    unowned_ptr<PlaneVolumeSampler> _plane;
+    unowned_ptr<BoundedPlaneVolumeSampler> _plane;
     std::unique_ptr<mc::ThreadedMarcher> _marcher;
 
     bool _animateVolume = true;
@@ -215,10 +215,10 @@ private:
     void onKeyPress(int key, int scancode, int mods)
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_LEFT_BRACKET)) {
-            _volume->setFalloffThreshold(_volume->falloffThreshold() - 0.1F);
+            _volume->setFuzziness(_volume->fuzziness() - 0.1F);
             marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_RIGHT_BRACKET)) {
-            _volume->setFalloffThreshold(_volume->falloffThreshold() + 0.1F);
+            _volume->setFuzziness(_volume->fuzziness() + 0.1F);
             marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
             _animateVolume = !_animateVolume;
@@ -304,7 +304,7 @@ private:
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
         _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
-        _plane = _volume->add(std::make_unique<PlaneVolumeSampler>(center, vec3(0, 1, 0), 4, IVolumeSampler::Mode::Subtractive));
+        _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(center, vec3(0, 1, 0), 4, IVolumeSampler::Mode::Subtractive));
 
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;

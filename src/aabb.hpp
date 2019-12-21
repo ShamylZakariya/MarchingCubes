@@ -10,8 +10,10 @@
 #define AABB_h
 
 #include <glm/glm.hpp>
+#include <glm/gtx/norm.hpp>
 #include <glm/gtx/hash.hpp>
 
+#include <array>
 #include <algorithm>
 #include <limits>
 
@@ -38,11 +40,13 @@ public:
     {
     }
 
-    AABB_(const AABB_<T, Q>& other)
+    template<typename V>
+    AABB_(const AABB_<V, Q>& other)
         : min(other.min)
         , max(other.max)
     {
     }
+
 
     AABB_(const vec<3, T, Q>& min, const vec<3, T, Q>& max)
         : min(min)
@@ -115,13 +119,15 @@ public:
     */
     T radius(void) const
     {
-        T xSize(max.x - min.x), ySize(max.y - min.y), zSize(max.z - min.z);
-
-        xSize /= 2;
-        ySize /= 2;
-        zSize /= 2;
-
-        return sqrt(xSize * xSize + ySize * ySize + zSize * zSize);
+        return glm::length((max - min) * 0.5F);
+    }
+    
+    /*
+        return the squared radius of the sphere that would exactly enclose this AABB_
+    */
+    T radius2(void) const
+    {
+        return glm::length2((max - min) * 0.5F);
     }
 
     /*
@@ -315,6 +321,20 @@ public:
     bool contains(const vec<3, T, Q>& point) const
     {
         return (point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y && point.z >= min.z && point.z <= max.z);
+    }
+    
+    std::array<vec<3, T, Q>, 8> vertices() const
+    {
+        return std::array<vec<3, T, Q>, 8> {
+            vec<3, T, Q>(min.x, min.y, min.z),
+            vec<3, T, Q>(min.x, min.y, max.z),
+            vec<3, T, Q>(max.x, min.y, max.z),
+            vec<3, T, Q>(max.x, min.y, min.z),
+            vec<3, T, Q>(min.x, max.y, min.z),
+            vec<3, T, Q>(min.x, max.y, max.z),
+            vec<3, T, Q>(max.x, max.y, max.z),
+            vec<3, T, Q>(max.x, max.y, min.z)
+        };
     }
 
     /*
