@@ -18,7 +18,6 @@
 		6316D8EC23AED956008549C7 /* libmc.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 6316D8DB23AED8E7008549C7 /* libmc.a */; };
 		634674672374BD1A00275DAC /* libglfw.3.4.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 633D34BE23557844001CF7FD /* libglfw.3.4.dylib */; };
 		6346746B2374BD1A00275DAC /* shaders in CopyFiles */ = {isa = PBXBuildFile; fileRef = 633D34D2235B8492001CF7FD /* shaders */; };
-		6346746C2374BD1A00275DAC /* textures in CopyFiles */ = {isa = PBXBuildFile; fileRef = 633D34D4235E0B74001CF7FD /* textures */; };
 		634674722374BD4D00275DAC /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 634674712374BD4D00275DAC /* main.cpp */; };
 		6346747A2374D75300275DAC /* libGLEW.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 634674792374D75300275DAC /* libGLEW.dylib */; };
 		6346747C2374D88D00275DAC /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6346747B2374D88D00275DAC /* OpenGL.framework */; };
@@ -43,7 +42,6 @@
 			dstSubfolderSpec = 16;
 			files = (
 				6346746B2374BD1A00275DAC /* shaders in CopyFiles */,
-				6346746C2374BD1A00275DAC /* textures in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,7 +62,6 @@
 		633D34BE23557844001CF7FD /* libglfw.3.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libglfw.3.4.dylib; path = "../../../../../../usr/local/Cellar/glfw/HEAD-d252483/lib/libglfw.3.4.dylib"; sourceTree = "<group>"; };
 		633D34C0235578BB001CF7FD /* libvulkan.1.1.121.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libvulkan.1.1.121.dylib; path = ../../../../../../usr/local/lib/libvulkan.1.1.121.dylib; sourceTree = "<group>"; };
 		633D34D2235B8492001CF7FD /* shaders */ = {isa = PBXFileReference; lastKnownFileType = folder; path = shaders; sourceTree = "<group>"; };
-		633D34D4235E0B74001CF7FD /* textures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = textures; sourceTree = "<group>"; };
 		634674702374BD1A00275DAC /* MarchingCubes */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MarchingCubes; sourceTree = BUILT_PRODUCTS_DIR; };
 		634674712374BD4D00275DAC /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		634674792374D75300275DAC /* libGLEW.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libGLEW.dylib; path = ../../../../../../usr/local/lib/libGLEW.dylib; sourceTree = "<group>"; };
@@ -120,7 +117,6 @@
 			isa = PBXGroup;
 			children = (
 				634674622374BCFF00275DAC /* src */,
-				633D34D4235E0B74001CF7FD /* textures */,
 				633D34D2235B8492001CF7FD /* shaders */,
 				6316D8E823AED956008549C7 /* Tests */,
 				633D34B423557766001CF7FD /* Products */,

@@ -148,35 +148,6 @@ protected:
 
 class OctreeVolume : public BaseCompositeVolume {
 public:
-    OctreeVolume(int size, float falloffThreshold, int minNodeSize)
-        : BaseCompositeVolume(ivec3 { size, size, size }, falloffThreshold)
-        , _root(buildOctreeNode(iAABB(ivec3(0, 0, 0), ivec3(size, size, size)), minNodeSize, 0))
-    {
-    }
-
-    void update()
-    {
-        // find the nodes which should be marched
-        _nodesToMarch.clear();
-        collect(_root.get(), _nodesToMarch);
-
-        int totalToMarch = 0;
-        std::map<int, int> hist;
-        for (auto node : _nodesToMarch) {
-            hist[node->depth]++;
-            auto bb = node->bounds;
-            totalToMarch += bb.size().x * bb.size().y * bb.size().z;
-        }
-
-        int totalVoxels = size().x * size().y * size().z;
-        std::cout << "Would march " << totalToMarch << " voxels of max " << totalVoxels << std::endl;
-
-        for (auto p : hist) {
-            std::cout << p.second << " nodes at depth: " << p.first << std::endl;
-        }
-    }
-
-protected:
     struct Node {
         Node(const iAABB bounds, int depth)
             : bounds(bounds)
@@ -192,6 +163,41 @@ protected:
         std::unordered_set<IVolumeSampler*> subtractiveSamplers;
     };
 
+public:
+    OctreeVolume(int size, float falloffThreshold, int minNodeSize)
+        : BaseCompositeVolume(ivec3 { size, size, size }, falloffThreshold)
+        , _root(buildOctreeNode(iAABB(ivec3(0, 0, 0), ivec3(size, size, size)), minNodeSize, 0))
+    {
+    }
+
+    void visitOccupiedNodes(bool update, std::function<void(Node*)> visitor)
+    {
+        if (update) {
+            // find the nodes which should be marched
+            _nodesToMarch.clear();
+            collect(_root.get(), _nodesToMarch);
+        }
+
+        for (auto node : _nodesToMarch) {
+            visitor(node);
+        }
+    }
+
+    void walkOctree(std::function<void(Node*)> visitor)
+    {
+        std::function<void(Node*)> walker = [&visitor, &walker](Node* node) {
+            visitor(node);
+            if (!node->isLeaf) {
+                for (auto& child : node->children) {
+                    walker(child.get());
+                }
+            }
+        };
+
+        walker(_root.get());
+    }
+
+protected:
     bool collect(Node* currentNode, std::vector<Node*>& nodesToMarch) const
     {
         currentNode->additiveSamplers.clear();
