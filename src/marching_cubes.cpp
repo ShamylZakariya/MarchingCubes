@@ -82,8 +82,8 @@ ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     auto nThreads = _consumers.size();
     auto sliceSize = static_cast<int>(ceil(static_cast<float>(_volume.size().y) / static_cast<float>(nThreads)));
 
-    for (auto i = 0; i < nThreads; i++) {
-        iAABB slice = region;
+    for (auto i = 0u; i < nThreads; i++) {
+        AABBi slice = region;
         slice.min.y = i * sliceSize;
         slice.max.y = slice.min.y + sliceSize;
         _slices[i] = slice;
@@ -92,7 +92,7 @@ ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
 
 void ThreadedMarcher::march()
 {
-    for (auto i = 0; i < _nThreads; i++) {
+    for (auto i = 0u; i < _nThreads; i++) {
         _consumers[i]->start();
         _threads->enqueue([this, i]() {
             mc::march(_volume, _slices[i], *_consumers[i], _transform, _computeNormals);
@@ -101,7 +101,7 @@ void ThreadedMarcher::march()
 
     _threads->wait();
 
-    for (auto i = 0; i < _nThreads; i++) {
+    for (auto i = 0u; i < _nThreads; i++) {
         _consumers[i]->finish();
     }
 }
