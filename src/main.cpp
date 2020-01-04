@@ -66,7 +66,7 @@ public:
     void run()
     {
         double lastTime = glfwGetTime();
-        while (!glfwWindowShouldClose(_window)) {
+        while (_running && !glfwWindowShouldClose(_window)) {
             glfwPollEvents();
 
             double now = glfwGetTime();
@@ -98,6 +98,7 @@ private:
     std::unique_ptr<mc::ThreadedMarcher> _marcher;
 
     bool _animateVolume = true;
+    bool _running = true;
 
 private:
     void initWindow()
@@ -167,10 +168,12 @@ private:
         // Kick off glew
         //
 
+        #if __APPLE__
         glewExperimental = true;
         if (glewInit() != GLEW_OK) {
             throw std::runtime_error("Failed to initialize GLEW\n");
         }
+        #endif
 
         std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
         std::cout << "OpenGL version supported: " << glGetString(GL_VERSION) << std::endl;
@@ -208,6 +211,8 @@ private:
 
     void onResize(int width, int height)
     {
+        glViewport(0,0,width,height);
+
         auto aspect = static_cast<float>(width) / static_cast<float>(height);
         _proj = perspective(radians(FOV_DEGREES), aspect, NEAR_PLANE, FAR_PLANE);
     }
@@ -222,6 +227,8 @@ private:
             marchVolume();
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
             _animateVolume = !_animateVolume;
+        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
+            _running = false;
         }
     }
 
@@ -306,7 +313,7 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
 
-        for (auto i = 0; i < nThreads; i++) {
+        for (auto i = 0u; i < nThreads; i++) {
             _triangleConsumers.push_back(std::make_unique<TriangleConsumer>());
         }
 
