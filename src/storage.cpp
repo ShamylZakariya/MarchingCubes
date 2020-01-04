@@ -9,7 +9,9 @@
 #include "storage.hpp"
 #include <iostream>
 
-#pragma mark - Vertex
+//
+// Vertex
+//
 
 void Vertex::bindVertexAttributes()
 {
@@ -41,7 +43,9 @@ void Vertex::bindVertexAttributes()
     glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Normal));
 }
 
-#pragma mark - Vertex Storage
+//
+// Vertex Storage
+//
 
 VertexStorage::~VertexStorage()
 {
@@ -111,7 +115,10 @@ void VertexStorage::_updateVertices(const std::vector<Vertex>& vertices)
     }
     util::CheckGlError("VertexStorage::_updateVertices exit");
 }
-#pragma mark - Indexed Vertex Storage
+
+//
+// Indexed Vertex Storage
+//
 
 IndexedVertexStorage::~IndexedVertexStorage()
 {

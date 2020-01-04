@@ -19,7 +19,9 @@
 #include "marching_cubes.hpp"
 #include "unowned_ptr.hpp"
 
-#pragma mark - VolumeSampler
+//
+// VolumeSampler
+//
 
 class IVolumeSampler {
 public:
@@ -56,7 +58,9 @@ private:
     Mode _mode;
 };
 
-#pragma mark - Volume
+//
+// Volume
+//
 
 class BaseCompositeVolume : public mc::IIsoSurface {
 public:

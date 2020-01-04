@@ -13,7 +13,9 @@ namespace mc {
 
 constexpr float IsoLevel = 0.5F;
 
-#pragma mark - IsoSurface
+//
+// IsoSurface
+//
 
 vec3 IIsoSurface::normalAt(const vec3& p) const
 {
@@ -27,7 +29,9 @@ vec3 IIsoSurface::normalAt(const vec3& p) const
     return -normalize(grad);
 }
 
-#pragma mark - March!
+//
+// March!
+//
 
 void march(const IIsoSurface& volume, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
 {
@@ -61,7 +65,9 @@ void march(const IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const
     }
 }
 
-#pragma mark - ThreadedMarcher
+//
+// ThreadedMarcher
+//
 
 ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     const std::vector<unowned_ptr<ITriangleConsumer>>& tc,

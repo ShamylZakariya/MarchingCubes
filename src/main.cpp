@@ -20,7 +20,9 @@
 #include <thread>
 #include <vector>
 
-#pragma mark - Constants
+//
+// Constants
+//
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -28,7 +30,9 @@ const float NEAR_PLANE = 0.1f;
 const float FAR_PLANE = 1000.0f;
 const float FOV_DEGREES = 50.0F;
 
-#pragma mark - Data
+//
+// Data
+//
 
 struct ProgramState {
     GLuint program = 0;
@@ -50,7 +54,9 @@ struct ProgramState {
     }
 };
 
-#pragma mark - App
+//
+// App
+//
 
 class OpenGLCubeApplication {
 public:
@@ -168,12 +174,12 @@ private:
         // Kick off glew
         //
 
-        #if __APPLE__
+#if __APPLE__
         glewExperimental = true;
         if (glewInit() != GLEW_OK) {
             throw std::runtime_error("Failed to initialize GLEW\n");
         }
-        #endif
+#endif
 
         std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
         std::cout << "OpenGL version supported: " << glGetString(GL_VERSION) << std::endl;
@@ -211,7 +217,7 @@ private:
 
     void onResize(int width, int height)
     {
-        glViewport(0,0,width,height);
+        glViewport(0, 0, width, height);
 
         auto aspect = static_cast<float>(width) / static_cast<float>(height);
         _proj = perspective(radians(FOV_DEGREES), aspect, NEAR_PLANE, FAR_PLANE);
@@ -341,7 +347,9 @@ private:
     }
 };
 
-#pragma mark - Main
+//
+// Main
+//
 
 int main()
 {

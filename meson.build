@@ -1,17 +1,21 @@
 project('MarchingCubes', 'cpp', default_options : [
-    'c_std=c11', 
+    'c_std=c11',
     'cpp_std=c++17'])
 
-thread_dep = dependency('threads')
-epoxy_dep = dependency('epoxy')
-glfw_dep = dependency('glfw3')
-glm_dep = dependency('glm')
+cxx = meson.get_compiler('cpp')
+
+ignored_warnings = [
+    '-Wno-unknown-pragmas',
+    '-Wno-documentation'
+]
+
+add_project_arguments(cxx.get_supported_arguments(ignored_warnings), language: 'cpp')
 
 dependencies = [
-    epoxy_dep,
-    glfw_dep,
-    glm_dep,
-    thread_dep,
+    dependency('epoxy'),
+    dependency('glfw3'),
+    dependency('glm'),
+    dependency('threads'),
 ]
 
 include_dirs = [
@@ -31,8 +35,8 @@ app_sources = [
     'src/main.cpp'
 ]
 
-executable('MarchingCubes', 
-    sources: sources + app_sources, 
+executable('MarchingCubes',
+    sources: sources + app_sources,
     include_directories: include_dirs,
     dependencies: dependencies)
 

@@ -12,7 +12,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#pragma mark - TriangleConsumer
+//
+// TriangleConsumer
+//
 
 void TriangleConsumer::start()
 {
@@ -36,7 +38,9 @@ void TriangleConsumer::draw() const
     _gpuStorage.draw();
 }
 
-#pragma mark - IndexedTriangleConsumer
+//
+// IndexedTriangleConsumer
+//
 
 void IndexedTriangleConsumer::start()
 {

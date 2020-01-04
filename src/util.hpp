@@ -18,15 +18,10 @@
 #include <epoxy/glx.h>
 #endif
 
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
 #include <GLFW/glfw3.h>
-#pragma clang diagnosic pop
 
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
