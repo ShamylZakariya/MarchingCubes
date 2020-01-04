@@ -83,7 +83,7 @@ ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     auto sliceSize = static_cast<int>(ceil(static_cast<float>(_volume.size().y) / static_cast<float>(nThreads)));
 
     for (auto i = 0u; i < nThreads; i++) {
-        AABBi slice = region;
+        iAABB slice = region;
         slice.min.y = i * sliceSize;
         slice.max.y = slice.min.y + sliceSize;
         _slices[i] = slice;

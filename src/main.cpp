@@ -333,8 +333,6 @@ private:
 
             _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), tcs, transform, false);
         }
-
-        _volume->update();
     }
 
     void marchVolume()
