@@ -1,12 +1,6 @@
 [
   {
     "directory": "/home/shamyl/Code/MarchingCubes/build",
-    "command": "c++ -Imeson-out/MarchingCubes@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/MarchingCubes@exe/src_main.cpp.o' -MF 'meson-out/MarchingCubes@exe/src_main.cpp.o.d' -o 'meson-out/MarchingCubes@exe/src_main.cpp.o' -c ../src/main.cpp",
-    "file": "../src/main.cpp",
-    "output": "meson-out/MarchingCubes@exe/src_main.cpp.o"
-  },
-  {
-    "directory": "/home/shamyl/Code/MarchingCubes/build",
     "command": "c++ -Imeson-out/MarchingCubes@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/MarchingCubes@exe/src_marching_cubes.cpp.o' -MF 'meson-out/MarchingCubes@exe/src_marching_cubes.cpp.o.d' -o 'meson-out/MarchingCubes@exe/src_marching_cubes.cpp.o' -c ../src/marching_cubes.cpp",
     "file": "../src/marching_cubes.cpp",
     "output": "meson-out/MarchingCubes@exe/src_marching_cubes.cpp.o"
@@ -28,5 +22,41 @@
     "command": "c++ -Imeson-out/MarchingCubes@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/MarchingCubes@exe/src_util.cpp.o' -MF 'meson-out/MarchingCubes@exe/src_util.cpp.o.d' -o 'meson-out/MarchingCubes@exe/src_util.cpp.o' -c ../src/util.cpp",
     "file": "../src/util.cpp",
     "output": "meson-out/MarchingCubes@exe/src_util.cpp.o"
+  },
+  {
+    "directory": "/home/shamyl/Code/MarchingCubes/build",
+    "command": "c++ -Imeson-out/MarchingCubes@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/MarchingCubes@exe/src_main.cpp.o' -MF 'meson-out/MarchingCubes@exe/src_main.cpp.o.d' -o 'meson-out/MarchingCubes@exe/src_main.cpp.o' -c ../src/main.cpp",
+    "file": "../src/main.cpp",
+    "output": "meson-out/MarchingCubes@exe/src_main.cpp.o"
+  },
+  {
+    "directory": "/home/shamyl/Code/MarchingCubes/build",
+    "command": "c++ -Imeson-out/UnitTests@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/UnitTests@exe/src_marching_cubes.cpp.o' -MF 'meson-out/UnitTests@exe/src_marching_cubes.cpp.o.d' -o 'meson-out/UnitTests@exe/src_marching_cubes.cpp.o' -c ../src/marching_cubes.cpp",
+    "file": "../src/marching_cubes.cpp",
+    "output": "meson-out/UnitTests@exe/src_marching_cubes.cpp.o"
+  },
+  {
+    "directory": "/home/shamyl/Code/MarchingCubes/build",
+    "command": "c++ -Imeson-out/UnitTests@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/UnitTests@exe/src_storage.cpp.o' -MF 'meson-out/UnitTests@exe/src_storage.cpp.o.d' -o 'meson-out/UnitTests@exe/src_storage.cpp.o' -c ../src/storage.cpp",
+    "file": "../src/storage.cpp",
+    "output": "meson-out/UnitTests@exe/src_storage.cpp.o"
+  },
+  {
+    "directory": "/home/shamyl/Code/MarchingCubes/build",
+    "command": "c++ -Imeson-out/UnitTests@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/UnitTests@exe/src_triangle_soup.cpp.o' -MF 'meson-out/UnitTests@exe/src_triangle_soup.cpp.o.d' -o 'meson-out/UnitTests@exe/src_triangle_soup.cpp.o' -c ../src/triangle_soup.cpp",
+    "file": "../src/triangle_soup.cpp",
+    "output": "meson-out/UnitTests@exe/src_triangle_soup.cpp.o"
+  },
+  {
+    "directory": "/home/shamyl/Code/MarchingCubes/build",
+    "command": "c++ -Imeson-out/UnitTests@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/UnitTests@exe/src_util.cpp.o' -MF 'meson-out/UnitTests@exe/src_util.cpp.o.d' -o 'meson-out/UnitTests@exe/src_util.cpp.o' -c ../src/util.cpp",
+    "file": "../src/util.cpp",
+    "output": "meson-out/UnitTests@exe/src_util.cpp.o"
+  },
+  {
+    "directory": "/home/shamyl/Code/MarchingCubes/build",
+    "command": "c++ -Imeson-out/UnitTests@exe -I. -I.. -I../include -I/usr/include/libdrm -fdiagnostics-color=always -pipe -D_FILE_OFFSET_BITS=64 -Wall -Winvalid-pch -Wnon-virtual-dtor -std=c++17 -g -pthread -MD -MQ 'meson-out/UnitTests@exe/tests_unit_tests.cpp.o' -MF 'meson-out/UnitTests@exe/tests_unit_tests.cpp.o.d' -o 'meson-out/UnitTests@exe/tests_unit_tests.cpp.o' -c ../tests/unit/tests.cpp",
+    "file": "../tests/unit/tests.cpp",
+    "output": "meson-out/UnitTests@exe/tests_unit_tests.cpp.o"
   }
 ]
