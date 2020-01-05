@@ -169,18 +169,6 @@ private:
 
     void initGl()
     {
-
-        //
-        // Kick off glew
-        //
-
-#if __APPLE__
-        glewExperimental = true;
-        if (glewInit() != GLEW_OK) {
-            throw std::runtime_error("Failed to initialize GLEW\n");
-        }
-#endif
-
         std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
         std::cout << "OpenGL version supported: " << glGetString(GL_VERSION) << std::endl;
 

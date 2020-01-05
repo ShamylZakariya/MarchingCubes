@@ -1,4 +1,4 @@
-project('MarchingCubes', 'cpp', default_options : [
+project('MarchingCubes', 'cpp', version: '0.1', default_options : [
     'c_std=c11',
     'cpp_std=c++17'])
 
@@ -17,6 +17,12 @@ dependencies = [
     dependency('glm'),
     dependency('threads'),
 ]
+
+if build_machine.system() == 'darwin'
+    dependencies += [
+        dependency('gl')
+    ]
+endif
 
 include_dirs = [
     'include'
