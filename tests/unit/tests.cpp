@@ -16,12 +16,7 @@
 #include "src/volume_samplers.hpp"
 
 using std::make_unique;
-constexpr auto EPSILON = 1e-6F;
-
-bool CloseToEqual(float a, float b, float epsilon)
-{
-    return abs(a - b) <= epsilon;
-}
+using namespace Catch::literals;
 
 TEST_CASE("SphereSampler", "[samplers]")
 {
@@ -33,19 +28,19 @@ TEST_CASE("SphereSampler", "[samplers]")
     SECTION("valueAt")
     {
         // Point inside sphere is inside
-        REQUIRE(sampler.valueAt(vec3(radius / 2, 0, 0), fuzz) == 1);
+        REQUIRE(sampler.valueAt(vec3(radius / 2, 0, 0), fuzz) == 1_a);
 
         // Point outside sphere is outside
-        REQUIRE(sampler.valueAt(vec3(radius * 2, 0, 0), fuzz) == 0);
+        REQUIRE(sampler.valueAt(vec3(radius * 2, 0, 0), fuzz) == 0_a);
 
         // Point on boundary is outside
-        REQUIRE(sampler.valueAt(vec3(radius, 0, 0), fuzz) == 0);
+        REQUIRE(sampler.valueAt(vec3(radius, 0, 0), fuzz) == 0_a);
 
         // Point on inner fuzz boundary is inside
-        REQUIRE(sampler.valueAt(vec3(radius - fuzz, 0, 0), fuzz) == 1);
+        REQUIRE(sampler.valueAt(vec3(radius - fuzz, 0, 0), fuzz) == 1_a);
 
         // Point halfway across fuzz boundary is half in/half out
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(radius - fuzz / 2, 0, 0), fuzz), 0.5F, EPSILON));
+        REQUIRE(sampler.valueAt(vec3(radius - fuzz / 2, 0, 0), fuzz) == 0.5_a);
     }
 
     SECTION("aabb")
@@ -83,39 +78,25 @@ TEST_CASE("PlaneSampler", "[samplers]")
     SECTION("valueAt")
     {
         //Point at origin of bounded plane is inside
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(0, 0, 0), fuzz),
-            1.0F,
-            EPSILON));
+        REQUIRE(sampler.valueAt(vec3(0, 0, 0), fuzz) == 1.0_a);
 
         //Point at halfway across fuzziness boundary is half-inside
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(0, 0.25F, 0), fuzz),
-            0.5F,
-            EPSILON));
+        REQUIRE(sampler.valueAt(vec3(0, 0.25F, 0), fuzz) == 0.5_a);
 
         //Point at halfway across fuzziness boundary is half-inside
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(0, -0.25F, 0), fuzz),
-            0.5F,
-            EPSILON));
+        REQUIRE(sampler.valueAt(vec3(0, -0.25F, 0), fuzz) == 0.5_a);
 
         //Point at fuzziness edge of bounded plane is outside
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(0, 0.5F, 0), fuzz),
-            0.0F,
-            EPSILON));
+        REQUIRE(sampler.valueAt(vec3(0, 0.5F, 0), fuzz) == 0.0_a);
 
         //Point at fuzziness edge of bounded plane is outside
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(0, -0.5F, 0), fuzz),
-            0.0F,
-            EPSILON));
+        REQUIRE(sampler.valueAt(vec3(0, -0.5F, 0), fuzz) == 0.0_a);
 
         //Point beyond fuzziness edge of bounded plane is outside
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(0, 10.0F, 0), fuzz),
-            0.0F,
-            EPSILON));
+        REQUIRE(sampler.valueAt(vec3(0, 10.0F, 0), fuzz) == 0.0_a);
 
         //Point beyond fuzziness edge of bounded plane is outside
-        REQUIRE(CloseToEqual(sampler.valueAt(vec3(0, -10.0F, 0), fuzz),
-            0.0F,
-            EPSILON));
+        REQUIRE(sampler.valueAt(vec3(0, -10.0F, 0), fuzz) == 0.0_a);
     }
 
     SECTION("aabb")
