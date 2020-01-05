@@ -9,19 +9,19 @@
 #ifndef util_h
 #define util_h
 
+#if __APPLE__
 // Silence Apple's OpenGL depecation warnings
 #define GL_SILENCE_DEPRECATION 1
-
 #include <GL/glew.h>
+#else
+#include <epoxy/gl.h>
+#include <epoxy/glx.h>
+#endif
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
 #include <GLFW/glfw3.h>
-#pragma clang diagnosic pop
 
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>

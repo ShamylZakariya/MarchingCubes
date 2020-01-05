@@ -13,7 +13,9 @@ namespace mc {
 
 constexpr float IsoLevel = 0.5F;
 
-#pragma mark - IsoSurface
+//
+// IsoSurface
+//
 
 vec3 IIsoSurface::normalAt(const vec3& p) const
 {
@@ -27,7 +29,9 @@ vec3 IIsoSurface::normalAt(const vec3& p) const
     return -normalize(grad);
 }
 
-#pragma mark - March!
+//
+// March!
+//
 
 void march(const IIsoSurface& volume, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
 {
@@ -61,7 +65,9 @@ void march(const IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const
     }
 }
 
-#pragma mark - ThreadedMarcher
+//
+// ThreadedMarcher
+//
 
 ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     const std::vector<unowned_ptr<ITriangleConsumer>>& tc,
@@ -82,7 +88,7 @@ ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     auto nThreads = _consumers.size();
     auto sliceSize = static_cast<int>(ceil(static_cast<float>(_volume.size().y) / static_cast<float>(nThreads)));
 
-    for (auto i = 0; i < nThreads; i++) {
+    for (auto i = 0u; i < nThreads; i++) {
         iAABB slice = region;
         slice.min.y = i * sliceSize;
         slice.max.y = slice.min.y + sliceSize;
@@ -92,7 +98,7 @@ ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
 
 void ThreadedMarcher::march()
 {
-    for (auto i = 0; i < _nThreads; i++) {
+    for (auto i = 0u; i < _nThreads; i++) {
         _consumers[i]->start();
         _threads->enqueue([this, i]() {
             mc::march(_volume, _slices[i], *_consumers[i], _transform, _computeNormals);
@@ -101,7 +107,7 @@ void ThreadedMarcher::march()
 
     _threads->wait();
 
-    for (auto i = 0; i < _nThreads; i++) {
+    for (auto i = 0u; i < _nThreads; i++) {
         _consumers[i]->finish();
     }
 }

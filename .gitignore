@@ -60,3 +60,7 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# meson build stuff
+build/
+build_release/

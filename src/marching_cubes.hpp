@@ -15,7 +15,9 @@
 
 namespace mc {
 
-#pragma mark - IIsoSurface
+//
+// IIsoSurface
+//
 
 class IIsoSurface {
 public:
@@ -40,7 +42,9 @@ public:
     virtual vec3 normalAt(const vec3& p) const;
 };
 
-#pragma mark - Marching
+//
+// Marching
+//
 
 /*
  March entire volume passing generated triangles into triangleConsumer

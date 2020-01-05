@@ -20,7 +20,9 @@ namespace mc::detail {
 
 constexpr float EPSILON = 1e-5f;
 
-#pragma mark - GridCell
+//
+// GridCell
+//
 
 class GridCell {
 public:
@@ -59,7 +61,9 @@ public:
     }
 };
 
-#pragma mark - MarchingCubes Implementation
+//
+// MarchingCubes Implementation
+//
 
 /*
     Linearly interpolate the position where an isosurface cuts
@@ -518,7 +522,9 @@ int Polygonise(const GridCell& grid, float isolevel, const mc::IIsoSurface& volu
     return numTriangles;
 }
 
-#pragma mark - GridCell Access
+//
+// GridCell Access
+//
 
 bool GetGridCell(int x, int y, int z, const mc::IIsoSurface& volume, GridCell& cell, const mat4& transform)
 {
