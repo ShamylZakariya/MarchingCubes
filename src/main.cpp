@@ -197,10 +197,10 @@ private:
         // force update of the _proj matrix
         //
 
-        int width = 0;
-        int height = 0;
-        glfwGetWindowSize(_window, &width, &height);
-        onResize(width, height);
+        int fbWidth = 0;
+        int fbHeight = 0;
+        glfwGetFramebufferSize(_window, &fbWidth, &fbHeight);
+        onResize(fbWidth, fbHeight);
     }
 
     void onResize(int width, int height)
