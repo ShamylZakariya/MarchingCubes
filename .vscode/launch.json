@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(CodeLLDB) Launch",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/meson-out/MarchingCubes",
+            "preLaunchTask": "build"
+        },
+        {
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
