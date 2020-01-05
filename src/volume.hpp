@@ -10,7 +10,6 @@
 #define volume_hpp
 
 #include <array>
-#include <map>
 #include <memory>
 #include <unordered_set>
 #include <vector>
@@ -198,54 +197,65 @@ public:
     }
 
 protected:
-    bool collect(Node* currentNode, std::vector<Node*>& nodesToMarch) const
-    {
+    bool collect(Node* currentNode, std::vector<Node*>& nodesToMarch) const {
+        /*
+         NOTE: I believe I should probably skip the root node; it will always intersect
+         something; it's not useful. Perhaps we should just manually iterate its 8 children?
+         */
+
         currentNode->additiveSamplers.clear();
         currentNode->subtractiveSamplers.clear();
 
-        if (currentNode->isLeaf) {
-            // only perform tests on leaf nodes
-            for (const auto sampler : _additiveSamplers) {
-                if (sampler->test(currentNode->bounds)) {
-                    currentNode->additiveSamplers.insert(sampler);
-                }
-            }
-
-            for (const auto sampler : _subtractiveSamplers) {
-                if (sampler->test(currentNode->bounds)) {
-                    currentNode->subtractiveSamplers.insert(sampler);
-                }
-            }
-        } else {
-            int occupied = 0;
-            for (auto& child : currentNode->children) {
-                if (collect(child.get(), nodesToMarch)) {
-                    occupied++;
-                }
-            }
-
-            if (occupied == 8) {
-                // all 8 children have intersected samplers; which means we
-                // can just march the currentNode, and skip the 8 children
-
-                // remove the 8 children from nodesToMarch
-                for (int i = 0; i < 8; i++) {
-                    nodesToMarch.pop_back();
-                }
-
-                // copy up their samplers
-                for (auto& child : currentNode->children) {
-                    currentNode->additiveSamplers.insert(std::begin(child->additiveSamplers), std::end(child->additiveSamplers));
-                    currentNode->subtractiveSamplers.insert(std::begin(child->subtractiveSamplers), std::end(child->subtractiveSamplers));
-                }
+        bool intersectSamplers = false;
+        for (const auto sampler : _additiveSamplers) {
+            if (sampler->test(currentNode->bounds)) {
+                currentNode->additiveSamplers.insert(sampler);
+                intersectSamplers = true;
             }
         }
 
-        if (!currentNode->additiveSamplers.empty() || !currentNode->subtractiveSamplers.empty()) {
-            nodesToMarch.push_back(currentNode);
+        for (const auto sampler : _subtractiveSamplers) {
+            if (sampler->test(currentNode->bounds)) {
+                currentNode->subtractiveSamplers.insert(sampler);
+                intersectSamplers = true;
+            }
+        }
+        
+        if (intersectSamplers) {
+            if (currentNode->isLeaf) {
+                // currentNode is a leaf node and intersects samplers; so add it to march list
+                nodesToMarch.push_back(currentNode);
+            } else {
+
+                // some samplers intersect this node; traverse down
+                int occupied = 0;
+                for (auto& child : currentNode->children) {
+                    if (collect(child.get(), nodesToMarch)) {
+                        occupied++;
+                    }
+                }
+                
+                if (occupied == 8) {
+                    // all 8 children intersect samplers; we can just coalesce their
+                    // samplers into currentNode, and discard children from the list to march
+                    
+                    for (int i = 0; i < 8; i++) {
+                        nodesToMarch.pop_back();
+                    }
+
+                    nodesToMarch.push_back(currentNode);
+
+                    // copy up their samplers
+                    for (auto& child : currentNode->children) {
+                        currentNode->additiveSamplers.insert(std::begin(child->additiveSamplers), std::end(child->additiveSamplers));
+                        currentNode->subtractiveSamplers.insert(std::begin(child->subtractiveSamplers), std::end(child->subtractiveSamplers));
+                    }
+                }
+            }
+            
             return true;
         }
-
+            
         return false;
     }
 
