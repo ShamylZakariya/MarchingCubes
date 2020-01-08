@@ -54,6 +54,8 @@ public:
         _cvFinished.wait(lock, [this]() { return _tasks.empty() && (_busy == 0); });
     }
 
+    auto size() const { return _workers.size(); }
+
 private:
     void threadLoop(int pinnedCpuIdx)
     {

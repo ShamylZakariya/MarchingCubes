@@ -5,17 +5,44 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(CodeLLDB) Launch",
+            "name": "MarchingCubes (CodeLLDB)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/MarchingCubes",
             "preLaunchTask": "build"
         },
         {
-            "name": "(gdb) Launch",
+            "name": "UnitTests (CodeLLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/meson-out/MarchingCubes",
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "MarchingCubes (gdb)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/MarchingCubes",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "UnitTests (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/meson-out/UnitTests",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

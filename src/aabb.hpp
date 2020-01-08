@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <ostream>
 
 using namespace glm;
 
@@ -35,7 +36,7 @@ public:
         Create a default AABB_. Will return true for invalid() because
         it hasn't been assigned any value yet.
     */
-    AABB_(void)
+    AABB_()
         : min(std::numeric_limits<T>::max())
         , max(-std::numeric_limits<T>::max())
     {
@@ -76,7 +77,7 @@ public:
         and not yet assigned values.
     */
 
-    bool valid(void) const
+    bool valid() const
     {
         return (min.x < max.x) && (min.y < max.y) && (min.z < max.z);
     }
@@ -93,7 +94,7 @@ public:
         Make this AABB_ invalid e.g., just like a default-constructed AABB_.
         Will fail the valid test.
     */
-    void invalidate(void)
+    void invalidate()
     {
         min.x = std::numeric_limits<T>::max();
         max.x = -std::numeric_limits<T>::max();
@@ -106,7 +107,7 @@ public:
     /*
         return geometric center of AABB_
     */
-    vec<3, T, Q> center(void) const
+    vec<3, T, Q> center() const
     {
         return vec<3, T, Q>(
             (min.x + max.x) / 2,
@@ -117,7 +118,7 @@ public:
     /*
         return the radius of the sphere that would exactly enclose this AABB_
     */
-    T radius(void) const
+    T radius() const
     {
         return glm::length((max - min) * 0.5F);
     }
@@ -125,7 +126,7 @@ public:
     /*
         return the squared radius of the sphere that would exactly enclose this AABB_
     */
-    T radius2(void) const
+    T radius2() const
     {
         return glm::length2((max - min) * 0.5F);
     }
@@ -133,7 +134,16 @@ public:
     /*
         return the magnitude along the 3 axes.
     */
-    vec<3, T, Q> size(void) const { return vec<3, T, Q>(max.x - min.x, max.y - min.y, max.z - min.z); }
+    vec<3, T, Q> size() const { return vec<3, T, Q>(max.x - min.x, max.y - min.y, max.z - min.z); }
+
+    /*
+        return the volume displaced by this aabb
+    */
+    T volume() const
+    {
+        auto sz = size();
+        return sz.x * sz.y * sz.z;
+    }
 
     /*
         return AABB_ containing both
@@ -366,6 +376,48 @@ public:
         return intersects(AABB_<T, Q>(center, radius));
     }
 
+    /**
+     * Subdivides this AABB into 8 child AABBs
+     */
+    void octreeSubdivide(std::array<AABB_<T, Q>, 8>& into) const
+    {
+        auto min = this->min;
+        auto size = this->size();
+
+        // no divide exists for ivec3, so we do it explicitly
+        auto hx = size.x / 2;
+        auto hy = size.y / 2;
+        auto hz = size.z / 2;
+        auto hs = vec<3, T, Q>(hx, hy, hz);
+
+        auto a = min + vec<3, T, Q>(+0, 0, +0);
+        auto b = min + vec<3, T, Q>(+hx, 0, +0);
+        auto c = min + vec<3, T, Q>(+hx, 0, +hz);
+        auto d = min + vec<3, T, Q>(+0, 0, +hz);
+
+        auto e = min + vec<3, T, Q>(+0, +hy, +0);
+        auto f = min + vec<3, T, Q>(+hx, +hy, +0);
+        auto g = min + vec<3, T, Q>(+hx, +hy, +hz);
+        auto h = min + vec<3, T, Q>(+0, +hy, +hz);
+
+        into[0] = AABB_<T, Q>(a, a + hs);
+        into[1] = AABB_<T, Q>(b, b + hs);
+        into[2] = AABB_<T, Q>(c, c + hs);
+        into[3] = AABB_<T, Q>(d, d + hs);
+
+        into[4] = AABB_<T, Q>(e, e + hs);
+        into[5] = AABB_<T, Q>(f, f + hs);
+        into[6] = AABB_<T, Q>(g, g + hs);
+        into[7] = AABB_<T, Q>(h, h + hs);
+    }
+
+    std::array<AABB_<T, Q>, 8> octreeSubdivide() const
+    {
+        auto store = std::array<AABB_<T, Q>, 8> {};
+        octreeSubdivide(store);
+        return store;
+    }
+
 public:
     vec<3, T, Q> min, max;
 };
@@ -384,6 +436,17 @@ struct hash<AABB_<T, Q>> {
         return (h0 ^ (h1 << 1));
     }
 };
+}
+
+template <typename T, qualifier Q>
+std::ostream& operator<<(std::ostream& os, const AABB_<T, Q>& bounds)
+{
+    os << "[AABB min(" << bounds.min.x << ", " << bounds.min.y << ", " << bounds.min.z
+       << ") max(" << bounds.max.x << ", " << bounds.max.y << ", " << bounds.max.z
+       << ") size(" << bounds.size().x << ", " << bounds.size().y << ", " << bounds.size().z
+       << ")]";
+
+    return os;
 }
 
 #endif /* AABB_h */

@@ -101,9 +101,8 @@ private:
     std::unique_ptr<OctreeVolume> _volume;
     unowned_ptr<SphereVolumeSampler> _mainShere;
     unowned_ptr<BoundedPlaneVolumeSampler> _plane;
-    std::unique_ptr<mc::ThreadedMarcher> _marcher;
 
-    bool _animateVolume = true;
+    bool _animateVolume = false;
     bool _running = true;
 
 private:
@@ -223,6 +222,8 @@ private:
             _animateVolume = !_animateVolume;
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
             _running = false;
+        } else if (!_animateVolume && scancode == glfwGetKeyScancode(GLFW_KEY_M)) {
+            marchVolume();
         }
     }
 
@@ -300,38 +301,31 @@ private:
 
     void buildVolume()
     {
-        _volume = std::make_unique<OctreeVolume>(64, 1, 4);
+        auto nThreads = std::thread::hardware_concurrency();
+        std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
+
+        std::vector<unowned_ptr<ITriangleConsumer>> unownedTriangleConsumers;
+        for (auto i = 0u; i < nThreads; i++) {
+            _triangleConsumers.push_back(std::make_unique<TriangleConsumer>());
+            unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
+        }
+
+        _volume = std::make_unique<OctreeVolume>(64, 1, 4, unownedTriangleConsumers);
 
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
         _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
         _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
 
-        auto nThreads = std::thread::hardware_concurrency();
-        std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
-
-        for (auto i = 0u; i < nThreads; i++) {
-            _triangleConsumers.push_back(std::make_unique<TriangleConsumer>());
-        }
-
-        {
-            // create a transform to map our _volume to the origin, and be of reasonable size
-            auto diagonal = length(vec3(size));
-            auto transform = glm::scale(mat4(1), vec3(2.5 / diagonal)) * glm::translate(mat4(1), -vec3(diagonal) / 2.0F);
-
-            // make a vector of unowned for _marcher to access
-            std::vector<unowned_ptr<ITriangleConsumer>> tcs;
-            for (auto& tc : _triangleConsumers) {
-                tcs.push_back(tc.get());
-            }
-
-            _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), tcs, transform, false);
-        }
+        marchVolume();
     }
 
     void marchVolume()
     {
-        _marcher->march();
+        auto size = vec3(_volume->size());
+        auto diagonal = length(vec3(size));
+        auto transform = glm::scale(mat4(1), vec3(2.5 / diagonal)) * glm::translate(mat4(1), -vec3(diagonal) / 2.0F);
+        _volume->march(transform, false);
     }
 };
 

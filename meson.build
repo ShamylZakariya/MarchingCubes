@@ -32,6 +32,7 @@ sources = [
     'src/marching_cubes.cpp',
     'src/storage.cpp',
     'src/triangle_soup.cpp',
+    'src/volume.cpp',
     'src/util.cpp'
 ]
 
