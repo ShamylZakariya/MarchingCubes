@@ -78,9 +78,7 @@ void march(const mc::IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, c
 class ThreadedMarcher {
 public:
     ThreadedMarcher(const IIsoSurface& volume,
-        const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers,
-        const mat4& transform = mat4(1),
-        bool computeNormals = true);
+        const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers);
 
     ~ThreadedMarcher() = default;
 
@@ -92,14 +90,12 @@ public:
      will be called on the calling thread; ITriangleConsumer::addTriangle()
      will be called via a dedicated thread owned by the internal pool.
      */
-    void march();
+    void march(const mat4& transform = mat4(1), bool computeNormals = true);
 
 private:
     const IIsoSurface& _volume;
     std::vector<unowned_ptr<ITriangleConsumer>> _consumers;
     std::unique_ptr<ThreadPool> _threads;
-    mat4 _transform;
-    bool _computeNormals;
     std::size_t _nThreads;
     std::vector<iAABB> _slices;
 };

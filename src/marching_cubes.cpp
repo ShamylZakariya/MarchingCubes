@@ -70,13 +70,9 @@ void march(const IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const
 //
 
 ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
-    const std::vector<unowned_ptr<ITriangleConsumer>>& tc,
-    const mat4& transform,
-    bool computeNormals)
+    const std::vector<unowned_ptr<ITriangleConsumer>>& tc)
     : _volume(volume)
     , _consumers(tc)
-    , _transform(transform)
-    , _computeNormals(computeNormals)
     , _nThreads(_consumers.size())
     , _slices(_nThreads)
 {
@@ -96,12 +92,12 @@ ThreadedMarcher::ThreadedMarcher(const IIsoSurface& volume,
     }
 }
 
-void ThreadedMarcher::march()
+void ThreadedMarcher::march(const mat4& transform, bool computeNormals)
 {
     for (auto i = 0u; i < _nThreads; i++) {
         _consumers[i]->start();
-        _threads->enqueue([this, i]() {
-            mc::march(_volume, _slices[i], *_consumers[i], _transform, _computeNormals);
+        _threads->enqueue([this, i, &transform, computeNormals]() {
+            mc::march(_volume, _slices[i], *_consumers[i], transform, computeNormals);
         });
     }
 

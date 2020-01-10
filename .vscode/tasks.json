@@ -23,7 +23,7 @@
         {
             "type": "meson",
             "mode": "build",
-            "label": "Build MarchingCubes",
+            "label": "Build",
             "group": {
                 "kind": "build",
                 "isDefault": true

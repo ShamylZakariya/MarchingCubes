@@ -101,9 +101,11 @@ private:
     std::unique_ptr<OctreeVolume> _volume;
     unowned_ptr<SphereVolumeSampler> _mainShere;
     unowned_ptr<BoundedPlaneVolumeSampler> _plane;
+    std::unique_ptr<mc::ThreadedMarcher> _marcher;
 
     bool _animateVolume = false;
     bool _running = true;
+    bool _marchUsingVolume = true;
 
 private:
     void initWindow()
@@ -224,6 +226,9 @@ private:
             _running = false;
         } else if (!_animateVolume && scancode == glfwGetKeyScancode(GLFW_KEY_M)) {
             marchVolume();
+        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_TAB)) {
+            _marchUsingVolume = !_marchUsingVolume;
+            marchVolume();
         }
     }
 
@@ -317,6 +322,8 @@ private:
         _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
         _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
 
+        _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), unownedTriangleConsumers);
+
         marchVolume();
     }
 
@@ -325,7 +332,14 @@ private:
         auto size = vec3(_volume->size());
         auto diagonal = length(vec3(size));
         auto transform = glm::scale(mat4(1), vec3(2.5 / diagonal)) * glm::translate(mat4(1), -vec3(diagonal) / 2.0F);
-        _volume->march(transform, false);
+
+        if (_marchUsingVolume) {
+            std::cout << "marchVolume() - _volume->march()" << std::endl;
+            _volume->march(transform, false);
+        } else {
+            std::cout << "marchVolume() - _marcher->march()" << std::endl;
+            _marcher->march(transform, false);
+        }
     }
 };
 
