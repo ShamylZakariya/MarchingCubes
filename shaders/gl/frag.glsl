@@ -1,4 +1,4 @@
-#version 330 core
+#version 330
 #extension GL_OES_standard_derivatives : enable
 
 in VS_OUT

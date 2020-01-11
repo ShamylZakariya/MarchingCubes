@@ -6,19 +6,25 @@
 //  Copyright © 2019 Shamyl Zakariya. All rights reserved.
 //
 
-#include "marching_cubes.hpp"
-#include "storage.hpp"
-#include "triangle_soup.hpp"
-#include "util.hpp"
-#include "volume.hpp"
-#include "volume_samplers.hpp"
-
 #include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <epoxy/gl.h>
+
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_opengl3.h>
+
+#include "marching_cubes.hpp"
+#include "storage.hpp"
+#include "triangle_soup.hpp"
+#include "util.hpp"
+#include "volume.hpp"
+#include "volume_samplers.hpp"
 
 //
 // Constants
@@ -71,9 +77,31 @@ public:
 
     void run()
     {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        (void)io;
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.ScaleAllSizes(2.5);
+        ImGui::GetIO().Fonts->AddFontFromFileTTF("./fonts/ConsolaMono.ttf", 32);
+
+        // Setup Platform/Renderer bindings
+        ImGui_ImplGlfw_InitForOpenGL(_window, true);
+        ImGui_ImplOpenGL3_Init();
+
         double lastTime = glfwGetTime();
         while (_running && !glfwWindowShouldClose(_window)) {
             glfwPollEvents();
+
+            // Start the Dear ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
 
             double now = glfwGetTime();
             double elapsed = now - lastTime;
@@ -81,8 +109,17 @@ public:
             step(static_cast<float>(now), static_cast<float>(elapsed));
 
             drawFrame();
+            drawGui();
+
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
             glfwSwapBuffers(_window);
         }
+
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
     }
 
 private:
@@ -105,7 +142,7 @@ private:
 
     bool _animateVolume = false;
     bool _running = true;
-    bool _marchUsingVolume = true;
+    bool _marchUsingVolume = false;
 
 private:
     void initWindow()
@@ -125,6 +162,11 @@ private:
         });
 
         glfwSetKeyCallback(_window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+
+            if (ImGui::GetIO().WantCaptureKeyboard) {
+                return;
+            }
+
             auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
             switch (action) {
             case GLFW_PRESS:
@@ -137,6 +179,10 @@ private:
         });
 
         glfwSetMouseButtonCallback(_window, [](GLFWwindow* window, int button, int action, int mods) {
+            if (ImGui::GetIO().WantCaptureMouse) {
+                return;
+            }
+
             auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
             switch (action) {
             case GLFW_PRESS:
@@ -149,6 +195,10 @@ private:
         });
 
         glfwSetScrollCallback(_window, [](GLFWwindow* window, double xOffset, double yOffset) {
+            if (ImGui::GetIO().WantCaptureMouse) {
+                return;
+            }
+
             auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
             app->onMouseWheel(vec2(xOffset, yOffset));
         });
@@ -302,6 +352,13 @@ private:
         for (auto& tc : _triangleConsumers) {
             tc->draw();
         }
+    }
+
+    void drawGui()
+    {
+        ImGui::Begin("Demo window");
+        ImGui::Button("Hello!");
+        ImGui::End();
     }
 
     void buildVolume()
