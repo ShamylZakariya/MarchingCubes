@@ -63,9 +63,9 @@ private:
 
 class BaseCompositeVolume : public mc::IIsoSurface {
 public:
-    BaseCompositeVolume(ivec3 size, float falloffThreshold)
+    BaseCompositeVolume(ivec3 size, float fuzziness)
         : _size(size)
-        , _fuzziness(falloffThreshold)
+        , _fuzziness(fuzziness)
     {
     }
 
@@ -169,8 +169,8 @@ public:
     };
 
 public:
-    OctreeVolume(int size, float falloffThreshold, int minNodeSize, const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers)
-        : BaseCompositeVolume(ivec3 { size, size, size }, falloffThreshold)
+    OctreeVolume(int size, float fuzziness, int minNodeSize, const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers)
+        : BaseCompositeVolume(ivec3 { size, size, size }, fuzziness)
         , _root(buildOctreeNode(iAABB(ivec3(0, 0, 0), ivec3(size, size, size)), minNodeSize, 0))
         , _triangleConsumers(triangleConsumers)
     {

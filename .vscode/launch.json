@@ -9,14 +9,14 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/MarchingCubes",
-            "preLaunchTask": "build"
+            "preLaunchTask": "Build"
         },
         {
             "name": "UnitTests (CodeLLDB)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/MarchingCubes",
-            "preLaunchTask": "build"
+            "preLaunchTask": "Build"
         },
         {
             "name": "MarchingCubes (gdb)",
@@ -36,7 +36,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build"
+            "preLaunchTask": "Build"
         },
         {
             "name": "UnitTests (gdb)",
@@ -56,7 +56,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build"
+            "preLaunchTask": "Build"
         }
     ]
 }

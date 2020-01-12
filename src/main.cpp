@@ -30,8 +30,8 @@
 // Constants
 //
 
-const int WIDTH = 800;
-const int HEIGHT = 600;
+const int WIDTH = 1440;
+const int HEIGHT = 900;
 const float NEAR_PLANE = 0.1f;
 const float FAR_PLANE = 1000.0f;
 const float FOV_DEGREES = 50.0F;
@@ -79,16 +79,12 @@ public:
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        (void)io;
-        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.ScaleAllSizes(2.5);
-        ImGui::GetIO().Fonts->AddFontFromFileTTF("./fonts/ConsolaMono.ttf", 32);
+        style.ScaleAllSizes(2);
+        ImGui::GetIO().Fonts->AddFontFromFileTTF("./fonts/ConsolaMono.ttf", 24);
 
         // Setup Platform/Renderer bindings
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
@@ -142,7 +138,15 @@ private:
 
     bool _animateVolume = false;
     bool _running = true;
-    bool _marchUsingVolume = false;
+
+    enum class MarchTechnique : int {
+        ThreadedMarcher = 0,
+        OctreeVolume = 1
+    };
+
+    int _marchTechnique = 0;
+    bool _marchOnce = false;
+    float _fuzziness = 1.0F;
 
 private:
     void initWindow()
@@ -162,7 +166,6 @@ private:
         });
 
         glfwSetKeyCallback(_window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
-
             if (ImGui::GetIO().WantCaptureKeyboard) {
                 return;
             }
@@ -264,21 +267,8 @@ private:
 
     void onKeyPress(int key, int scancode, int mods)
     {
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_LEFT_BRACKET)) {
-            _volume->setFuzziness(_volume->fuzziness() - 0.1F);
-            marchVolume();
-        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_RIGHT_BRACKET)) {
-            _volume->setFuzziness(_volume->fuzziness() + 0.1F);
-            marchVolume();
-        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
-            _animateVolume = !_animateVolume;
-        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
             _running = false;
-        } else if (!_animateVolume && scancode == glfwGetKeyScancode(GLFW_KEY_M)) {
-            marchVolume();
-        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_TAB)) {
-            _marchUsingVolume = !_marchUsingVolume;
-            marchVolume();
         }
     }
 
@@ -333,8 +323,11 @@ private:
             float angle = static_cast<float>(M_PI * origin.y / height);
             vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
             _plane->setPlaneNormal(normal);
+        }
 
+        if (_animateVolume || _marchOnce) {
             marchVolume();
+            _marchOnce = false;
         }
     }
 
@@ -357,7 +350,26 @@ private:
     void drawGui()
     {
         ImGui::Begin("Demo window");
-        ImGui::Button("Hello!");
+
+        ImGui::Checkbox("Animate", &_animateVolume);
+        if (!_animateVolume) {
+            ImGui::SameLine();
+            _marchOnce = ImGui::Button("March Once");
+        }
+
+        ImGui::Separator();
+        ImGui::Text("March Technique");
+        ImGui::RadioButton("ThreadedMarcher", &_marchTechnique, 0);
+        ImGui::RadioButton("OctreeVolumeMarcher", &_marchTechnique, 1);
+
+        ImGui::Separator();
+        if (ImGui::SliderFloat("Fuzziness", &_fuzziness, 0, 5, "%.2f")) {
+            _volume->setFuzziness(_fuzziness);
+            if (!_animateVolume) {
+                _marchOnce = true;
+            }
+        }
+
         ImGui::End();
     }
 
@@ -372,7 +384,7 @@ private:
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
-        _volume = std::make_unique<OctreeVolume>(64, 1, 4, unownedTriangleConsumers);
+        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
 
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
@@ -390,12 +402,13 @@ private:
         auto diagonal = length(vec3(size));
         auto transform = glm::scale(mat4(1), vec3(2.5 / diagonal)) * glm::translate(mat4(1), -vec3(diagonal) / 2.0F);
 
-        if (_marchUsingVolume) {
-            std::cout << "marchVolume() - _volume->march()" << std::endl;
-            _volume->march(transform, false);
-        } else {
-            std::cout << "marchVolume() - _marcher->march()" << std::endl;
+        switch (_marchTechnique) {
+        case static_cast<int>(MarchTechnique::ThreadedMarcher):
             _marcher->march(transform, false);
+            break;
+        case static_cast<int>(MarchTechnique::OctreeVolume):
+            _volume->march(transform, false);
+            break;
         }
     }
 };
