@@ -132,7 +132,6 @@ private:
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
 
-    mat4 _proj { 1 };
     mat4 _model { 1 };
     mat4 _trackballRotation { 1 };
     float _cameraZPosition = -120;
@@ -147,6 +146,7 @@ private:
     bool _animateVolume = false;
     bool _running = true;
     bool _drawAABBs = true;
+    bool _useOrthoProjection = false;
 
     enum class MarchTechnique : int {
         ThreadedMarcher = 0,
@@ -156,6 +156,7 @@ private:
     MarchTechnique _marchTechnique = MarchTechnique::OctreeVolume;
     bool _marchOnce = false;
     float _fuzziness = 1.0F;
+    float _aspect = 1;
 
 private:
     void initWindow()
@@ -266,9 +267,7 @@ private:
     void onResize(int width, int height)
     {
         glViewport(0, 0, width, height);
-
-        auto aspect = static_cast<float>(width) / static_cast<float>(height);
-        _proj = perspective(radians(FOV_DEGREES), aspect, NEAR_PLANE, FAR_PLANE);
+        _aspect = static_cast<float>(width) / static_cast<float>(height);
     }
 
     void onKeyPress(int key, int scancode, int mods)
@@ -346,7 +345,19 @@ private:
 
         const auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
         const auto model = _trackballRotation * _model;
-        const auto mvp = _proj * view * model;
+        const auto mvp = [this, &view, &model](){
+            if (_useOrthoProjection) {
+                auto bounds = _volume->bounds();
+                auto size = length(bounds.size());
+                auto width = _aspect * size;
+                auto height = size;
+                auto proj = glm::ortho(-width/2, width/2, -height/2, height/2, NEAR_PLANE, FAR_PLANE);
+                return proj * view * model;
+            } else {
+                auto proj = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
+                return proj * view * model;
+            }
+        }();
 
         glUseProgram(_volumeProgram.program);
         glUniformMatrix4fv(_volumeProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
@@ -401,6 +412,7 @@ private:
 
         ImGui::Separator();
         ImGui::Checkbox("Draw AABBs", &_drawAABBs);
+        ImGui::Checkbox("Ortho Projection", &_useOrthoProjection);
 
         ImGui::End();
     }
