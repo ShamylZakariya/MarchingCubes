@@ -113,11 +113,15 @@ public:
             v += s->valueAt(p, _fuzziness);
         }
 
+        v = std::min<float>(v, 1);
+
         for (auto& s : _subtractiveSamplers) {
             v -= s->valueAt(p, _fuzziness);
         }
 
-        return min(max(v, 0.0F), 1.0F);
+        v = std::max<float>(v, 0);
+
+        return v;
     }
 
     void setFuzziness(float ft) { _fuzziness = max<float>(ft, 0); }
