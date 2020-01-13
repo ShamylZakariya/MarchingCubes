@@ -175,7 +175,8 @@ public:
 public:
     OctreeVolume(int size, float fuzziness, int minNodeSize, const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers)
         : BaseCompositeVolume(ivec3 { size, size, size }, fuzziness)
-        , _root(buildOctreeNode(iAABB(ivec3(0, 0, 0), ivec3(size, size, size)), minNodeSize, 0))
+        , _bounds(iAABB(ivec3(0, 0, 0), ivec3(size, size, size)))
+        , _root(buildOctreeNode(_bounds, minNodeSize, 0))
         , _triangleConsumers(triangleConsumers)
     {
     }
@@ -209,6 +210,10 @@ public:
      * March the represented volume into the triangle consumers provided in the constructor
     */
     void march(const mat4& transform = mat4(1), bool computeNormals = true);
+
+    iAABB bounds() const {
+        return _bounds;
+    }
 
 protected:
     /**
@@ -310,8 +315,8 @@ protected:
     }
 
 private:
+    iAABB _bounds;
     std::unique_ptr<Node> _root;
-
     std::vector<Node*> _marchNodes;
     std::unique_ptr<ThreadPool> _marchThreads;
     std::vector<unowned_ptr<ITriangleConsumer>> _triangleConsumers;

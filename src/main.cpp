@@ -19,6 +19,7 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
+#include "lines.hpp"
 #include "marching_cubes.hpp"
 #include "storage.hpp"
 #include "triangle_soup.hpp"
@@ -52,8 +53,10 @@ struct ProgramState {
         }
     }
 
-    void build(const std::string& vertSrc, const std::string& fragSrc)
+    void build(const std::string& vertPath, const std::string& fragPath)
     {
+        auto vertSrc = util::ReadFile(vertPath);
+        auto fragSrc = util::ReadFile(fragPath);
         program = util::CreateProgram(vertSrc.c_str(), fragSrc.c_str());
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         uniformLocModel = glGetUniformLocation(program, "uModel");
@@ -77,19 +80,20 @@ public:
 
     void run()
     {
+        // start imgui
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
-        // Setup Dear ImGui style
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
         style.ScaleAllSizes(2);
         ImGui::GetIO().Fonts->AddFontFromFileTTF("./fonts/ConsolaMono.ttf", 24);
 
-        // Setup Platform/Renderer bindings
+        // set imgui platform/renderer bindings
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
         ImGui_ImplOpenGL3_Init();
 
+        // enter run loop
         double lastTime = glfwGetTime();
         while (_running && !glfwWindowShouldClose(_window)) {
             glfwPollEvents();
@@ -113,6 +117,7 @@ public:
             glfwSwapBuffers(_window);
         }
 
+        // shutdown imgui
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -121,7 +126,7 @@ public:
 private:
     GLFWwindow* _window;
 
-    ProgramState _program;
+    ProgramState _volumeProgram, _lineProgram;
     std::vector<std::unique_ptr<ITriangleConsumer>> _triangleConsumers;
 
     bool _mouseButtonState[3] = { false, false, false };
@@ -129,12 +134,15 @@ private:
 
     mat4 _proj { 1 };
     mat4 _model { 1 };
-    float _cameraZPosition = -4;
+    mat4 _trackballRotation { 1 };
+    float _cameraZPosition = -120;
 
     std::unique_ptr<OctreeVolume> _volume;
     unowned_ptr<SphereVolumeSampler> _mainShere;
+    unowned_ptr<SphereVolumeSampler> _secondaryShere;
     unowned_ptr<BoundedPlaneVolumeSampler> _plane;
     std::unique_ptr<mc::ThreadedMarcher> _marcher;
+    LineSegmentBuffer _lineSegmentStorage;
 
     bool _animateVolume = false;
     bool _running = true;
@@ -144,7 +152,7 @@ private:
         OctreeVolume = 1
     };
 
-    int _marchTechnique = 0;
+    MarchTechnique _marchTechnique = MarchTechnique::OctreeVolume;
     bool _marchOnce = false;
     float _fuzziness = 1.0F;
 
@@ -227,14 +235,11 @@ private:
         std::cout << "OpenGL version supported: " << glGetString(GL_VERSION) << std::endl;
 
         //
-        // load program
+        // load programs
         //
 
-        auto vertFile = "shaders/gl/vert.glsl";
-        auto fragFile = "shaders/gl/frag.glsl";
-        auto vertSrc = util::ReadFile(vertFile);
-        auto fragSrc = util::ReadFile(fragFile);
-        _program.build(vertSrc, fragSrc);
+        _volumeProgram.build("shaders/gl/volume_vert.glsl", "shaders/gl/volume_frag.glsl");
+        _lineProgram.build("shaders/gl/line_vert.glsl", "shaders/gl/line_frag.glsl");
 
         //
         // some constant GL state
@@ -267,7 +272,7 @@ private:
 
     void onKeyPress(int key, int scancode, int mods)
     {
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE) || scancode == glfwGetKeyScancode(GLFW_KEY_Q)) {
             _running = false;
         }
     }
@@ -283,7 +288,7 @@ private:
             float trackballSpeed = 0.004 * M_PI;
             mat4 xRot = rotate(mat4(1), -1 * delta.y * trackballSpeed, vec3(1, 0, 0));
             mat4 yRot = rotate(mat4(1), 1 * delta.x * trackballSpeed, vec3(0, 1, 0));
-            _model = xRot * yRot * _model;
+            _trackballRotation = xRot * yRot * _trackballRotation;
         }
     }
 
@@ -312,17 +317,19 @@ private:
     void step(float now, float deltaT)
     {
         if (_animateVolume) {
-            const float planeSpeed = 5;
-            auto origin = _plane->planeOrigin();
-            auto height = _volume->size().y;
-            if (origin.y < 0) {
-                origin.y = height;
-            }
-            _plane->setPlaneOrigin(origin + vec3(0, -1, 0) * planeSpeed * deltaT);
+            if (_plane) {
+                const float planeSpeed = 5;
+                auto origin = _plane->planeOrigin();
+                auto height = _volume->size().y;
+                if (origin.y < 0) {
+                    origin.y = height;
+                }
+                _plane->setPlaneOrigin(origin + vec3(0, -1, 0) * planeSpeed * deltaT);
 
-            float angle = static_cast<float>(M_PI * origin.y / height);
-            vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
-            _plane->setPlaneNormal(normal);
+                float angle = static_cast<float>(M_PI * origin.y / height);
+                vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
+                _plane->setPlaneNormal(normal);
+            }
         }
 
         if (_animateVolume || _marchOnce) {
@@ -335,16 +342,22 @@ private:
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(_program.program);
+        const auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
+        const auto model = _trackballRotation * _model;
+        const auto mvp = _proj * view * model;
 
-        auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
-        auto mvp = _proj * view * _model;
+        glUseProgram(_volumeProgram.program);
+        glUniformMatrix4fv(_volumeProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        glUniformMatrix4fv(_volumeProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
 
-        glUniformMatrix4fv(_program.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-        glUniformMatrix4fv(_program.uniformLocModel, 1, GL_FALSE, value_ptr(_model));
         for (auto& tc : _triangleConsumers) {
             tc->draw();
         }
+
+        glUseProgram(_lineProgram.program);
+        glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+        _lineSegmentStorage.draw();
     }
 
     void drawGui()
@@ -359,8 +372,12 @@ private:
 
         ImGui::Separator();
         ImGui::Text("March Technique");
-        ImGui::RadioButton("ThreadedMarcher", &_marchTechnique, 0);
-        ImGui::RadioButton("OctreeVolumeMarcher", &_marchTechnique, 1);
+        auto technique = _marchTechnique;
+        ImGui::RadioButton("ThreadedMarcher", reinterpret_cast<int*>(&_marchTechnique), 0);
+        ImGui::RadioButton("OctreeVolumeMarcher", reinterpret_cast<int*>(&_marchTechnique), 1);
+        if (_marchTechnique != technique) {
+            marchTechniqueChanged();
+        }
 
         ImGui::Separator();
         if (ImGui::SliderFloat("Fuzziness", &_fuzziness, 0, 5, "%.2f")) {
@@ -385,29 +402,49 @@ private:
         }
 
         _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
+        AppendAABB(_volume->bounds(), _lineSegmentStorage, vec4(1,0.2,1,0.5));
 
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
-        _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(center, length(size) * 0.25F, IVolumeSampler::Mode::Additive));
-        _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
+        auto mainSphereRadius = length(size) * 0.2F;
+        auto secondarySphereRadius = mainSphereRadius * 0.2F;
+
+        _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(
+            center, mainSphereRadius, IVolumeSampler::Mode::Additive));
+
+        if (true) {
+            _secondaryShere = _volume->add(std::make_unique<SphereVolumeSampler>(
+                center + vec3(mainSphereRadius, 0, 0), secondarySphereRadius, IVolumeSampler::Mode::Additive));
+
+            _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(
+                center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
+        }
 
         _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), unownedTriangleConsumers);
 
+        _model = glm::translate(mat4{1}, -vec3(_volume->bounds().center()));
+
+        marchVolume();
+    }
+
+    void marchTechniqueChanged()
+    {
+        // clears storage
+        for (const auto& tc : _triangleConsumers) {
+            tc->start();
+            tc->finish();
+        }
         marchVolume();
     }
 
     void marchVolume()
     {
-        auto size = vec3(_volume->size());
-        auto diagonal = length(vec3(size));
-        auto transform = glm::scale(mat4(1), vec3(2.5 / diagonal)) * glm::translate(mat4(1), -vec3(diagonal) / 2.0F);
-
         switch (_marchTechnique) {
-        case static_cast<int>(MarchTechnique::ThreadedMarcher):
-            _marcher->march(transform, false);
+        case MarchTechnique::ThreadedMarcher:
+            _marcher->march(mat4(1), false);
             break;
-        case static_cast<int>(MarchTechnique::OctreeVolume):
-            _volume->march(transform, false);
+        case MarchTechnique::OctreeVolume:
+            _volume->march(mat4(1), false);
             break;
         }
     }

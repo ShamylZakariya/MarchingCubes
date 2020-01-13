@@ -15,8 +15,8 @@
 
 struct Vertex {
     vec3 pos;
-    vec3 color { 1 };
-    vec3 normal;
+    vec4 color { 1 };
+    vec3 normal { 0, 1, 0 };
 
     enum class AttributeLayout : GLuint {
         Pos = 0,
@@ -40,7 +40,7 @@ struct hash<Vertex> {
         // https://en.cppreference.com/w/cpp/utility/hash
 
         std::size_t h0 = hash<glm::vec3>()(vertex.pos);
-        std::size_t h1 = hash<glm::vec3>()(vertex.color);
+        std::size_t h1 = hash<glm::vec4>()(vertex.color);
         std::size_t h2 = hash<glm::vec3>()(vertex.normal);
 
         std::size_t r = (h0 ^ (h1 << 1));

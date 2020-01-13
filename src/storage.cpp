@@ -26,7 +26,7 @@ void Vertex::bindVertexAttributes()
 
     glVertexAttribPointer(
         static_cast<GLuint>(Vertex::AttributeLayout::Color),
-        3,
+        4,
         GL_FLOAT,
         GL_FALSE,
         sizeof(Vertex),
