@@ -156,13 +156,13 @@ protected:
 class OctreeVolume : public BaseCompositeVolume {
 public:
     struct Node {
-        Node(const iAABB bounds, int depth)
+        Node(const AABB bounds, int depth)
             : bounds(bounds)
             , depth(depth)
         {
         }
 
-        iAABB bounds;
+        AABB bounds;
         int depth;
         bool isLeaf = false;
         bool march = false;
@@ -175,7 +175,7 @@ public:
 public:
     OctreeVolume(int size, float fuzziness, int minNodeSize, const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers)
         : BaseCompositeVolume(ivec3 { size, size, size }, fuzziness)
-        , _bounds(iAABB(ivec3(0, 0, 0), ivec3(size, size, size)))
+        , _bounds(AABB(ivec3(0, 0, 0), ivec3(size, size, size)))
         , _root(buildOctreeNode(_bounds, minNodeSize, 0))
         , _triangleConsumers(triangleConsumers)
     {
@@ -214,7 +214,7 @@ public:
     /**
      * Get the bounds of this volume - no geometry will exceed this region
      */
-    iAABB bounds() const
+    AABB bounds() const
     {
         return _bounds;
     }
@@ -307,7 +307,7 @@ protected:
         }
     }
 
-    std::unique_ptr<Node> buildOctreeNode(iAABB bounds, int minNodeSize, int depth)
+    std::unique_ptr<Node> buildOctreeNode(AABB bounds, int minNodeSize, int depth)
     {
         _maxDepth = std::max(depth, _maxDepth);
         auto node = std::make_unique<Node>(bounds, depth);
@@ -328,7 +328,7 @@ protected:
     }
 
 private:
-    iAABB _bounds;
+    AABB _bounds;
     int _maxDepth = 0;
     std::unique_ptr<Node> _root;
     std::vector<Node*> _marchNodes;

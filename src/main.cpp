@@ -353,12 +353,14 @@ private:
         glUniformMatrix4fv(_volumeProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
         util::CheckGlError("bind _volumeProgram");
 
+        glDepthMask(GL_TRUE);
         for (auto& tc : _triangleConsumers) {
             tc->draw();
             util::CheckGlError("draw triangle consumer");
         }
 
         if (_drawAABBs) {
+            glDepthMask(GL_FALSE);
             glUseProgram(_lineProgram.program);
             glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
             glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
@@ -366,6 +368,8 @@ private:
             _lineSegmentStorage.draw();
             util::CheckGlError("draw line segment storage");
         }
+
+        glDepthMask(GL_TRUE);
     }
 
     void drawGui()
@@ -418,7 +422,7 @@ private:
 
         std::cout << "volume->depth(): " << _volume->depth() << std::endl;
 
-        // generate AABBs for debug visualization
+        // generate AABBs for debug
         float hueStep = 360.0F / _volume->depth();
         std::vector<vec4> nodeColors;
         for (int i = 0; i <= _volume->depth(); i++) {
@@ -429,7 +433,7 @@ private:
 
         _volume->walkOctree([this, &nodeColors](OctreeVolume::Node* node) {
             auto bounds = node->bounds;
-            bounds.inset(node->depth * 1);
+            bounds.inset(node->depth * 0.25F);
             AppendAABB(bounds, _lineSegmentStorage, nodeColors[node->depth]);
         });
 
