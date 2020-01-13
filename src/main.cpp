@@ -146,6 +146,7 @@ private:
 
     bool _animateVolume = false;
     bool _running = true;
+    bool _drawAABBs = true;
 
     enum class MarchTechnique : int {
         ThreadedMarcher = 0,
@@ -245,7 +246,7 @@ private:
         // some constant GL state
         //
 
-        glClearColor(0.2f, 0.2f, 0.22f, 0.0f);
+        glClearColor(0, 0, 0, 0);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
         glEnable(GL_CULL_FACE);
@@ -309,8 +310,8 @@ private:
     void onMouseWheel(const vec2& scrollOffset)
     {
         // move camera forward/backward
-        float cameraDollySpeed = 0.1F;
-        _cameraZPosition += cameraDollySpeed * -scrollOffset.y;
+        float cameraDollySpeed = 0.1F * std::abs(_cameraZPosition);
+        _cameraZPosition += cameraDollySpeed * +scrollOffset.y;
         _cameraZPosition = min(_cameraZPosition, 0.01F);
     }
 
@@ -340,6 +341,7 @@ private:
 
     void drawFrame()
     {
+        util::CheckGlError("drawFrame");
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
@@ -349,15 +351,21 @@ private:
         glUseProgram(_volumeProgram.program);
         glUniformMatrix4fv(_volumeProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
         glUniformMatrix4fv(_volumeProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+        util::CheckGlError("bind _volumeProgram");
 
         for (auto& tc : _triangleConsumers) {
             tc->draw();
+            util::CheckGlError("draw triangle consumer");
         }
 
-        glUseProgram(_lineProgram.program);
-        glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-        glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
-        _lineSegmentStorage.draw();
+        if (_drawAABBs) {
+            glUseProgram(_lineProgram.program);
+            glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+            glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+            util::CheckGlError("bind _lineProgram");
+            _lineSegmentStorage.draw();
+            util::CheckGlError("draw line segment storage");
+        }
     }
 
     void drawGui()
@@ -387,11 +395,15 @@ private:
             }
         }
 
+        ImGui::Separator();
+        ImGui::Checkbox("Draw AABBs", &_drawAABBs);
+
         ImGui::End();
     }
 
     void buildVolume()
     {
+        // build a volume
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
 
@@ -401,8 +413,30 @@ private:
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
-        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
-        AppendAABB(_volume->bounds(), _lineSegmentStorage, vec4(1,0.2,1,0.5));
+        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 8, unownedTriangleConsumers);
+        _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
+
+        std::cout << "volume->depth(): " << _volume->depth() << std::endl;
+
+        // generate AABBs for debug visualization
+        float hueStep = 360.0F / _volume->depth();
+        std::vector<vec4> nodeColors;
+        for (int i = 0; i <= _volume->depth(); i++) {
+            util::color::hsv hC { i * hueStep, 0.6F, 1.0F };
+            auto rgbC = util::color::Hsv2Rgb(hC);
+            nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, 0.5F);
+        }
+
+        _volume->walkOctree([this, &nodeColors](OctreeVolume::Node* node) {
+            auto bounds = node->bounds;
+            bounds.inset(node->depth * 1);
+            AppendAABB(bounds, _lineSegmentStorage, nodeColors[node->depth]);
+        });
+
+        // TODO: when OctreeVolume works remove this fallback ThreadedMarcher
+        _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), unownedTriangleConsumers);
+
+        // build samplers to populate the volume
 
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
@@ -419,10 +453,6 @@ private:
             _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(
                 center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
         }
-
-        _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), unownedTriangleConsumers);
-
-        _model = glm::translate(mat4{1}, -vec3(_volume->bounds().center()));
 
         marchVolume();
     }

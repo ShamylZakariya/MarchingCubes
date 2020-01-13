@@ -82,26 +82,25 @@ private:
 template <typename T, qualifier Q>
 inline void AppendAABB(const AABB_<T, Q>& bounds, LineSegmentBuffer& lineSegs, const vec4& color)
 {
-    auto vertices = bounds.vertices();
+    auto corners = bounds.corners();
 
     // trace bottom
-    lineSegs.add(Vertex { vertices[0], color }, Vertex { vertices[1], color });
-    lineSegs.add(Vertex { vertices[1], color }, Vertex { vertices[2], color });
-    lineSegs.add(Vertex { vertices[2], color }, Vertex { vertices[3], color });
-    lineSegs.add(Vertex { vertices[3], color }, Vertex { vertices[0], color });
+    lineSegs.add(Vertex { corners[0], color }, Vertex { corners[1], color });
+    lineSegs.add(Vertex { corners[1], color }, Vertex { corners[2], color });
+    lineSegs.add(Vertex { corners[2], color }, Vertex { corners[3], color });
+    lineSegs.add(Vertex { corners[3], color }, Vertex { corners[0], color });
 
     // trace top
-    lineSegs.add(Vertex { vertices[4], color }, Vertex { vertices[5], color });
-    lineSegs.add(Vertex { vertices[5], color }, Vertex { vertices[6], color });
-    lineSegs.add(Vertex { vertices[6], color }, Vertex { vertices[7], color });
-    lineSegs.add(Vertex { vertices[7], color }, Vertex { vertices[4], color });
+    lineSegs.add(Vertex { corners[4], color }, Vertex { corners[5], color });
+    lineSegs.add(Vertex { corners[5], color }, Vertex { corners[6], color });
+    lineSegs.add(Vertex { corners[6], color }, Vertex { corners[7], color });
+    lineSegs.add(Vertex { corners[7], color }, Vertex { corners[4], color });
 
     // add bars connecting bottom to top
-    lineSegs.add(Vertex { vertices[0], color }, Vertex { vertices[4], color });
-    lineSegs.add(Vertex { vertices[1], color }, Vertex { vertices[5], color });
-    lineSegs.add(Vertex { vertices[2], color }, Vertex { vertices[6], color });
-    lineSegs.add(Vertex { vertices[3], color }, Vertex { vertices[7], color });
-
+    lineSegs.add(Vertex { corners[0], color }, Vertex { corners[4], color });
+    lineSegs.add(Vertex { corners[1], color }, Vertex { corners[5], color });
+    lineSegs.add(Vertex { corners[2], color }, Vertex { corners[6], color });
+    lineSegs.add(Vertex { corners[3], color }, Vertex { corners[7], color });
 }
 
 #endif /* lines_hpp */

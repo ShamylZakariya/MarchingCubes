@@ -211,8 +211,20 @@ public:
     */
     void march(const mat4& transform = mat4(1), bool computeNormals = true);
 
-    iAABB bounds() const {
+    /**
+     * Get the bounds of this volume - no geometry will exceed this region
+     */
+    iAABB bounds() const
+    {
         return _bounds;
+    }
+
+    /**
+     * Get the max octree node depth
+     */
+    int depth() const
+    {
+        return _maxDepth;
     }
 
 protected:
@@ -295,8 +307,9 @@ protected:
         }
     }
 
-    static std::unique_ptr<Node> buildOctreeNode(iAABB bounds, int minNodeSize, int depth)
+    std::unique_ptr<Node> buildOctreeNode(iAABB bounds, int minNodeSize, int depth)
     {
+        _maxDepth = std::max(depth, _maxDepth);
         auto node = std::make_unique<Node>(bounds, depth);
 
         // we're working on cubes, so only one bounds size is checked
@@ -316,6 +329,7 @@ protected:
 
 private:
     iAABB _bounds;
+    int _maxDepth = 0;
     std::unique_ptr<Node> _root;
     std::vector<Node*> _marchNodes;
     std::unique_ptr<ThreadPool> _marchThreads;

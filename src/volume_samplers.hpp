@@ -105,7 +105,7 @@ public:
         // we need to see if the bounds actually intersects
         int onPositiveSide = 0;
         int onNegativeSide = 0;
-        for (const auto& v : bounds.vertices()) {
+        for (const auto& v : bounds.corners()) {
             float signedDistance = dot(_normal, v - _origin);
 
             if (abs(signedDistance) < halfThickness) {

@@ -285,10 +285,10 @@ public:
     void outset(T d)
     {
         min.x -= d;
-        max.x += d;
         min.y -= d;
-        max.y += d;
         min.z -= d;
+        max.x += d;
+        max.y += d;
         max.z += d;
     }
 
@@ -312,8 +312,12 @@ public:
     */
     void inset(T d)
     {
-        min += vec3(d);
-        max -= vec3(d);
+        min.x += d;
+        min.y += d;
+        min.z += d;
+        max.x -= d;
+        max.y -= d;
+        max.z -= d;
     }
 
     /*
@@ -333,7 +337,7 @@ public:
         return (point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y && point.z >= min.z && point.z <= max.z);
     }
 
-    std::array<vec<3, T, Q>, 8> vertices() const
+    std::array<vec<3, T, Q>, 8> corners() const
     {
         return std::array<vec<3, T, Q>, 8> {
             vec<3, T, Q>(min.x, min.y, min.z),
