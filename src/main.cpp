@@ -94,6 +94,7 @@ public:
         ImGui_ImplOpenGL3_Init();
 
         // enter run loop
+        _fpsCalculator.reset();
         double lastTime = glfwGetTime();
         while (_running && !glfwWindowShouldClose(_window)) {
             glfwPollEvents();
@@ -108,6 +109,7 @@ public:
             lastTime = now;
             step(static_cast<float>(now), static_cast<float>(elapsed));
 
+            _fpsCalculator.update();
             drawFrame();
             drawGui();
 
@@ -125,7 +127,7 @@ public:
 
 private:
     GLFWwindow* _window;
-
+    util::FpsCalculator _fpsCalculator;
     ProgramState _volumeProgram, _lineProgram;
     std::vector<std::unique_ptr<ITriangleConsumer>> _triangleConsumers;
 
@@ -146,7 +148,7 @@ private:
     bool _animateVolume = false;
     bool _running = true;
     bool _drawAABBs = true;
-    bool _useOrthoProjection = false;
+    bool _useOrthoProjection = true;
 
     enum class MarchTechnique : int {
         ThreadedMarcher = 0,
@@ -274,6 +276,8 @@ private:
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE) || scancode == glfwGetKeyScancode(GLFW_KEY_Q)) {
             _running = false;
+        } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
+            examineOctree();
         }
     }
 
@@ -343,15 +347,18 @@ private:
         util::CheckGlError("drawFrame");
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // TODO: Don't dolly _cameraZPosition on scroll, just update some scalar
+        // and use that to position camera on z for perspective, and to scale the
+        // bounds volume for ortho
         const auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
         const auto model = _trackballRotation * _model;
-        const auto mvp = [this, &view, &model](){
+        const auto mvp = [this, &view, &model]() {
             if (_useOrthoProjection) {
                 auto bounds = _volume->bounds();
                 auto size = length(bounds.size());
                 auto width = _aspect * size;
                 auto height = size;
-                auto proj = glm::ortho(-width/2, width/2, -height/2, height/2, NEAR_PLANE, FAR_PLANE);
+                auto proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
                 return proj * view * model;
             } else {
                 auto proj = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
@@ -386,6 +393,8 @@ private:
     void drawGui()
     {
         ImGui::Begin("Demo window");
+
+        ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
 
         ImGui::Checkbox("Animate", &_animateVolume);
         if (!_animateVolume) {
@@ -429,7 +438,7 @@ private:
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
-        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 8, unownedTriangleConsumers);
+        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 16, unownedTriangleConsumers);
         _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
 
         std::cout << "volume->depth(): " << _volume->depth() << std::endl;
@@ -456,7 +465,7 @@ private:
 
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
-        auto mainSphereRadius = length(size) * 0.2F;
+        auto mainSphereRadius = size.x * 0.2F;
         auto secondarySphereRadius = mainSphereRadius * 0.2F;
 
         _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(
@@ -493,6 +502,23 @@ private:
             _volume->march(mat4(1), false);
             break;
         }
+    }
+
+    void examineOctree()
+    {
+        auto indenter = [](int count) {
+            std::string indent = "";
+            for (int i = 0; i < count; i++) {
+                indent += "\t";
+            }
+            return indent;
+        };
+
+        _volume->walkOctree([&indenter](OctreeVolume::Node* node) {
+            std::cout << indenter(node->depth) << "(" << node->childIdx << " @ " << node->depth << ")"
+                      << " march: " << std::boolalpha << node->march
+                      << " empty: " << std::boolalpha << node->empty << std::endl;
+        });
     }
 };
 
