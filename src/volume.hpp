@@ -156,14 +156,20 @@ protected:
 class OctreeVolume : public BaseCompositeVolume {
 public:
     struct Node {
-        Node(const AABB bounds, int depth)
+        Node() = delete;
+        Node(const Node &) = delete;
+        Node(const Node &&) = delete;
+        Node(const AABB bounds, int depth, int childIdx)
             : bounds(bounds)
             , depth(depth)
+            , childIdx(childIdx)
         {
         }
+        ~Node() = default;
 
         AABB bounds;
-        int depth;
+        int depth = 0;
+        int childIdx = 0;
         bool isLeaf = false;
         bool march = false;
         bool empty = false;
@@ -176,7 +182,7 @@ public:
     OctreeVolume(int size, float fuzziness, int minNodeSize, const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers)
         : BaseCompositeVolume(ivec3 { size, size, size }, fuzziness)
         , _bounds(AABB(ivec3(0, 0, 0), ivec3(size, size, size)))
-        , _root(buildOctreeNode(_bounds, minNodeSize, 0))
+        , _root(buildOctreeNode(_bounds, minNodeSize, 0, 0))
         , _triangleConsumers(triangleConsumers)
     {
     }
@@ -276,16 +282,14 @@ protected:
 
                 // copy up their samplers
                 for (auto& child : currentNode->children) {
-                    child->march = false;
-
                     // FIXME: Using a std::set() here makes sense but there may be
-                    // a smarter way to store samplers non-redundantly
+                    // a smarter way to store samplers non-redundantly.
                     currentNode->additiveSamplers.insert(std::begin(child->additiveSamplers), std::end(child->additiveSamplers));
                     currentNode->subtractiveSamplers.insert(std::begin(child->subtractiveSamplers), std::end(child->subtractiveSamplers));
                 }
-            }
 
-            return true;
+                return true;
+            }
         }
 
         return false;
@@ -301,16 +305,16 @@ protected:
             nodesToMarch.push_back(currentNode);
         } else if (!currentNode->isLeaf) {
             // if this is not a leaf node and not marked
-            for (const auto& childNode : currentNode->children) {
-                collect(childNode.get(), nodesToMarch);
+            for (const auto& child : currentNode->children) {
+                collect(child.get(), nodesToMarch);
             }
         }
     }
 
-    std::unique_ptr<Node> buildOctreeNode(AABB bounds, int minNodeSize, int depth)
+    std::unique_ptr<Node> buildOctreeNode(AABB bounds, int minNodeSize, int depth, int childIdx)
     {
         _maxDepth = std::max(depth, _maxDepth);
-        auto node = std::make_unique<Node>(bounds, depth);
+        auto node = std::make_unique<Node>(bounds, depth, childIdx);
 
         // we're working on cubes, so only one bounds size is checked
         int size = bounds.size().x;
@@ -318,7 +322,7 @@ protected:
             node->isLeaf = false;
             auto childBounds = bounds.octreeSubdivide();
             for (size_t i = 0, N = childBounds.size(); i < N; i++) {
-                node->children[i] = buildOctreeNode(childBounds[i], minNodeSize, depth + 1);
+                node->children[i] = buildOctreeNode(childBounds[i], minNodeSize, depth + 1, i);
             }
         } else {
             node->isLeaf = true;
