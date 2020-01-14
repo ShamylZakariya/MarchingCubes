@@ -252,10 +252,14 @@ protected:
             }
         }
 
-        for (const auto sampler : _subtractiveSamplers) {
-            if (sampler->test(currentNode->bounds)) {
-                currentNode->subtractiveSamplers.insert(sampler);
-                currentNode->empty = false;
+        // we don't care about subtractiveSamplers UNLESS the
+        // current node has additive ones; because without any
+        // additive samplers, there is no volume to subtract from
+        if (!currentNode->empty) {
+            for (const auto sampler : _subtractiveSamplers) {
+                if (sampler->test(currentNode->bounds)) {
+                    currentNode->subtractiveSamplers.insert(sampler);
+                }
             }
         }
 

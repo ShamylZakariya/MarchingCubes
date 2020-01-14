@@ -35,6 +35,10 @@ void OctreeVolume::march(
 
     std::atomic_int voxelsMarched = 0u;
 
+    for (auto &tc : _triangleConsumers) {
+        tc->start();
+    }
+
     std::mutex popMutex;
     for (std::size_t i = 0, N = _marchThreads->size(); i < N; i++) {
         _marchThreads->enqueue([&popMutex, this, &voxelsMarched, i, N, &transform, computeNormals]() {
@@ -59,6 +63,10 @@ void OctreeVolume::march(
     }
 
     _marchThreads->wait();
+
+    for (auto &tc : _triangleConsumers) {
+        tc->finish();
+    }
 
     std::cout << "marched " << voxelsMarched << " voxels out of worst-case of " << maxVoxelCount
               << " : " << (static_cast<float>(voxelsMarched) / static_cast<float>(maxVoxelCount))
