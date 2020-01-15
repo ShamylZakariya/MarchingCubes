@@ -17,13 +17,17 @@
 #include <random>
 #include <thread>
 
+#ifndef __APPLE__
+#include <sched.h>
+#endif
+
 class ThreadPool {
 public:
     ThreadPool(unsigned int n = std::thread::hardware_concurrency(), bool pinThreads = true)
     {
         for (unsigned int i = 0; i < n; ++i)
             _workers.emplace_back([this, i, pinThreads]() {
-                threadLoop(pinThreads ? i : -1);
+                threadLoop(pinThreads ? i % std::thread::hardware_concurrency() : -1);
             });
     }
 
@@ -60,7 +64,30 @@ private:
     void threadLoop(int pinnedCpuIdx)
     {
         if (pinnedCpuIdx >= 0) {
-            // TODO(shamyl@gmail.com): set core affinity here
+#ifndef __APPLE__
+            cpu_set_t mask;
+            CPU_ZERO(&mask);
+            CPU_SET(pinnedCpuIdx, &mask);
+            auto result = sched_setaffinity(0, sizeof(cpu_set_t), &mask);
+            if (result != 0) {
+                std::string err = "<Unknown>";
+                switch (result) {
+                case EINVAL:
+                    err = "EINVAL";
+                    break;
+                case EFAULT:
+                    err = "EFAULT";
+                    break;
+                case EPERM:
+                    err = "EPERM";
+                    break;
+                case ESRCH:
+                    err = "ESRCH";
+                    break;
+                }
+                std::cerr << "sched_setaffinity failed: " << err << std::endl;
+            }
+#endif
         }
 
         while (true) {

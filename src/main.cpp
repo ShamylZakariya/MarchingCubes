@@ -136,7 +136,6 @@ private:
 
     mat4 _model { 1 };
     mat4 _trackballRotation { 1 };
-    float _cameraZPosition = -120;
 
     std::unique_ptr<OctreeVolume> _volume;
     unowned_ptr<SphereVolumeSampler> _mainShere;
@@ -159,6 +158,7 @@ private:
     bool _marchOnce = false;
     float _fuzziness = 1.0F;
     float _aspect = 1;
+    float _dolly = 1;
 
 private:
     void initWindow()
@@ -312,10 +312,8 @@ private:
 
     void onMouseWheel(const vec2& scrollOffset)
     {
-        // move camera forward/backward
-        float cameraDollySpeed = 0.1F * std::abs(_cameraZPosition);
-        _cameraZPosition += cameraDollySpeed * +scrollOffset.y;
-        _cameraZPosition = min(_cameraZPosition, 0.01F);
+        _dolly -= 0.025F * scrollOffset.y;
+        _dolly = clamp<float>(_dolly, 0, 1);
     }
 
     void step(float now, float deltaT)
@@ -347,20 +345,29 @@ private:
         util::CheckGlError("drawFrame");
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // TODO: Don't dolly _cameraZPosition on scroll, just update some scalar
-        // and use that to position camera on z for perspective, and to scale the
-        // bounds volume for ortho
-        const auto view = lookAt(vec3(0, 0, _cameraZPosition), vec3(0, 0, 0), vec3(0, 1, 0));
         const auto model = _trackballRotation * _model;
-        const auto mvp = [this, &view, &model]() {
+        const auto mvp = [this, &model]() {
             if (_useOrthoProjection) {
                 auto bounds = _volume->bounds();
                 auto size = length(bounds.size());
-                auto width = _aspect * size;
-                auto height = size;
+
+                auto scaleMin = 0.1F;
+                auto scaleMax = 5.0F;
+                auto scale = mix(scaleMin, scaleMax, _dolly);
+
+                auto width = scale * _aspect * size;
+                auto height = scale * size;
+
                 auto proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
+                const auto view = lookAt(vec3(0, 0, -FAR_PLANE/2), vec3(0, 0, 0), vec3(0, 1, 0));
                 return proj * view * model;
             } else {
+                auto bounds = _volume->bounds();
+                auto minCameraZ = 0.1F;
+                auto maxCameraZ = length(bounds.size()) * 2;
+                auto cameraZ = -mix(minCameraZ, maxCameraZ, pow<float>(_dolly, 2));
+
+                const auto view = lookAt(vec3(0, 0, cameraZ), vec3(0, 0, 0), vec3(0, 1, 0));
                 auto proj = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
                 return proj * view * model;
             }
@@ -430,7 +437,7 @@ private:
     {
         // build a volume
         auto nThreads = std::thread::hardware_concurrency();
-        std::cout << "Will use " << nThreads << " threads to march _volume" << std::endl;
+        std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
 
         std::vector<unowned_ptr<ITriangleConsumer>> unownedTriangleConsumers;
         for (auto i = 0u; i < nThreads; i++) {
@@ -438,10 +445,8 @@ private:
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
-        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 16, unownedTriangleConsumers);
+        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
         _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
-
-        std::cout << "volume->depth(): " << _volume->depth() << std::endl;
 
         // generate AABBs for debug
         float hueStep = 360.0F / _volume->depth();
@@ -465,7 +470,7 @@ private:
 
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
-        auto mainSphereRadius = size.x * 0.2F;
+        auto mainSphereRadius = size.x * 0.4F;
         auto secondarySphereRadius = mainSphereRadius * 0.2F;
 
         _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(

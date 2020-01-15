@@ -22,26 +22,13 @@ void OctreeVolume::march(
     _marchNodes.clear();
     collect(_marchNodes);
 
-    int willMarch = 0;
-    for (auto node : _marchNodes) {
-        willMarch += node->bounds.volume();
-    }
-
-    auto maxVoxelCount = size().x * size().y * size().z;
-
-    std::cout << "will marched " << willMarch << " voxels out of worst-case of " << maxVoxelCount
-              << " : " << (static_cast<float>(willMarch) / static_cast<float>(maxVoxelCount))
-              << std::endl;
-
-    std::atomic_int voxelsMarched = 0u;
-
     for (auto &tc : _triangleConsumers) {
         tc->start();
     }
 
     std::mutex popMutex;
     for (std::size_t i = 0, N = _marchThreads->size(); i < N; i++) {
-        _marchThreads->enqueue([&popMutex, this, &voxelsMarched, i, N, &transform, computeNormals]() {
+        _marchThreads->enqueue([&popMutex, this, i, N, &transform, computeNormals]() {
             while (true) {
                 Node* node = nullptr;
                 {
@@ -57,7 +44,6 @@ void OctreeVolume::march(
                 // we need to march the sub-region against the set of samplers in node
 
                 mc::march(*this, node->bounds, *_triangleConsumers[i % N], transform, computeNormals);
-                voxelsMarched += node->bounds.volume();
             }
         });
     }
@@ -67,8 +53,4 @@ void OctreeVolume::march(
     for (auto &tc : _triangleConsumers) {
         tc->finish();
     }
-
-    std::cout << "marched " << voxelsMarched << " voxels out of worst-case of " << maxVoxelCount
-              << " : " << (static_cast<float>(voxelsMarched) / static_cast<float>(maxVoxelCount))
-              << std::endl;
 }
