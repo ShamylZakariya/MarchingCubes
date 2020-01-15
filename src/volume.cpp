@@ -6,9 +6,10 @@
 //  Copyright © 2020 Shamyl Zakariya. All rights reserved.
 //
 
-#include "volume.hpp"
-
 #include <atomic>
+
+#include "marching_cubes.hpp"
+#include "volume.hpp"
 
 void OctreeVolume::march(
     const mat4& transform,
@@ -22,7 +23,21 @@ void OctreeVolume::march(
     _marchNodes.clear();
     collect(_marchNodes);
 
-    for (auto &tc : _triangleConsumers) {
+    // collapse each node's set of samplers to a vector for faster iteration when marching
+    for (const auto& node : _marchNodes) {
+        node->_additiveSamplersVec.clear();
+        node->_subtractiveSamplersVec.clear();
+
+        std::copy(std::begin(node->additiveSamplers),
+            std::end(node->additiveSamplers),
+            std::back_inserter(node->_additiveSamplersVec));
+
+        std::copy(std::begin(node->subtractiveSamplers),
+            std::end(node->subtractiveSamplers),
+            std::back_inserter(node->_subtractiveSamplersVec));
+    }
+
+    for (auto& tc : _triangleConsumers) {
         tc->start();
     }
 
@@ -40,17 +55,44 @@ void OctreeVolume::march(
                     _marchNodes.pop_back();
                 }
 
-                // FIXME: we shouldn't be calling march() - it doesn't know which samplers to use
-                // we need to march the sub-region against the set of samplers in node
-
-                mc::march(*this, node->bounds, *_triangleConsumers[i % N], transform, computeNormals);
+                march(node, *_triangleConsumers[i % N], transform, computeNormals);
             }
         });
     }
 
     _marchThreads->wait();
 
-    for (auto &tc : _triangleConsumers) {
+    for (auto& tc : _triangleConsumers) {
         tc->finish();
     }
+}
+
+void OctreeVolume::march(OctreeVolume::Node* node, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
+{
+    auto fuzziness = this->_fuzziness;
+    auto valueSampler = [fuzziness, node](const vec3& p) {
+        float value = 0;
+        for (auto additiveSampler : node->_additiveSamplersVec) {
+            value += additiveSampler->valueAt(p, fuzziness);
+        }
+        value = min<float>(value, 1.0F);
+        for (auto subtractiveSampler : node->_subtractiveSamplersVec) {
+            value -= subtractiveSampler->valueAt(p, fuzziness);
+        }
+        value = max<float>(value, 0.0F);
+        return value;
+    };
+
+    auto normalSampler = [&valueSampler](const vec3& p) {
+        // from GPUGems 3 Chap 1 -- compute normal of voxel space
+        const float d = 0.1f;
+        vec3 grad(
+            valueSampler(p + vec3(d, 0, 0)) - valueSampler(p + vec3(-d, 0, 0)),
+            valueSampler(p + vec3(0, d, 0)) - valueSampler(p + vec3(0, -d, 0)),
+            valueSampler(p + vec3(0, 0, d)) - valueSampler(p + vec3(0, 0, -d)));
+
+        return -normalize(grad);
+    };
+
+    mc::march(iAABB(node->bounds), valueSampler, normalSampler, tc, transform, computeNormals);
 }

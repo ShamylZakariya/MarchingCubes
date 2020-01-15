@@ -157,8 +157,8 @@ class OctreeVolume : public BaseCompositeVolume {
 public:
     struct Node {
         Node() = delete;
-        Node(const Node &) = delete;
-        Node(const Node &&) = delete;
+        Node(const Node&) = delete;
+        Node(const Node&&) = delete;
         Node(const AABB bounds, int depth, int childIdx)
             : bounds(bounds)
             , depth(depth)
@@ -176,6 +176,12 @@ public:
         std::array<std::unique_ptr<Node>, 8> children;
         std::unordered_set<IVolumeSampler*> additiveSamplers;
         std::unordered_set<IVolumeSampler*> subtractiveSamplers;
+
+    private:
+        friend class OctreeVolume;
+
+        std::vector<IVolumeSampler*> _additiveSamplersVec;
+        std::vector<IVolumeSampler*> _subtractiveSamplersVec;
     };
 
 public:
@@ -234,6 +240,8 @@ public:
     }
 
 protected:
+    void march(OctreeVolume::Node* node, ITriangleConsumer& tc, const mat4& transform, bool computeNormals);
+
     /**
      * Mark the nodes which should be marched.
     */

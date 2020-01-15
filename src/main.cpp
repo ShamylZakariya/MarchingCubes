@@ -359,7 +359,7 @@ private:
                 auto height = scale * size;
 
                 auto proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
-                const auto view = lookAt(vec3(0, 0, -FAR_PLANE/2), vec3(0, 0, 0), vec3(0, 1, 0));
+                const auto view = lookAt(vec3(0, 0, -FAR_PLANE / 2), vec3(0, 0, 0), vec3(0, 1, 0));
                 return proj * view * model;
             } else {
                 auto bounds = _volume->bounds();

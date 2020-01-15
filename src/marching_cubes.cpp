@@ -40,14 +40,13 @@ void march(const IIsoSurface& volume, ITriangleConsumer& tc, const mat4& transfo
     tc.finish();
 }
 
-void march(const IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
+void march(const IIsoSurface& volume,
+    iAABB region, ITriangleConsumer& tc,
+    const mat4& transform,
+    bool computeNormals)
 {
-    using detail::GetGridCell;
-    using detail::GridCell;
-    using detail::Polygonise;
-
     Triangle triangles[5];
-    GridCell cell;
+    detail::GridCell cell;
 
     region.min = max(region.min, ivec3(0));
     region.max = min(region.max, volume.size());
@@ -55,8 +54,8 @@ void march(const IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const
     for (int z = region.min.z; z < region.max.z; z++) {
         for (int y = region.min.y; y < region.max.y; y++) {
             for (int x = region.min.x; x < region.max.x; x++) {
-                if (GetGridCell(x, y, z, volume, cell, transform)) {
-                    for (int t = 0, nTriangles = Polygonise(cell, IsoLevel, volume, triangles, computeNormals); t < nTriangles; t++) {
+                if (detail::GetGridCell(x, y, z, volume, cell, transform)) {
+                    for (int t = 0, nTriangles = detail::Polygonise(cell, IsoLevel, volume, triangles, computeNormals); t < nTriangles; t++) {
                         tc.addTriangle(triangles[t]);
                     }
                 }
@@ -65,6 +64,28 @@ void march(const IIsoSurface& volume, iAABB region, ITriangleConsumer& tc, const
     }
 }
 
+void march(iAABB region,
+    IsoSurfaceValueFunction valueSampler,
+    IsoSurfaceNormalFunction normalSampler,
+    ITriangleConsumer& tc,
+    const mat4& transform,
+    bool computeNormals)
+{
+    Triangle triangles[5];
+    detail::GridCell cell;
+
+    for (int z = region.min.z; z < region.max.z; z++) {
+        for (int y = region.min.y; y < region.max.y; y++) {
+            for (int x = region.min.x; x < region.max.x; x++) {
+                if (detail::GetGridCell(x, y, z, valueSampler, cell, transform)) {
+                    for (int t = 0, nTriangles = detail::Polygonise(cell, IsoLevel, normalSampler, triangles, computeNormals); t < nTriangles; t++) {
+                        tc.addTriangle(triangles[t]);
+                    }
+                }
+            }
+        }
+    }
+}
 //
 // ThreadedMarcher
 //

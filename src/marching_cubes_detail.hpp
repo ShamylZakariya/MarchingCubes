@@ -388,7 +388,7 @@ constexpr int triTable[256][16] = {
     of totally below the isolevel.
 */
 
-int Polygonise(const GridCell& grid, float isolevel, const mc::IIsoSurface& volume, Triangle* triangles, bool computeNormals)
+int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction normalSampler, Triangle* triangles, bool computeNormals)
 {
     /*
         Determine the index into the edge table which
@@ -506,9 +506,9 @@ int Polygonise(const GridCell& grid, float isolevel, const mc::IIsoSurface& volu
         triangles[numTriangles].c.pos = vertList[triTable[cubeIndex][i + 2]];
 
         if (computeNormals) {
-            triangles[numTriangles].a.normal = volume.normalAt(sourceList[triTable[cubeIndex][i]]);
-            triangles[numTriangles].b.normal = volume.normalAt(sourceList[triTable[cubeIndex][i + 1]]);
-            triangles[numTriangles].c.normal = volume.normalAt(sourceList[triTable[cubeIndex][i + 2]]);
+            triangles[numTriangles].a.normal = normalSampler(sourceList[triTable[cubeIndex][i]]);
+            triangles[numTriangles].b.normal = normalSampler(sourceList[triTable[cubeIndex][i + 1]]);
+            triangles[numTriangles].c.normal = normalSampler(sourceList[triTable[cubeIndex][i + 2]]);
         } else {
             vec3 n = normalize(cross(triangles[numTriangles].b.pos - triangles[numTriangles].a.pos, triangles[numTriangles].c.pos - triangles[numTriangles].a.pos));
             triangles[numTriangles].a.normal = n;
@@ -522,11 +522,20 @@ int Polygonise(const GridCell& grid, float isolevel, const mc::IIsoSurface& volu
     return numTriangles;
 }
 
+int Polygonise(const GridCell& grid, float isolevel, const mc::IIsoSurface& volume, Triangle* triangles, bool computeNormals)
+{
+    auto normalSampler = [&volume](const vec3& p) -> vec3 {
+        return volume.normalAt(p);
+    };
+
+    return Polygonise(grid, isolevel, normalSampler, triangles, computeNormals);
+}
+
 //
 // GridCell Access
 //
 
-bool GetGridCell(int x, int y, int z, const mc::IIsoSurface& volume, GridCell& cell, const mat4& transform)
+bool GetGridCell(int x, int y, int z, IsoSurfaceValueFunction valueFunction, GridCell& cell, const mat4& transform)
 {
     // store the location in the voxel array
     cell.v[0] = vec3(x, y, z);
@@ -540,15 +549,15 @@ bool GetGridCell(int x, int y, int z, const mc::IIsoSurface& volume, GridCell& c
     cell.v[7] = vec3(x, y + 1, z + 1);
 
     // store the value in the voxel array
-    cell.val[0] = volume.valueAt(cell.v[0]);
-    cell.val[1] = volume.valueAt(cell.v[1]);
-    cell.val[2] = volume.valueAt(cell.v[2]);
-    cell.val[3] = volume.valueAt(cell.v[3]);
+    cell.val[0] = valueFunction(cell.v[0]);
+    cell.val[1] = valueFunction(cell.v[1]);
+    cell.val[2] = valueFunction(cell.v[2]);
+    cell.val[3] = valueFunction(cell.v[3]);
 
-    cell.val[4] = volume.valueAt(cell.v[4]);
-    cell.val[5] = volume.valueAt(cell.v[5]);
-    cell.val[6] = volume.valueAt(cell.v[6]);
-    cell.val[7] = volume.valueAt(cell.v[7]);
+    cell.val[4] = valueFunction(cell.v[4]);
+    cell.val[5] = valueFunction(cell.v[5]);
+    cell.val[6] = valueFunction(cell.v[6]);
+    cell.val[7] = valueFunction(cell.v[7]);
 
     cell.occupied = (cell.val[0] > 0 || cell.val[1] > 0 || cell.val[2] > 0 || cell.val[3] > 0 || cell.val[4] > 0 || cell.val[5] > 0 || cell.val[6] > 0 || cell.val[7] > 0);
 
@@ -566,6 +575,15 @@ bool GetGridCell(int x, int y, int z, const mc::IIsoSurface& volume, GridCell& c
     }
 
     return cell.occupied;
+}
+
+bool GetGridCell(int x, int y, int z, const mc::IIsoSurface& volume, GridCell& cell, const mat4& transform)
+{
+    auto valueSampler = [&volume](const vec3& p) -> float {
+        return volume.valueAt(p);
+    };
+
+    return GetGridCell(x, y, z, valueSampler, cell, transform);
 }
 
 } // namespace mc::detail
