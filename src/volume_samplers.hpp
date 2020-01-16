@@ -22,15 +22,22 @@ public:
         : IVolumeSampler(mode)
         , _position(position)
         , _radius(radius)
+        , _radius2(radius * radius)
     {
-        updateBounds();
     }
 
     ~SphereVolumeSampler() override = default;
 
     bool test(const AABB bounds) const override
     {
-        return _bounds.intersect(bounds) != AABB::Intersection::Outside;
+        // find the point on surface of bounds closest to _position
+        vec3 closestPoint {
+            max(bounds.min.x, min(_position.x, bounds.max.x)),
+            max(bounds.min.y, min(_position.y, bounds.max.y)),
+            max(bounds.min.z, min(_position.z, bounds.max.z))
+        };
+
+        return distance2(_position, closestPoint) <= _radius2;
     }
 
     float valueAt(const vec3& p, float fuzziness) const override
@@ -54,26 +61,22 @@ public:
     void setPosition(const vec3& center)
     {
         _position = center;
-        updateBounds();
     }
+
     void setRadius(float radius)
     {
         _radius = max<float>(radius, 0);
-        updateBounds();
+        _radius2 = _radius * _radius;
     }
-    vec3 position() const { return _position; }
-    float radius() const { return _radius; }
 
-private:
-    void updateBounds()
-    {
-        _bounds = AABB(_position, _radius);
-    }
+    vec3 position() const { return _position; }
+
+    float radius() const { return _radius; }
 
 private:
     vec3 _position;
     float _radius;
-    AABB _bounds;
+    float _radius2;
 };
 
 /*
