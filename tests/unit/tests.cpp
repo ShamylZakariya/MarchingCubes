@@ -57,11 +57,19 @@ TEST_CASE("SphereSampler", "[samplers]")
         // enclosing AABB intersects sphere
         REQUIRE(sampler.test(AABB(vec3(0, 0, 0), 2 * radius)));
 
-        // tangential enclosing AABB intersects sphere
-        REQUIRE(sampler.test(AABB(vec3(radius, 0, 0), 2 * radius)));
+        // tangential AABB intersects sphere
+        {
+            auto bb = AABB(vec3(radius + 10, 0, 0), 10);
+            auto r = sampler.test(bb);
+            REQUIRE(r);
+        }
 
         // distant AABB doesn't intersect sphere
-        REQUIRE_FALSE(sampler.test(AABB(vec3(3 * radius, 0, 0), 2 * radius)));
+        {
+            auto bb = AABB(vec3(radius + 1000, 0, 0), 10);
+            auto r = sampler.test(bb);
+            REQUIRE_FALSE(r);
+        }
     }
 }
 
@@ -214,6 +222,8 @@ TEST_CASE("OctreePartitioning", "[octree]")
             REQUIRE(bounds.size().x == expectedSize);
             REQUIRE(bounds.size().x == bounds.size().y);
             REQUIRE(bounds.size().x == bounds.size().z);
+
+            return true;
         });
 
         // Expect octree node max depth == 2
@@ -249,6 +259,8 @@ TEST_CASE("OctreePartitioning", "[octree]")
             REQUIRE(bounds.size().x == expectedSize);
             REQUIRE(bounds.size().x == bounds.size().y);
             REQUIRE(bounds.size().x == bounds.size().z);
+
+            return true;
         });
 
         // Expect octree node max depth == 2
@@ -284,6 +296,7 @@ TEST_CASE("OctreePartitioning", "[octree]")
         auto nodes = std::vector<OctreeVolume::Node*>();
         octree.walkOctree([&nodes](auto node) {
             nodes.push_back(node);
+            return true;
         });
 
         REQUIRE(nodes.size() == 9);

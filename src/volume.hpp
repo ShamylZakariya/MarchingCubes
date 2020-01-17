@@ -168,6 +168,7 @@ public:
         ~Node() = default;
 
         AABB bounds;
+        AABB expandedBounds;
         int depth = 0;
         int childIdx = 0;
         bool isLeaf = false;
@@ -196,7 +197,7 @@ public:
     void collect(std::vector<Node*>& collector)
     {
         /*
-            I believe I should probably skip the root node; it will always intersect
+            TODO: I believe I should probably skip the root node; it will always intersect
             something; it's not useful. Perhaps we should just manually iterate its 8 children
             from the public entry point?
         */
@@ -204,13 +205,14 @@ public:
         collect(_root.get(), collector);
     }
 
-    void walkOctree(std::function<void(Node*)> visitor)
+    void walkOctree(std::function<bool(Node*)> visitor)
     {
         std::function<void(Node*)> walker = [&visitor, &walker](Node* node) {
-            visitor(node);
-            if (!node->isLeaf) {
-                for (auto& child : node->children) {
-                    walker(child.get());
+            if (visitor(node)) {
+                if (!node->isLeaf) {
+                    for (auto& child : node->children) {
+                        walker(child.get());
+                    }
                 }
             }
         };
@@ -221,7 +223,9 @@ public:
     /**
      * March the represented volume into the triangle consumers provided in the constructor
     */
-    void march(const mat4& transform = mat4(1), bool computeNormals = true);
+    void march(const mat4& transform = mat4(1),
+        bool computeNormals = true,
+        std::vector<OctreeVolume::Node*>* nodesMarched = nullptr);
 
     /**
      * Get the bounds of this volume - no geometry will exceed this region
@@ -239,6 +243,15 @@ public:
         return _maxDepth;
     }
 
+    void marchStats(int& voxelsMarched,
+        std::vector<int>& nodesVisitedByDepth,
+        std::vector<OctreeVolume::Node*>& nodesMarched)
+    {
+        voxelsMarched = _voxelsMarched;
+        nodesVisitedByDepth = _nodesVisitedByDepth;
+        nodesMarched = _nodesToMarch;
+    }
+
 protected:
     void march(OctreeVolume::Node* node, ITriangleConsumer& tc, const mat4& transform, bool computeNormals);
 
@@ -254,7 +267,7 @@ protected:
         currentNode->subtractiveSamplers.clear();
 
         for (const auto sampler : _additiveSamplers) {
-            if (sampler->test(currentNode->bounds)) {
+            if (sampler->test(currentNode->expandedBounds)) {
                 currentNode->additiveSamplers.insert(sampler);
                 currentNode->empty = false;
             }
@@ -265,7 +278,7 @@ protected:
         // additive samplers, there is no volume to subtract from
         if (!currentNode->empty) {
             for (const auto sampler : _subtractiveSamplers) {
-                if (sampler->test(currentNode->bounds)) {
+                if (sampler->test(currentNode->expandedBounds)) {
                     currentNode->subtractiveSamplers.insert(sampler);
                 }
             }
@@ -294,8 +307,6 @@ protected:
 
                 // copy up their samplers
                 for (auto& child : currentNode->children) {
-                    // FIXME: Using a std::set() here makes sense but there may be
-                    // a smarter way to store samplers non-redundantly.
                     currentNode->additiveSamplers.insert(std::begin(child->additiveSamplers), std::end(child->additiveSamplers));
                     currentNode->subtractiveSamplers.insert(std::begin(child->subtractiveSamplers), std::end(child->subtractiveSamplers));
                 }
@@ -328,6 +339,11 @@ protected:
         _maxDepth = std::max(depth, _maxDepth);
         auto node = std::make_unique<Node>(bounds, depth, childIdx);
 
+        // FIXME expand bounds slightly to fix artifacting - is this actually a fix?
+        auto expandedBounds = bounds;
+        expandedBounds.outset(static_cast<float>(minNodeSize) * 0.125F);
+        node->expandedBounds = expandedBounds;
+
         // we're working on cubes, so only one bounds size is checked
         int size = bounds.size().x;
         if (size / 2 >= minNodeSize) {
@@ -347,9 +363,13 @@ private:
     AABB _bounds;
     int _maxDepth = 0;
     std::unique_ptr<Node> _root;
-    std::vector<Node*> _marchNodes;
+    std::vector<Node*> _nodesToMarch;
     std::unique_ptr<ThreadPool> _marchThreads;
     std::vector<unowned_ptr<ITriangleConsumer>> _triangleConsumers;
+
+    // stats
+    std::vector<int> _nodesVisitedByDepth;
+    int _voxelsMarched;
 };
 
 #endif /* volume_hpp */

@@ -36,6 +36,7 @@ const int HEIGHT = 900;
 const float NEAR_PLANE = 0.1f;
 const float FAR_PLANE = 1000.0f;
 const float FOV_DEGREES = 50.0F;
+const float OCTREE_NODE_INSET_FACTOR = 0.0625F;
 
 //
 // Data
@@ -142,12 +143,20 @@ private:
     unowned_ptr<SphereVolumeSampler> _secondaryShere;
     unowned_ptr<BoundedPlaneVolumeSampler> _plane;
     std::unique_ptr<mc::ThreadedMarcher> _marcher;
-    LineSegmentBuffer _lineSegmentStorage;
+    LineSegmentBuffer _octreeAABBLineSegmentStorage;
+    LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
 
     bool _animateVolume = false;
     bool _running = true;
-    bool _drawAABBs = true;
     bool _useOrthoProjection = true;
+
+    enum class AABBDisplay : int {
+        None,
+        OctreeGraph,
+        MarchNodes
+    };
+
+    AABBDisplay _aabbDisplay = AABBDisplay::None;
 
     enum class MarchTechnique : int {
         ThreadedMarcher = 0,
@@ -155,10 +164,15 @@ private:
     };
 
     MarchTechnique _marchTechnique = MarchTechnique::OctreeVolume;
-    bool _marchOnce = false;
+
+    bool _needsMarchVolume = false;
     float _fuzziness = 1.0F;
     float _aspect = 1;
     float _dolly = 1;
+    float _animationPhase = 0;
+
+    std::vector<vec4> _nodeColors;
+    std::vector<OctreeVolume::Node*> _nodesMarched;
 
 private:
     void initWindow()
@@ -277,7 +291,7 @@ private:
         if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE) || scancode == glfwGetKeyScancode(GLFW_KEY_Q)) {
             _running = false;
         } else if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
-            examineOctree();
+            displayMarchStats();
         }
     }
 
@@ -319,24 +333,21 @@ private:
     void step(float now, float deltaT)
     {
         if (_animateVolume) {
-            if (_plane) {
-                const float planeSpeed = 5;
-                auto origin = _plane->planeOrigin();
-                auto height = _volume->size().y;
-                if (origin.y < 0) {
-                    origin.y = height;
-                }
-                _plane->setPlaneOrigin(origin + vec3(0, -1, 0) * planeSpeed * deltaT);
-
-                float angle = static_cast<float>(M_PI * origin.y / height);
-                vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
-                _plane->setPlaneNormal(normal);
-            }
+            _animationPhase = now * 0.2F;
         }
 
-        if (_animateVolume || _marchOnce) {
+        float i = 0;
+        _animationPhase = std::modf(_animationPhase, &i);
+
+        if (_plane) {
+            float angle = static_cast<float>(M_PI * _animationPhase);
+            vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
+            _plane->setPlaneNormal(normal);
+        }
+
+        if (_animateVolume || _needsMarchVolume) {
             marchVolume();
-            _marchOnce = false;
+            _needsMarchVolume = false;
         }
     }
 
@@ -347,27 +358,33 @@ private:
 
         const auto model = _trackballRotation * _model;
         const auto mvp = [this, &model]() {
-            if (_useOrthoProjection) {
+            if (_useOrthoProjection)
+            {
                 auto bounds = _volume->bounds();
                 auto size = length(bounds.size());
 
                 auto scaleMin = 0.1F;
                 auto scaleMax = 5.0F;
-                auto scale = mix(scaleMin, scaleMax, _dolly);
+                auto scale = mix(scaleMin, scaleMax, pow<float>(_dolly, 2.5));
 
                 auto width = scale * _aspect * size;
                 auto height = scale * size;
 
-                auto proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
-                const auto view = lookAt(vec3(0, 0, -FAR_PLANE / 2), vec3(0, 0, 0), vec3(0, 1, 0));
-                return proj * view * model;
-            } else {
-                auto bounds = _volume->bounds();
-                auto minCameraZ = 0.1F;
-                auto maxCameraZ = length(bounds.size()) * 2;
-                auto cameraZ = -mix(minCameraZ, maxCameraZ, pow<float>(_dolly, 2));
+                auto distance = FAR_PLANE / 2;
+                auto view = lookAt(-distance * vec3(0, 0, 1), vec3(0), vec3(0, 1, 0));
 
-                const auto view = lookAt(vec3(0, 0, cameraZ), vec3(0, 0, 0), vec3(0, 1, 0));
+                auto proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
+                return proj * view * model;
+            }
+            else
+            {
+                auto bounds = _volume->bounds();
+                auto minDistance = 0.1F;
+                auto maxDistance = length(bounds.size()) * 2;
+
+                auto distance = mix(minDistance, maxDistance, pow<float>(_dolly, 2));
+                auto view = lookAt(-distance * vec3(0, 0, 1), vec3(0), vec3(0, 1, 0));
+
                 auto proj = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
                 return proj * view * model;
             }
@@ -376,22 +393,29 @@ private:
         glUseProgram(_volumeProgram.program);
         glUniformMatrix4fv(_volumeProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
         glUniformMatrix4fv(_volumeProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
-        util::CheckGlError("bind _volumeProgram");
 
         glDepthMask(GL_TRUE);
         for (auto& tc : _triangleConsumers) {
             tc->draw();
-            util::CheckGlError("draw triangle consumer");
         }
 
-        if (_drawAABBs) {
+        switch (_aabbDisplay) {
+        case AABBDisplay::None:
+            break;
+        case AABBDisplay::OctreeGraph:
             glDepthMask(GL_FALSE);
             glUseProgram(_lineProgram.program);
             glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
             glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
-            util::CheckGlError("bind _lineProgram");
-            _lineSegmentStorage.draw();
-            util::CheckGlError("draw line segment storage");
+            _octreeAABBLineSegmentStorage.draw();
+            break;
+        case AABBDisplay::MarchNodes:
+            glDepthMask(GL_FALSE);
+            glUseProgram(_lineProgram.program);
+            glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+            glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+            _octreeOccupiedAABBsLineSegmentStorage.draw();
+            break;
         }
 
         glDepthMask(GL_TRUE);
@@ -406,7 +430,11 @@ private:
         ImGui::Checkbox("Animate", &_animateVolume);
         if (!_animateVolume) {
             ImGui::SameLine();
-            _marchOnce = ImGui::Button("March Once");
+            _needsMarchVolume = ImGui::Button("March Once");
+        }
+
+        if (ImGui::InputFloat("Animation Phase", &_animationPhase, 0.01F, 0.1F)) {
+            _needsMarchVolume = true;
         }
 
         ImGui::Separator();
@@ -421,14 +449,34 @@ private:
         ImGui::Separator();
         if (ImGui::SliderFloat("Fuzziness", &_fuzziness, 0, 5, "%.2f")) {
             _volume->setFuzziness(_fuzziness);
-            if (!_animateVolume) {
-                _marchOnce = true;
-            }
+            _needsMarchVolume = true;
         }
 
         ImGui::Separator();
-        ImGui::Checkbox("Draw AABBs", &_drawAABBs);
         ImGui::Checkbox("Ortho Projection", &_useOrthoProjection);
+
+        ImGui::Text("Reset Trackball Rotation");
+        if (ImGui::Button("+X")) {
+            _trackballRotation = rotate(mat4{1}, 0.0F, vec3(1,0,0));
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+Y")) {
+            _trackballRotation = rotate(mat4{1}, half_pi<float>(), vec3(1,0,0));
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+Z")) {
+            _trackballRotation = rotate(mat4{1}, half_pi<float>(), vec3(0,1,0));
+        }
+
+        ImGui::Separator();
+        ImGui::Text("AABBs");
+        auto aabbDisplay = _aabbDisplay;
+        ImGui::RadioButton("None", reinterpret_cast<int*>(&_aabbDisplay), 0);
+        ImGui::RadioButton("Octree Graph", reinterpret_cast<int*>(&_aabbDisplay), 1);
+        ImGui::RadioButton("March Nodes", reinterpret_cast<int*>(&_aabbDisplay), 2);
+        if (aabbDisplay != _aabbDisplay) {
+            aabbDisplayChanged();
+        }
 
         ImGui::End();
     }
@@ -448,19 +496,13 @@ private:
         _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
         _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
 
-        // generate AABBs for debug
-        float hueStep = 360.0F / _volume->depth();
-        std::vector<vec4> nodeColors;
-        for (int i = 0; i <= _volume->depth(); i++) {
-            util::color::hsv hC { i * hueStep, 0.6F, 1.0F };
-            auto rgbC = util::color::Hsv2Rgb(hC);
-            nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, 0.5F);
-        }
+        buildNodeColors(_volume->depth());
 
-        _volume->walkOctree([this, &nodeColors](OctreeVolume::Node* node) {
+        _volume->walkOctree([this](OctreeVolume::Node* node) {
             auto bounds = node->bounds;
-            bounds.inset(node->depth * 0.25F);
-            AppendAABB(bounds, _lineSegmentStorage, nodeColors[node->depth]);
+            bounds.inset(node->depth * OCTREE_NODE_INSET_FACTOR);
+            AppendAABB(bounds, _octreeAABBLineSegmentStorage, _nodeColors[node->depth]);
+            return true;
         });
 
         // TODO: when OctreeVolume works remove this fallback ThreadedMarcher
@@ -487,6 +529,11 @@ private:
         marchVolume();
     }
 
+    void aabbDisplayChanged()
+    {
+        marchVolume();
+    }
+
     void marchTechniqueChanged()
     {
         // clears storage
@@ -504,9 +551,50 @@ private:
             _marcher->march(mat4(1), false);
             break;
         case MarchTechnique::OctreeVolume:
-            _volume->march(mat4(1), false);
+            _volume->march(mat4(1), false, &_nodesMarched);
             break;
         }
+
+        _octreeOccupiedAABBsLineSegmentStorage.clear();
+        if (_aabbDisplay == AABBDisplay::MarchNodes) {
+            for (auto node : _nodesMarched) {
+                auto bounds = node->bounds;
+                bounds.inset(node->depth * OCTREE_NODE_INSET_FACTOR);
+                AppendAABB(bounds, _octreeOccupiedAABBsLineSegmentStorage, _nodeColors[node->depth]);
+            }
+        }
+    }
+
+    void buildNodeColors(int depth)
+    {
+        // generate AABBs for debug
+        _nodeColors.clear();
+        const float hueStep = 360.0F / depth;
+        for (int i = 0; i <= depth; i++) {
+            const util::color::hsv hC { i * hueStep, 0.6F, 1.0F };
+            const auto rgbC = util::color::Hsv2Rgb(hC);
+            _nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, mix<float>(0.6, 0.25, static_cast<float>(i) / depth));
+        }
+    }
+
+    void displayMarchStats()
+    {
+        auto maxVoxels = static_cast<int>(_volume->bounds().volume());
+        int voxelsMarched = 0;
+        std::vector<int> nodesMarchedByDepth;
+        _volume->marchStats(voxelsMarched, nodesMarchedByDepth, _nodesMarched);
+
+        std::cout << "marched " << voxelsMarched << "/" << maxVoxels
+                  << " voxels (" << (static_cast<float>(voxelsMarched) / static_cast<float>(maxVoxels)) << ")"
+                  << std::endl;
+
+        for (auto i = 0U; i < nodesMarchedByDepth.size(); i++) {
+            std::cout << "depth: " << i << "\t" << nodesMarchedByDepth[i]
+                      << "/" << static_cast<int>(pow(8, i)) << " nodes"
+                      << std::endl;
+        }
+
+        std::cout << std::endl;
     }
 
     void examineOctree()
@@ -523,6 +611,7 @@ private:
             std::cout << indenter(node->depth) << "(" << node->childIdx << " @ " << node->depth << ")"
                       << " march: " << std::boolalpha << node->march
                       << " empty: " << std::boolalpha << node->empty << std::endl;
+            return true;
         });
     }
 };
