@@ -14,14 +14,8 @@
 void OctreeVolume::march(
     const mat4& transform,
     bool computeNormals,
-    std::vector<OctreeVolume::Node*>* nodesMarched)
+    std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
-    _voxelsMarched = 0;
-    _nodesVisitedByDepth.resize(_maxDepth);
-    for (int i = 0; i <= _maxDepth; i++) {
-        _nodesVisitedByDepth[i] = 0;
-    }
-
     if (!_marchThreads) {
         auto nThreads = _triangleConsumers.size();
         _marchThreads = std::make_unique<ThreadPool>(nThreads, true);
@@ -30,8 +24,10 @@ void OctreeVolume::march(
     _nodesToMarch.clear();
     collect(_nodesToMarch);
 
-    if (nodesMarched != nullptr) {
-        *nodesMarched = _nodesToMarch;
+    if (marchedNodeObserver) {
+        for (const auto &node : _nodesToMarch) {
+            marchedNodeObserver(node);
+        }
     }
 
     // collapse each node's set of samplers to a vector for faster iteration when marching
@@ -64,10 +60,6 @@ void OctreeVolume::march(
                     }
                     node = _nodesToMarch.back();
                     _nodesToMarch.pop_back();
-
-                    _nodesVisitedByDepth[node->depth]++;
-                    auto count = static_cast<int>(node->bounds.volume());
-                    _voxelsMarched += count;
                 }
 
                 march(node, *_triangleConsumers[i % N], transform, computeNormals);

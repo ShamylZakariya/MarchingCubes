@@ -31,12 +31,12 @@
 // Constants
 //
 
-const int WIDTH = 1440;
-const int HEIGHT = 900;
-const float NEAR_PLANE = 0.1f;
-const float FAR_PLANE = 1000.0f;
-const float FOV_DEGREES = 50.0F;
-const float OCTREE_NODE_INSET_FACTOR = 0.0625F;
+constexpr int WIDTH = 1440;
+constexpr int HEIGHT = 900;
+constexpr float NEAR_PLANE = 0.1f;
+constexpr float FAR_PLANE = 1000.0f;
+constexpr float FOV_DEGREES = 50.0F;
+constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0625F;
 
 //
 // Data
@@ -68,16 +68,16 @@ struct ProgramState {
 // App
 //
 
-class OpenGLCubeApplication {
+class App {
 public:
-    OpenGLCubeApplication()
+    App()
     {
         initWindow();
         initGl();
         buildVolume();
     }
 
-    ~OpenGLCubeApplication() = default;
+    ~App() = default;
 
     void run()
     {
@@ -129,50 +129,49 @@ public:
 private:
     GLFWwindow* _window;
     util::FpsCalculator _fpsCalculator;
+
+    // render state
     ProgramState _volumeProgram, _lineProgram;
     std::vector<std::unique_ptr<ITriangleConsumer>> _triangleConsumers;
+    LineSegmentBuffer _octreeAABBLineSegmentStorage;
+    LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
 
+    // input state
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
-
     mat4 _model { 1 };
     mat4 _trackballRotation { 1 };
 
+
+    // volume and samplers
     std::unique_ptr<OctreeVolume> _volume;
     unowned_ptr<SphereVolumeSampler> _mainShere;
     unowned_ptr<SphereVolumeSampler> _secondaryShere;
     unowned_ptr<BoundedPlaneVolumeSampler> _plane;
-    std::unique_ptr<mc::ThreadedMarcher> _marcher;
-    LineSegmentBuffer _octreeAABBLineSegmentStorage;
-    LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
 
-    bool _animateVolume = false;
-    bool _running = true;
-    bool _useOrthoProjection = true;
-
+    // app state
     enum class AABBDisplay : int {
         None,
         OctreeGraph,
         MarchNodes
     };
 
+    bool _animateVolume = false;
+    bool _running = true;
+    bool _useOrthoProjection = true;
     AABBDisplay _aabbDisplay = AABBDisplay::None;
-
-    enum class MarchTechnique : int {
-        ThreadedMarcher = 0,
-        OctreeVolume = 1
-    };
-
-    MarchTechnique _marchTechnique = MarchTechnique::OctreeVolume;
-
     bool _needsMarchVolume = false;
     float _fuzziness = 1.0F;
     float _aspect = 1;
     float _dolly = 1;
     float _animationPhase = 0;
 
-    std::vector<vec4> _nodeColors;
-    std::vector<OctreeVolume::Node*> _nodesMarched;
+
+    struct MarchInfo {
+        int nodesMarched = 0;
+        std::vector<int> nodesMarchedByDepth;
+        int voxelsMarched = 0;
+    } _marchStats;
 
 private:
     void initWindow()
@@ -187,7 +186,7 @@ private:
         _window = glfwCreateWindow(WIDTH, HEIGHT, "Marching Cubes", nullptr, nullptr);
         glfwSetWindowUserPointer(_window, this);
         glfwSetFramebufferSizeCallback(_window, [](GLFWwindow* window, int width, int height) {
-            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
             app->onResize(width, height);
         });
 
@@ -196,7 +195,7 @@ private:
                 return;
             }
 
-            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
             switch (action) {
             case GLFW_PRESS:
                 app->onKeyPress(key, scancode, mods);
@@ -212,7 +211,7 @@ private:
                 return;
             }
 
-            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
             switch (action) {
             case GLFW_PRESS:
                 app->onMouseDown(button, mods);
@@ -228,12 +227,12 @@ private:
                 return;
             }
 
-            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
             app->onMouseWheel(vec2(xOffset, yOffset));
         });
 
         glfwSetCursorPosCallback(_window, [](GLFWwindow* window, double xPos, double yPos) {
-            auto app = reinterpret_cast<OpenGLCubeApplication*>(glfwGetWindowUserPointer(window));
+            auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
             vec2 pos { xPos, yPos };
             if (app->_lastMousePosition != vec2 { -1 }) {
                 vec2 delta = pos - app->_lastMousePosition;
@@ -353,7 +352,6 @@ private:
 
     void drawFrame()
     {
-        util::CheckGlError("drawFrame");
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const auto model = _trackballRotation * _model;
@@ -438,15 +436,6 @@ private:
         }
 
         ImGui::Separator();
-        ImGui::Text("March Technique");
-        auto technique = _marchTechnique;
-        ImGui::RadioButton("ThreadedMarcher", reinterpret_cast<int*>(&_marchTechnique), 0);
-        ImGui::RadioButton("OctreeVolumeMarcher", reinterpret_cast<int*>(&_marchTechnique), 1);
-        if (_marchTechnique != technique) {
-            marchTechniqueChanged();
-        }
-
-        ImGui::Separator();
         if (ImGui::SliderFloat("Fuzziness", &_fuzziness, 0, 5, "%.2f")) {
             _volume->setFuzziness(_fuzziness);
             _needsMarchVolume = true;
@@ -496,17 +485,12 @@ private:
         _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
         _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
 
-        buildNodeColors(_volume->depth());
-
         _volume->walkOctree([this](OctreeVolume::Node* node) {
             auto bounds = node->bounds;
-            bounds.inset(node->depth * OCTREE_NODE_INSET_FACTOR);
-            AppendAABB(bounds, _octreeAABBLineSegmentStorage, _nodeColors[node->depth]);
+            bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
+            AppendAABB(bounds, _octreeAABBLineSegmentStorage, nodeColor(node->depth));
             return true;
         });
-
-        // TODO: when OctreeVolume works remove this fallback ThreadedMarcher
-        _marcher = std::make_unique<mc::ThreadedMarcher>(*(_volume.get()), unownedTriangleConsumers);
 
         // build samplers to populate the volume
 
@@ -534,85 +518,61 @@ private:
         marchVolume();
     }
 
-    void marchTechniqueChanged()
-    {
-        // clears storage
-        for (const auto& tc : _triangleConsumers) {
-            tc->start();
-            tc->finish();
-        }
-        marchVolume();
-    }
-
     void marchVolume()
     {
-        switch (_marchTechnique) {
-        case MarchTechnique::ThreadedMarcher:
-            _marcher->march(mat4(1), false);
-            break;
-        case MarchTechnique::OctreeVolume:
-            _volume->march(mat4(1), false, &_nodesMarched);
-            break;
-        }
-
+        _marchStats.nodesMarched = 0;
+        _marchStats.nodesMarchedByDepth = std::vector<int>(_volume->depth(), 0);
+        _marchStats.voxelsMarched = 0;
         _octreeOccupiedAABBsLineSegmentStorage.clear();
-        if (_aabbDisplay == AABBDisplay::MarchNodes) {
-            for (auto node : _nodesMarched) {
+
+        _volume->march(mat4(1), false, [this](OctreeVolume::Node *node){
+
+            // update the occupied aabb display
+            {
                 auto bounds = node->bounds;
-                bounds.inset(node->depth * OCTREE_NODE_INSET_FACTOR);
-                AppendAABB(bounds, _octreeOccupiedAABBsLineSegmentStorage, _nodeColors[node->depth]);
+                bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
+                AppendAABB(bounds, _octreeOccupiedAABBsLineSegmentStorage, nodeColor(node->depth));
             }
-        }
+
+            // update march stats
+            _marchStats.nodesMarched++;
+            _marchStats.voxelsMarched += iAABB(node->bounds).volume();
+            _marchStats.nodesMarchedByDepth[node->depth]++;
+        });
     }
 
-    void buildNodeColors(int depth)
+    const vec4 nodeColor(int atDepth) const
     {
-        // generate AABBs for debug
-        _nodeColors.clear();
-        const float hueStep = 360.0F / depth;
-        for (int i = 0; i <= depth; i++) {
-            const util::color::hsv hC { i * hueStep, 0.6F, 1.0F };
-            const auto rgbC = util::color::Hsv2Rgb(hC);
-            _nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, mix<float>(0.6, 0.25, static_cast<float>(i) / depth));
+        static std::vector<vec4> nodeColors;
+
+        auto depth = _volume->depth();
+        if (nodeColors.size() != depth) {
+            nodeColors.clear();
+            const float hueStep = 360.0F / depth;
+            for (auto i = 0U; i <= depth; i++) {
+                const util::color::hsv hC { i * hueStep, 0.6F, 1.0F };
+                const auto rgbC = util::color::Hsv2Rgb(hC);
+                nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, mix<float>(0.6, 0.25, static_cast<float>(i) / depth));
+            }
         }
+
+        return nodeColors[atDepth];
     }
 
     void displayMarchStats()
     {
         auto maxVoxels = static_cast<int>(_volume->bounds().volume());
-        int voxelsMarched = 0;
-        std::vector<int> nodesMarchedByDepth;
-        _volume->marchStats(voxelsMarched, nodesMarchedByDepth, _nodesMarched);
-
-        std::cout << "marched " << voxelsMarched << "/" << maxVoxels
-                  << " voxels (" << (static_cast<float>(voxelsMarched) / static_cast<float>(maxVoxels)) << ")"
+        std::cout << "marched " << _marchStats.voxelsMarched << "/" << maxVoxels
+                  << " voxels (" << (static_cast<float>(_marchStats.voxelsMarched) / static_cast<float>(maxVoxels)) << ")"
                   << std::endl;
 
-        for (auto i = 0U; i < nodesMarchedByDepth.size(); i++) {
-            std::cout << "depth: " << i << "\t" << nodesMarchedByDepth[i]
+        for (auto i = 0U; i < _marchStats.nodesMarchedByDepth.size(); i++) {
+            std::cout << "depth: " << i << "\t" << _marchStats.nodesMarchedByDepth[i]
                       << "/" << static_cast<int>(pow(8, i)) << " nodes"
                       << std::endl;
         }
 
         std::cout << std::endl;
-    }
-
-    void examineOctree()
-    {
-        auto indenter = [](int count) {
-            std::string indent = "";
-            for (int i = 0; i < count; i++) {
-                indent += "\t";
-            }
-            return indent;
-        };
-
-        _volume->walkOctree([&indenter](OctreeVolume::Node* node) {
-            std::cout << indenter(node->depth) << "(" << node->childIdx << " @ " << node->depth << ")"
-                      << " march: " << std::boolalpha << node->march
-                      << " empty: " << std::boolalpha << node->empty << std::endl;
-            return true;
-        });
     }
 };
 
@@ -622,7 +582,7 @@ private:
 
 int main()
 {
-    OpenGLCubeApplication app;
+    App app;
 
     try {
         app.run();

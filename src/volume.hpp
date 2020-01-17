@@ -225,7 +225,7 @@ public:
     */
     void march(const mat4& transform = mat4(1),
         bool computeNormals = true,
-        std::vector<OctreeVolume::Node*>* nodesMarched = nullptr);
+        std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr);
 
     /**
      * Get the bounds of this volume - no geometry will exceed this region
@@ -238,18 +238,9 @@ public:
     /**
      * Get the max octree node depth
      */
-    int depth() const
+    size_t depth() const
     {
-        return _maxDepth;
-    }
-
-    void marchStats(int& voxelsMarched,
-        std::vector<int>& nodesVisitedByDepth,
-        std::vector<OctreeVolume::Node*>& nodesMarched)
-    {
-        voxelsMarched = _voxelsMarched;
-        nodesVisitedByDepth = _nodesVisitedByDepth;
-        nodesMarched = _nodesToMarch;
+        return _treeDepth;
     }
 
 protected:
@@ -334,9 +325,9 @@ protected:
         }
     }
 
-    std::unique_ptr<Node> buildOctreeNode(AABB bounds, int minNodeSize, int depth, int childIdx)
+    std::unique_ptr<Node> buildOctreeNode(AABB bounds, size_t minNodeSize, size_t depth, size_t childIdx)
     {
-        _maxDepth = std::max(depth, _maxDepth);
+        _treeDepth = std::max(depth, _treeDepth);
         auto node = std::make_unique<Node>(bounds, depth, childIdx);
 
         // FIXME expand bounds slightly to fix artifacting - is this actually a fix?
@@ -345,7 +336,7 @@ protected:
         node->expandedBounds = expandedBounds;
 
         // we're working on cubes, so only one bounds size is checked
-        int size = bounds.size().x;
+        size_t size = bounds.size().x;
         if (size / 2 >= minNodeSize) {
             node->isLeaf = false;
             auto childBounds = bounds.octreeSubdivide();
@@ -361,15 +352,11 @@ protected:
 
 private:
     AABB _bounds;
-    int _maxDepth = 0;
+    size_t _treeDepth = 0;
     std::unique_ptr<Node> _root;
     std::vector<Node*> _nodesToMarch;
     std::unique_ptr<ThreadPool> _marchThreads;
     std::vector<unowned_ptr<ITriangleConsumer>> _triangleConsumers;
-
-    // stats
-    std::vector<int> _nodesVisitedByDepth;
-    int _voxelsMarched;
 };
 
 #endif /* volume_hpp */
