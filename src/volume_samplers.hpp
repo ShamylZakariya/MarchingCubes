@@ -31,7 +31,7 @@ public:
     bool test(const AABB bounds) const override
     {
         // find the point on surface of bounds closest to _position
-        vec3 closestPoint {
+        const auto closestPoint = vec3 {
             max(bounds.min.x, min(_position.x, bounds.max.x)),
             max(bounds.min.y, min(_position.y, bounds.max.y)),
             max(bounds.min.z, min(_position.z, bounds.max.z))
@@ -45,12 +45,12 @@ public:
         float d2 = distance2(p, _position);
         float innerRadius = _radius - fuzziness;
         float min2 = innerRadius * innerRadius;
-        if (d2 < min2) {
+        if (d2 <= min2) {
             return 1;
         }
 
         float max2 = _radius * _radius;
-        if (d2 > max2) {
+        if (d2 >= max2) {
             return 0;
         }
 
@@ -140,7 +140,7 @@ public:
 
         if (dist <= innerDist) {
             return 1;
-        } else if (dist > outerDist) {
+        } else if (dist >= outerDist) {
             return 0;
         }
 
@@ -160,6 +160,122 @@ private:
     vec3 _origin;
     vec3 _normal;
     float _thickness;
+};
+
+class CubeVolumeSampler : public IVolumeSampler {
+public:
+    CubeVolumeSampler(vec3 origin, vec3 halfExtents, mat3 rotation, Mode mode)
+        : IVolumeSampler(mode)
+        , _origin(origin)
+        , _halfExtents(max(halfExtents, vec3(0)))
+        , _rotation(rotation)
+    {
+        updateBasis();
+    }
+
+    bool test(const AABB bounds) const override
+    {
+        // find the point on surface of bounds closest to _position
+        const auto closestPoint = vec3 {
+            max(bounds.min.x, min(_origin.x, bounds.max.x)),
+            max(bounds.min.y, min(_origin.y, bounds.max.y)),
+            max(bounds.min.z, min(_origin.z, bounds.max.z))
+        };
+
+        const auto dir = closestPoint - _origin;
+        const auto posXDistance = dot(_posX, dir);
+        const auto posYDistance = dot(_posY, dir);
+        const auto posZDistance = dot(_posZ, dir);
+
+        const auto posX = posXDistance - _halfExtents.x;
+        const auto negX = -posXDistance - _halfExtents.x;
+        const auto posY = posYDistance - _halfExtents.y;
+        const auto negY = -posYDistance - _halfExtents.y;
+        const auto posZ = posZDistance - _halfExtents.z;
+        const auto negZ = -posZDistance - _halfExtents.z;
+
+        return (posX <= 0 && negX <= 0 && posY <= 0 && negY <= 0 && posZ <= 0 && negZ <= 0);
+    }
+
+    float valueAt(const vec3& p, float fuzziness) const override
+    {
+        fuzziness += 1e-5F;
+
+        // postivie values denote that the point is on the positive
+        // side of the plane, or, outside the cube. if all values
+        // are negative, the point is *inside* the cube.
+
+        const auto dir = p - _origin;
+        const auto posXDistance = dot(_posX, dir);
+        const auto posYDistance = dot(_posY, dir);
+        const auto posZDistance = dot(_posZ, dir);
+
+        const auto posX = posXDistance - _halfExtents.x;
+        const auto negX = -posXDistance - _halfExtents.x;
+        const auto posY = posYDistance - _halfExtents.y;
+        const auto negY = -posYDistance - _halfExtents.y;
+        const auto posZ = posZDistance - _halfExtents.z;
+        const auto negZ = -posZDistance - _halfExtents.z;
+
+        if (posX <= 0 && negX <= 0 && posY <= 0 && negY <= 0 && posZ <= 0 && negZ <= 0) {
+            auto posXAmt = -posX / fuzziness;
+            auto negXAmt = -negX / fuzziness;
+            auto posYAmt = -posY / fuzziness;
+            auto negYAmt = -negY / fuzziness;
+            auto posZAmt = -posZ / fuzziness;
+            auto negZAmt = -negZ / fuzziness;
+            return min(min(posXAmt, min(negXAmt, min(posYAmt, min(negYAmt, min(posZAmt, negZAmt))))), 1.0F);
+        }
+        return 0;
+    }
+
+    void setPosition(const vec3& position)
+    {
+        _origin = position;
+        updateBasis();
+    }
+
+    vec3 position() const { return _origin; }
+
+    void setSize(const vec3& halfExtents)
+    {
+        _halfExtents = max(halfExtents, vec3(0));
+        updateBasis();
+    }
+
+    vec3 size() const { return _halfExtents; }
+
+    void setRotation(const mat3& rotation)
+    {
+        _rotation = rotation;
+        updateBasis();
+    }
+
+    mat3 rotation() const { return _rotation; }
+
+    void set(const vec3& position, const vec3& halfExtents, const mat3& rotation)
+    {
+        _origin = position;
+        _halfExtents = max(halfExtents, vec3(0));
+        _rotation = rotation;
+        updateBasis();
+    }
+
+private:
+    void updateBasis()
+    {
+        _basis = glm::translate(mat4 { 1 }, _origin) * mat4(_rotation);
+        _posX = vec3(vec4(+1, 0, 0, 1) * _basis);
+        _posY = vec3(vec4(0, +1, 0, 1) * _basis);
+        _posZ = vec3(vec4(0, 0, +1, 1) * _basis);
+    }
+
+private:
+    vec3 _origin;
+    vec3 _halfExtents;
+    mat3 _rotation;
+    mat4 _basis;
+    vec3 _posX, _posY, _posZ;
 };
 
 #endif /* volume_samplers_h */

@@ -135,6 +135,7 @@ private:
     std::vector<std::unique_ptr<ITriangleConsumer>> _triangleConsumers;
     LineSegmentBuffer _octreeAABBLineSegmentStorage;
     LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
+    LineSegmentBuffer _axes;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -142,11 +143,9 @@ private:
     mat4 _model { 1 };
     mat4 _trackballRotation { 1 };
 
-
     // volume and samplers
     std::unique_ptr<OctreeVolume> _volume;
-    unowned_ptr<SphereVolumeSampler> _mainShere;
-    unowned_ptr<SphereVolumeSampler> _secondaryShere;
+    unowned_ptr<CubeVolumeSampler> _cube;
     unowned_ptr<BoundedPlaneVolumeSampler> _plane;
 
     // app state
@@ -166,11 +165,19 @@ private:
     float _dolly = 1;
     float _animationPhase = 0;
 
-
     struct MarchInfo {
         int nodesMarched = 0;
         std::vector<int> nodesMarchedByDepth;
         int voxelsMarched = 0;
+        int triangleCount = 0;
+
+        void reset(int maxDepth)
+        {
+            nodesMarched = 0;
+            nodesMarchedByDepth = std::vector<int>(maxDepth, 0);
+            voxelsMarched = 0;
+            triangleCount = 0;
+        }
     } _marchStats;
 
 private:
@@ -277,6 +284,11 @@ private:
         int fbHeight = 0;
         glfwGetFramebufferSize(_window, &fbWidth, &fbHeight);
         onResize(fbWidth, fbHeight);
+
+        _axes.clear();
+        _axes.add(Vertex { vec3(0, 0, 0), vec4(1, 0, 0, 1) }, Vertex { vec3(10, 0, 0), vec4(1, 0, 0, 1) });
+        _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 1, 0, 1) }, Vertex { vec3(0, 10, 0), vec4(0, 1, 0, 1) });
+        _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 0, 1, 1) }, Vertex { vec3(0, 0, 10), vec4(0, 0, 1, 1) });
     }
 
     void onResize(int width, int height)
@@ -338,6 +350,11 @@ private:
         float i = 0;
         _animationPhase = std::modf(_animationPhase, &i);
 
+        if (_cube) {
+            float angle = static_cast<float>(M_PI * _animationPhase);
+            _cube->setRotation(rotate(mat4 { 1 }, angle, vec3(0, 0, 1)));
+        }
+
         if (_plane) {
             float angle = static_cast<float>(M_PI * _animationPhase);
             vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
@@ -356,8 +373,7 @@ private:
 
         const auto model = _trackballRotation * _model;
         const auto mvp = [this, &model]() {
-            if (_useOrthoProjection)
-            {
+            if (_useOrthoProjection) {
                 auto bounds = _volume->bounds();
                 auto size = length(bounds.size());
 
@@ -373,9 +389,7 @@ private:
 
                 auto proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
                 return proj * view * model;
-            }
-            else
-            {
+            } else {
                 auto bounds = _volume->bounds();
                 auto minDistance = 0.1F;
                 auto maxDistance = length(bounds.size()) * 2;
@@ -397,21 +411,20 @@ private:
             tc->draw();
         }
 
+        glDepthMask(GL_FALSE);
+        glUseProgram(_lineProgram.program);
+        glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+
+        _axes.draw();
+
         switch (_aabbDisplay) {
         case AABBDisplay::None:
             break;
         case AABBDisplay::OctreeGraph:
-            glDepthMask(GL_FALSE);
-            glUseProgram(_lineProgram.program);
-            glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-            glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
             _octreeAABBLineSegmentStorage.draw();
             break;
         case AABBDisplay::MarchNodes:
-            glDepthMask(GL_FALSE);
-            glUseProgram(_lineProgram.program);
-            glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-            glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
             _octreeOccupiedAABBsLineSegmentStorage.draw();
             break;
         }
@@ -424,6 +437,9 @@ private:
         ImGui::Begin("Demo window");
 
         ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
+        ImGui::LabelText("triangles", "%d", _marchStats.triangleCount);
+
+        ImGui::Separator();
 
         ImGui::Checkbox("Animate", &_animateVolume);
         if (!_animateVolume) {
@@ -446,15 +462,15 @@ private:
 
         ImGui::Text("Reset Trackball Rotation");
         if (ImGui::Button("+X")) {
-            _trackballRotation = rotate(mat4{1}, 0.0F, vec3(1,0,0));
+            _trackballRotation = rotate(mat4 { 1 }, 0.0F, vec3(1, 0, 0));
         }
         ImGui::SameLine();
         if (ImGui::Button("+Y")) {
-            _trackballRotation = rotate(mat4{1}, half_pi<float>(), vec3(1,0,0));
+            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(1, 0, 0));
         }
         ImGui::SameLine();
         if (ImGui::Button("+Z")) {
-            _trackballRotation = rotate(mat4{1}, half_pi<float>(), vec3(0,1,0));
+            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(0, 1, 0));
         }
 
         ImGui::Separator();
@@ -496,16 +512,11 @@ private:
 
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
-        auto mainSphereRadius = size.x * 0.4F;
-        auto secondarySphereRadius = mainSphereRadius * 0.2F;
 
-        _mainShere = _volume->add(std::make_unique<SphereVolumeSampler>(
-            center, mainSphereRadius, IVolumeSampler::Mode::Additive));
+        _cube = _volume->add(std::make_unique<CubeVolumeSampler>(
+            center, vec3(10, 10, 10), mat3 { 1 }, IVolumeSampler::Mode::Additive));
 
-        if (true) {
-            _secondaryShere = _volume->add(std::make_unique<SphereVolumeSampler>(
-                center + vec3(mainSphereRadius, 0, 0), secondarySphereRadius, IVolumeSampler::Mode::Additive));
-
+        if (false) {
             _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(
                 center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
         }
@@ -520,13 +531,10 @@ private:
 
     void marchVolume()
     {
-        _marchStats.nodesMarched = 0;
-        _marchStats.nodesMarchedByDepth = std::vector<int>(_volume->depth(), 0);
-        _marchStats.voxelsMarched = 0;
+        _marchStats.reset(_volume->depth());
         _octreeOccupiedAABBsLineSegmentStorage.clear();
 
-        _volume->march(mat4(1), false, [this](OctreeVolume::Node *node){
-
+        _volume->march(mat4(1), false, [this](OctreeVolume::Node* node) {
             // update the occupied aabb display
             {
                 auto bounds = node->bounds;
@@ -539,6 +547,10 @@ private:
             _marchStats.voxelsMarched += iAABB(node->bounds).volume();
             _marchStats.nodesMarchedByDepth[node->depth]++;
         });
+
+        for (const auto& tc : _triangleConsumers) {
+            _marchStats.triangleCount += tc->numTriangles();
+        }
     }
 
     const vec4 nodeColor(int atDepth) const
@@ -564,6 +576,7 @@ private:
         auto maxVoxels = static_cast<int>(_volume->bounds().volume());
         std::cout << "marched " << _marchStats.voxelsMarched << "/" << maxVoxels
                   << " voxels (" << (static_cast<float>(_marchStats.voxelsMarched) / static_cast<float>(maxVoxels)) << ")"
+                  << " numTriangles: " << _marchStats.triangleCount
                   << std::endl;
 
         for (auto i = 0U; i < _marchStats.nodesMarchedByDepth.size(); i++) {

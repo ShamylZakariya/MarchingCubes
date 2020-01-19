@@ -18,6 +18,11 @@
 using std::make_unique;
 using namespace Catch::literals;
 
+auto approx(float v, float m = 1e-4F)
+{
+    return Approx(v).margin(m);
+}
+
 TEST_CASE("SphereSampler", "[samplers]")
 {
     auto pos = vec3(0, 0, 0);
@@ -34,7 +39,7 @@ TEST_CASE("SphereSampler", "[samplers]")
         REQUIRE(sampler.valueAt(vec3(radius * 2, 0, 0), fuzz) == 0_a);
 
         // Point on boundary is outside
-        REQUIRE(sampler.valueAt(vec3(radius, 0, 0), fuzz) == 0_a);
+        REQUIRE(sampler.valueAt(vec3(radius, 0, 0), fuzz) == 0.0_a);
 
         // Point on inner fuzz boundary is inside
         REQUIRE(sampler.valueAt(vec3(radius - fuzz, 0, 0), fuzz) == 1_a);
@@ -153,6 +158,148 @@ TEST_CASE("PlaneSampler", "[samplers]")
 
         //Large aabb with enclosed corners intersects bounded plane
         REQUIRE(sampler.test(AABB(vec3(0, 4.75, 0), 10)));
+    }
+}
+
+TEST_CASE("CubeSampler", "[samplers]")
+{
+    SECTION("Identity Transform Value At")
+    {
+
+        // cube from -1 -> +1 on each axis, centered at origin
+        auto fuzz = 0;
+        auto cube = CubeVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
+
+        // test axes
+        for (float x = 0; x <= 2; x += 0.25F) {
+            auto v = cube.valueAt(vec3(x, 0, 0), fuzz);
+            REQUIRE(v == (x < 1 ? 1.0_a : 0.0_a));
+        }
+        for (float y = 0; y <= 2; y += 0.25F) {
+            auto v = cube.valueAt(vec3(0, y, 0), fuzz);
+            REQUIRE(v == (y < 1 ? 1.0_a : 0.0_a));
+        }
+        for (float z = 0; z <= 2; z += 0.25F) {
+            auto v = cube.valueAt(vec3(0, 0, z), fuzz);
+            REQUIRE(v == (z < 1 ? 1.0_a : 0.0_a));
+        }
+    }
+
+    SECTION("Identity Transform Value At + Fuzz")
+    {
+        // cube from -1 -> +1 on each axis, centered at origin
+        auto fuzz = 0.5;
+        auto cube = CubeVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
+
+        auto eval = [&cube, &fuzz](vec3 p) {
+            return cube.valueAt(p, fuzz);
+        };
+
+        REQUIRE(eval(vec3(0, 0, 0)) == approx(1.0F));
+        REQUIRE(eval(vec3(0.5, 0, 0)) == approx(1.0F));
+        REQUIRE(eval(vec3(-0.5, 0, 0)) == approx(1.0F));
+        REQUIRE(eval(vec3(0.75, 0, 0)) == approx(0.5F));
+        REQUIRE(eval(vec3(-0.75, 0, 0)) == approx(0.5F));
+        REQUIRE(eval(vec3(1.0, 0, 0)) == approx(0.0F));
+        REQUIRE(eval(vec3(-1.0, 0, 0)) == approx(0.0F));
+
+        REQUIRE(eval(vec3(0, 0, 0)) == approx(1.0F));
+        REQUIRE(eval(vec3(0, 0.5, 0)) == approx(1.0F));
+        REQUIRE(eval(vec3(0, -0.5, 0)) == approx(1.0F));
+        REQUIRE(eval(vec3(0, 0.75, 0)) == approx(0.5F));
+        REQUIRE(eval(vec3(0, -0.75, 0)) == approx(0.5F));
+        REQUIRE(eval(vec3(0, 1.0, 0)) == approx(0.0F));
+        REQUIRE(eval(vec3(0, -1.0, 0)) == approx(0.0F));
+
+        REQUIRE(eval(vec3(0, 0, 0)) == approx(1.0F));
+        REQUIRE(eval(vec3(0, 0, 0.5)) == approx(1.0F));
+        REQUIRE(eval(vec3(0, 0, -0.5)) == approx(1.0F));
+        REQUIRE(eval(vec3(0, 0, 0.75)) == approx(0.5F));
+        REQUIRE(eval(vec3(0, 0, -0.75)) == approx(0.5F));
+        REQUIRE(eval(vec3(0, 0, 1.0)) == approx(0.0F));
+        REQUIRE(eval(vec3(0, 0, -1.0)) == approx(0.0F));
+
+        // now we should be at value 1 from -1 to +1 and ramp to 0 from +1->+2 and -1->-2
+        cube.setSize(vec3(2, 2, 2));
+        fuzz = 1.0F;
+        for (float x = -3; x <= +3; x += 0.5F) {
+            auto v = eval(vec3(x, 0, 0));
+            auto expected = 1.0F;
+            if (x >= +2 || x <= -2) {
+                expected = 0;
+            } else if (x > 1 && x < 2) {
+                expected = 1 - (x - 1);
+            } else if (x < -1 && x > -2) {
+                expected = 1 - (fabs(x) - 1);
+            }
+            REQUIRE(v == approx(expected));
+        }
+    }
+
+    SECTION("Translation Transform value at")
+    {
+        auto fuzz = 1;
+        auto cube = CubeVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
+
+        auto eval = [&cube, &fuzz](vec3 p) {
+            return cube.valueAt(p, fuzz);
+        };
+
+        auto test = [&eval, &cube](vec3 cubeOrigin) {
+            // now we should be at value 1 from -1 to +1 and ramp to 0 from +1->+2 and -1->-2
+            cube.setSize(vec3(2, 2, 2));
+            cube.setPosition(cubeOrigin);
+
+            for (float x = -3; x <= +3; x += 0.5F) {
+                auto v = eval(cubeOrigin + vec3(x, 0, 0));
+                auto expected = 1.0F;
+                if (x >= +2 || x <= -2) {
+                    expected = 0;
+                } else if (x > 1 && x < 2) {
+                    expected = 1 - (x - 1);
+                } else if (x < -1 && x > -2) {
+                    expected = 1 - (fabs(x) - 1);
+                }
+                REQUIRE(v == approx(expected));
+            }
+
+            for (float y = -3; y <= +3; y += 0.5F) {
+                auto v = eval(cubeOrigin + vec3(0, y, 0));
+                auto expected = 1.0F;
+                if (y >= +2 || y <= -2) {
+                    expected = 0;
+                } else if (y > 1 && y < 2) {
+                    expected = 1 - (y - 1);
+                } else if (y < -1 && y > -2) {
+                    expected = 1 - (fabs(y) - 1);
+                }
+                REQUIRE(v == approx(expected));
+            }
+
+            for (float z = -3; z <= +3; z += 0.5F) {
+                auto v = eval(cubeOrigin + vec3(0, 0, z));
+                auto expected = 1.0F;
+                if (z >= +2 || z <= -2) {
+                    expected = 0;
+                } else if (z > 1 && z < 2) {
+                    expected = 1 - (z - 1);
+                } else if (z < -1 && z > -2) {
+                    expected = 1 - (fabs(z) - 1);
+                }
+                REQUIRE(v == approx(expected));
+            }
+        };
+
+        test(vec3(0, 0, 0));
+
+        test(vec3(50, 0, 0));
+        test(vec3(-50, 0, 0));
+
+        test(vec3(0, 50, 0));
+        test(vec3(0, -50, 0));
+
+        test(vec3(0, 0, 50));
+        test(vec3(0, 0, -50));
     }
 }
 

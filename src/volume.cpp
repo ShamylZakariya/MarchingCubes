@@ -25,7 +25,7 @@ void OctreeVolume::march(
     collect(_nodesToMarch);
 
     if (marchedNodeObserver) {
-        for (const auto &node : _nodesToMarch) {
+        for (const auto& node : _nodesToMarch) {
             marchedNodeObserver(node);
         }
     }

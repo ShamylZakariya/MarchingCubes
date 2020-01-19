@@ -57,6 +57,11 @@ public:
     virtual void addTriangle(const Triangle& t) = 0;
 
     /*
+    Count of triangles added since last call to start()
+    */
+    virtual size_t numTriangles() const = 0;
+
+    /*
      Signal that batch addition has completed; submits new triangles to GPU
      */
     virtual void finish() = 0;
@@ -85,13 +90,13 @@ public:
         _triangleCount++;
     }
 
+    size_t numTriangles() const override { return _triangleCount; }
+
     void finish() override
     {
     }
 
     void draw() const override {}
-
-    size_t numTriangles() const { return _triangleCount; }
 
 private:
     size_t _triangleCount = 0;
@@ -104,6 +109,7 @@ class TriangleConsumer : public ITriangleConsumer {
 private:
     std::vector<Vertex> _vertices;
     VertexStorage _gpuStorage { GL_TRIANGLES };
+    size_t _numTriangles = 0;
 
 public:
     TriangleConsumer() = default;
@@ -111,6 +117,7 @@ public:
 
     void start() override;
     void addTriangle(const Triangle& t) override;
+    size_t numTriangles() const override { return _numTriangles; }
     void finish() override;
     void draw() const override;
 
@@ -138,17 +145,20 @@ private:
     std::vector<Vertex> _vertices;
     IndexedVertexStorage _gpuStorage { GL_TRIANGLES };
     Strategy _strategy;
+    size_t _numTriangles;
     float _normalSmoothingDotThreshold = 0.96F; // ~15°
 
 public:
     IndexedTriangleConsumer(Strategy strategy)
         : _strategy(strategy)
+        , _numTriangles(0)
     {
     }
     virtual ~IndexedTriangleConsumer() = default;
 
     void start() override;
     void addTriangle(const Triangle& t) override;
+    size_t numTriangles() const override { return _numTriangles; }
     void finish() override;
     void draw() const override;
 

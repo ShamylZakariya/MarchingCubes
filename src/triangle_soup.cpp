@@ -19,6 +19,7 @@
 void TriangleConsumer::start()
 {
     _vertices.clear();
+    _numTriangles = 0;
 }
 
 void TriangleConsumer::addTriangle(const Triangle& t)
@@ -26,6 +27,7 @@ void TriangleConsumer::addTriangle(const Triangle& t)
     _vertices.push_back(t.a);
     _vertices.push_back(t.b);
     _vertices.push_back(t.c);
+    _numTriangles++;
 }
 
 void TriangleConsumer::finish()
