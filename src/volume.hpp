@@ -298,6 +298,7 @@ protected:
 
                 // copy up their samplers
                 for (auto& child : currentNode->children) {
+                    child->march = false;
                     currentNode->additiveSamplers.insert(std::begin(child->additiveSamplers), std::end(child->additiveSamplers));
                     currentNode->subtractiveSamplers.insert(std::begin(child->subtractiveSamplers), std::end(child->subtractiveSamplers));
                 }
@@ -314,6 +315,8 @@ protected:
     */
     void collect(Node* currentNode, std::vector<Node*>& nodesToMarch) const
     {
+        if (currentNode->empty) return;
+
         if (currentNode->march) {
             // collect this node, don't recurse further
             nodesToMarch.push_back(currentNode);

@@ -24,6 +24,7 @@ void OctreeVolume::march(
     _nodesToMarch.clear();
     collect(_nodesToMarch);
 
+    // if we hav an observer, pass collected march nodes to it
     if (marchedNodeObserver) {
         for (const auto& node : _nodesToMarch) {
             marchedNodeObserver(node);

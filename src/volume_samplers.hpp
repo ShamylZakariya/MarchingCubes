@@ -96,39 +96,22 @@ public:
 
     bool test(const AABB bounds) const override
     {
+        // find point on plane closest to bounds
+        auto boundsCenter = bounds.center();
+        auto distanceToBoundsCenter = dot(_normal, boundsCenter - _origin);
+        auto closestPointOnPlane = boundsCenter + _normal * -distanceToBoundsCenter;
+
+        // find the point bounds closest to closestPointOnPlane
+        const auto closestPointOnBounds = vec3 {
+            max(bounds.min.x, min(closestPointOnPlane.x, bounds.max.x)),
+            max(bounds.min.y, min(closestPointOnPlane.y, bounds.max.y)),
+            max(bounds.min.z, min(closestPointOnPlane.z, bounds.max.z))
+        };
+
+        // now test that closestPointOnBounds is inside our volume
         float halfThickness = _thickness * 0.5F;
-
-        // quick test for early exit
-        float dist = abs(dot(_normal, bounds.center() - _origin)) - halfThickness;
-        float dist2 = dist * dist;
-        if (dist2 > bounds.radius2()) {
-            return false;
-        }
-
-        // we need to see if the bounds actually intersects
-        int onPositiveSide = 0;
-        int onNegativeSide = 0;
-        for (const auto& v : bounds.corners()) {
-            float signedDistance = dot(_normal, v - _origin);
-
-            if (abs(signedDistance) < halfThickness) {
-                // if any vertices are inside the plane thickness we
-                // have an intersection
-                return true;
-            } else if (signedDistance > 0) {
-                onPositiveSide++;
-            } else {
-                onNegativeSide++;
-            }
-
-            // if we have vertices on both sides of the plane
-            // we have an intersection
-            if (onPositiveSide && onNegativeSide) {
-                return true;
-            }
-        }
-
-        return false;
+        auto distance = dot(_normal, (closestPointOnBounds - _origin));
+        return (distance < halfThickness && distance > -halfThickness);
     }
 
     float valueAt(const vec3& p, float fuzziness) const override
