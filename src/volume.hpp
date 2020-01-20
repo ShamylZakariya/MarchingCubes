@@ -42,7 +42,7 @@ public:
     /*
      Return true iff bounds intersects the region affected by this sampler
     */
-    virtual bool test(const AABB bounds) const = 0;
+    virtual bool intersects(const AABB bounds) const = 0;
 
     /*
      Return the amount a given point in space is "inside" the volume. The
@@ -61,13 +61,15 @@ private:
 // Volume
 //
 
-class BaseCompositeVolume : public mc::IIsoSurface {
+class BaseCompositeVolume {
 public:
     BaseCompositeVolume(ivec3 size, float fuzziness)
         : _size(size)
         , _fuzziness(fuzziness)
     {
     }
+
+    virtual ~BaseCompositeVolume() = default;
 
     template <typename T>
     unowned_ptr<T> add(std::unique_ptr<T>&& sampler)
@@ -90,60 +92,15 @@ public:
         return sPtr;
     }
 
-    ivec3 size() const override
+    ivec3 size() const
     {
         return _size;
-    }
-
-    float valueAt(const vec3& p) const override
-    {
-        // TODO(shamyl@gmail.com): Adapt the smooth-min functions; they're meant
-        // for SDF; but the idea is applicable here.
-        //        float v = 0;
-        //        for (auto& s : _additiveSamplers) {
-        //            v = smin(v, s->valueAt(p, _falloffThreshold), 10.0f);
-        //        }
-        //
-        //        for (auto& s : _subtractiveSamplers) {
-        //            v = smin(v, -s->valueAt(p, _falloffThreshold), 10.0f);
-        //        }
-
-        float v = 0;
-        for (auto& s : _additiveSamplers) {
-            v += s->valueAt(p, _fuzziness);
-        }
-
-        v = std::min<float>(v, 1);
-
-        for (auto& s : _subtractiveSamplers) {
-            v -= s->valueAt(p, _fuzziness);
-        }
-
-        v = std::max<float>(v, 0);
-
-        return v;
     }
 
     void setFuzziness(float ft) { _fuzziness = max<float>(ft, 0); }
     float fuzziness() const { return _fuzziness; }
 
 protected:
-    // polynomial smooth min
-    // https://www.iquilezles.org/www/articles/smin/smin.htm
-    static inline float smin(float a, float b, float k)
-    {
-        float h = std::max<float>(k - abs(a - b), 0.0f) / k;
-        return std::min<float>(a, b) - h * h * k * (1.0f / 4.0f);
-    }
-
-    // cubic smooth min
-    // https://www.iquilezles.org/www/articles/smin/smin.htm
-    static inline float sminCubic(float a, float b, float k)
-    {
-        float h = std::max<float>(k - abs(a - b), 0.0f) / k;
-        return std::min<float>(a, b) - h * h * h * k * (1.0f / 6.0f);
-    }
-
     virtual void onVolumeSamplerAdded(IVolumeSampler* sampler) {}
 
 protected:
@@ -168,7 +125,6 @@ public:
         ~Node() = default;
 
         AABB bounds;
-        AABB expandedBounds;
         int depth = 0;
         int childIdx = 0;
         bool isLeaf = false;
@@ -198,8 +154,7 @@ public:
     {
         /*
             TODO: I believe I should probably skip the root node; it will always intersect
-            something; it's not useful. Perhaps we should just manually iterate its 8 children
-            from the public entry point?
+            something; it's not useful.
         */
         mark(_root.get());
         collect(_root.get(), collector);
@@ -258,7 +213,7 @@ protected:
         currentNode->subtractiveSamplers.clear();
 
         for (const auto sampler : _additiveSamplers) {
-            if (sampler->test(currentNode->expandedBounds)) {
+            if (sampler->intersects(currentNode->bounds)) {
                 currentNode->additiveSamplers.insert(sampler);
                 currentNode->empty = false;
             }
@@ -269,7 +224,7 @@ protected:
         // additive samplers, there is no volume to subtract from
         if (!currentNode->empty) {
             for (const auto sampler : _subtractiveSamplers) {
-                if (sampler->test(currentNode->expandedBounds)) {
+                if (sampler->intersects(currentNode->bounds)) {
                     currentNode->subtractiveSamplers.insert(sampler);
                 }
             }
@@ -315,7 +270,8 @@ protected:
     */
     void collect(Node* currentNode, std::vector<Node*>& nodesToMarch) const
     {
-        if (currentNode->empty) return;
+        if (currentNode->empty)
+            return;
 
         if (currentNode->march) {
             // collect this node, don't recurse further
@@ -332,11 +288,6 @@ protected:
     {
         _treeDepth = std::max(depth, _treeDepth);
         auto node = std::make_unique<Node>(bounds, depth, childIdx);
-
-        // FIXME expand bounds slightly to fix artifacting - is this actually a fix?
-        auto expandedBounds = bounds;
-        expandedBounds.outset(static_cast<float>(minNodeSize) * 0.125F);
-        node->expandedBounds = expandedBounds;
 
         // we're working on cubes, so only one bounds size is checked
         size_t size = bounds.size().x;

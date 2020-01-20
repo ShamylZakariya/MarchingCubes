@@ -24,6 +24,30 @@ public:
         _dirty = true;
     }
 
+    template <typename T, qualifier Q>
+    inline void add(const AABB_<T, Q>& bounds, const vec4& color)
+    {
+        auto corners = bounds.corners();
+
+        // trace bottom
+        add(Vertex { corners[0], color }, Vertex { corners[1], color });
+        add(Vertex { corners[1], color }, Vertex { corners[2], color });
+        add(Vertex { corners[2], color }, Vertex { corners[3], color });
+        add(Vertex { corners[3], color }, Vertex { corners[0], color });
+
+        // trace top
+        add(Vertex { corners[4], color }, Vertex { corners[5], color });
+        add(Vertex { corners[5], color }, Vertex { corners[6], color });
+        add(Vertex { corners[6], color }, Vertex { corners[7], color });
+        add(Vertex { corners[7], color }, Vertex { corners[4], color });
+
+        // add bars connecting bottom to top
+        add(Vertex { corners[0], color }, Vertex { corners[4], color });
+        add(Vertex { corners[1], color }, Vertex { corners[5], color });
+        add(Vertex { corners[2], color }, Vertex { corners[6], color });
+        add(Vertex { corners[3], color }, Vertex { corners[7], color });
+    }
+
     void draw()
     {
         if (_dirty) {
@@ -78,29 +102,5 @@ private:
     std::vector<Vertex> _vertices;
     VertexStorage _gpuStorage { GL_LINE_STRIP };
 };
-
-template <typename T, qualifier Q>
-inline void AppendAABB(const AABB_<T, Q>& bounds, LineSegmentBuffer& lineSegs, const vec4& color)
-{
-    auto corners = bounds.corners();
-
-    // trace bottom
-    lineSegs.add(Vertex { corners[0], color }, Vertex { corners[1], color });
-    lineSegs.add(Vertex { corners[1], color }, Vertex { corners[2], color });
-    lineSegs.add(Vertex { corners[2], color }, Vertex { corners[3], color });
-    lineSegs.add(Vertex { corners[3], color }, Vertex { corners[0], color });
-
-    // trace top
-    lineSegs.add(Vertex { corners[4], color }, Vertex { corners[5], color });
-    lineSegs.add(Vertex { corners[5], color }, Vertex { corners[6], color });
-    lineSegs.add(Vertex { corners[6], color }, Vertex { corners[7], color });
-    lineSegs.add(Vertex { corners[7], color }, Vertex { corners[4], color });
-
-    // add bars connecting bottom to top
-    lineSegs.add(Vertex { corners[0], color }, Vertex { corners[4], color });
-    lineSegs.add(Vertex { corners[1], color }, Vertex { corners[5], color });
-    lineSegs.add(Vertex { corners[2], color }, Vertex { corners[6], color });
-    lineSegs.add(Vertex { corners[3], color }, Vertex { corners[7], color });
-}
 
 #endif /* lines_hpp */

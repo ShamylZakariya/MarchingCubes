@@ -36,7 +36,7 @@ constexpr int HEIGHT = 900;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
-constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0625F;
+constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
 
 //
 // Data
@@ -136,6 +136,7 @@ private:
     LineSegmentBuffer _octreeAABBLineSegmentStorage;
     LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
     LineSegmentBuffer _axes;
+    LineSegmentBuffer _debugLines;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -145,7 +146,7 @@ private:
 
     // volume and samplers
     std::unique_ptr<OctreeVolume> _volume;
-    unowned_ptr<CubeVolumeSampler> _cube;
+    unowned_ptr<RectangularPrismVolumeSampler> _rectPrism;
     unowned_ptr<BoundedPlaneVolumeSampler> _plane;
 
     // app state
@@ -158,12 +159,14 @@ private:
     bool _animateVolume = false;
     bool _running = true;
     bool _useOrthoProjection = true;
-    AABBDisplay _aabbDisplay = AABBDisplay::None;
-    bool _needsMarchVolume = false;
+    AABBDisplay _aabbDisplay = AABBDisplay::MarchNodes;
+    bool _needsMarchVolume = true;
     float _fuzziness = 1.0F;
     float _aspect = 1;
     float _dolly = 1;
-    float _animationPhase = 0;
+    float _animationPhase = 0.410F;
+    bool _drawMarchedVolume = true;
+    bool _drawDebugLines = true;
 
     struct MarchInfo {
         int nodesMarched = 0;
@@ -350,9 +353,9 @@ private:
         float i = 0;
         _animationPhase = std::modf(_animationPhase, &i);
 
-        if (_cube) {
+        if (_rectPrism) {
             float angle = static_cast<float>(M_PI * _animationPhase);
-            _cube->setRotation(rotate(mat4 { 1 }, angle, vec3(0, 0, 1)));
+            _rectPrism->setRotation(rotate(mat4 { 1 }, angle, vec3(0, 0, 1)));
         }
 
         if (_plane) {
@@ -402,13 +405,15 @@ private:
             }
         }();
 
-        glUseProgram(_volumeProgram.program);
-        glUniformMatrix4fv(_volumeProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-        glUniformMatrix4fv(_volumeProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+        if (_drawMarchedVolume) {
+            glUseProgram(_volumeProgram.program);
+            glUniformMatrix4fv(_volumeProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+            glUniformMatrix4fv(_volumeProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
 
-        glDepthMask(GL_TRUE);
-        for (auto& tc : _triangleConsumers) {
-            tc->draw();
+            glDepthMask(GL_TRUE);
+            for (auto& tc : _triangleConsumers) {
+                tc->draw();
+            }
         }
 
         glDepthMask(GL_FALSE);
@@ -427,6 +432,14 @@ private:
         case AABBDisplay::MarchNodes:
             _octreeOccupiedAABBsLineSegmentStorage.draw();
             break;
+        }
+
+        if (_drawDebugLines) {
+            _debugLines.clear();
+            _debugLines.add(_rectPrism->bounds(), vec4(1, 1, 0, 1));
+            _rectPrism->addTo(_debugLines, vec4(0, 1, 1, 1));
+
+            _debugLines.draw();
         }
 
         glDepthMask(GL_TRUE);
@@ -458,7 +471,6 @@ private:
         }
 
         ImGui::Separator();
-        ImGui::Checkbox("Ortho Projection", &_useOrthoProjection);
 
         ImGui::Text("Reset Trackball Rotation");
         if (ImGui::Button("+X")) {
@@ -474,6 +486,13 @@ private:
         }
 
         ImGui::Separator();
+
+        ImGui::Checkbox("Ortho Projection", &_useOrthoProjection);
+        ImGui::Checkbox("Draw Marched Volume", &_drawMarchedVolume);
+        ImGui::Checkbox("Draw Debug Lines", &_drawDebugLines);
+
+        ImGui::Separator();
+
         ImGui::Text("AABBs");
         auto aabbDisplay = _aabbDisplay;
         ImGui::RadioButton("None", reinterpret_cast<int*>(&_aabbDisplay), 0);
@@ -504,7 +523,7 @@ private:
         _volume->walkOctree([this](OctreeVolume::Node* node) {
             auto bounds = node->bounds;
             bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
-            AppendAABB(bounds, _octreeAABBLineSegmentStorage, nodeColor(node->depth));
+            _octreeAABBLineSegmentStorage.add(bounds, nodeColor(node->depth));
             return true;
         });
 
@@ -513,8 +532,8 @@ private:
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
 
-        _cube = _volume->add(std::make_unique<CubeVolumeSampler>(
-            center, vec3(10, 10, 10), mat3 { 1 }, IVolumeSampler::Mode::Additive));
+        _rectPrism = _volume->add(std::make_unique<RectangularPrismVolumeSampler>(
+            center, vec3(10, 1, 5), mat3 { 1 }, IVolumeSampler::Mode::Additive));
 
         if (false) {
             _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(
@@ -535,11 +554,11 @@ private:
         _octreeOccupiedAABBsLineSegmentStorage.clear();
 
         _volume->march(mat4(1), false, [this](OctreeVolume::Node* node) {
-            // update the occupied aabb display
             {
+                // update the occupied aabb display
                 auto bounds = node->bounds;
                 bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
-                AppendAABB(bounds, _octreeOccupiedAABBsLineSegmentStorage, nodeColor(node->depth));
+                _octreeOccupiedAABBsLineSegmentStorage.add(bounds, nodeColor(node->depth));
             }
 
             // update march stats
@@ -595,9 +614,9 @@ private:
 
 int main()
 {
-    App app;
 
     try {
+        App app;
         app.run();
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

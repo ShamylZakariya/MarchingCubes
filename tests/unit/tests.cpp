@@ -51,28 +51,28 @@ TEST_CASE("SphereSampler", "[samplers]")
     SECTION("aabb")
     {
         // unit AABB intersects sphere
-        REQUIRE(sampler.test(AABB(vec3(0, 0, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0, 0), 1)));
 
         // tangential unit AABB intersects sphere
-        REQUIRE(sampler.test(AABB(vec3(radius, 0, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(radius, 0, 0), 1)));
 
         // unit AABB outside sphere
-        REQUIRE_FALSE(sampler.test(AABB(vec3(2 * radius, 0, 0), 1)));
+        REQUIRE_FALSE(sampler.intersects(AABB(vec3(2 * radius, 0, 0), 1)));
 
         // enclosing AABB intersects sphere
-        REQUIRE(sampler.test(AABB(vec3(0, 0, 0), 2 * radius)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0, 0), 2 * radius)));
 
         // tangential AABB intersects sphere
         {
             auto bb = AABB(vec3(radius + 10, 0, 0), 10);
-            auto r = sampler.test(bb);
+            auto r = sampler.intersects(bb);
             REQUIRE(r);
         }
 
         // distant AABB doesn't intersect sphere
         {
             auto bb = AABB(vec3(radius + 1000, 0, 0), 10);
-            auto r = sampler.test(bb);
+            auto r = sampler.intersects(bb);
             REQUIRE_FALSE(r);
         }
     }
@@ -115,49 +115,49 @@ TEST_CASE("PlaneSampler", "[samplers]")
     SECTION("aabb")
     {
         //unit AABB intersects bounded plane"
-        REQUIRE(sampler.test(AABB(vec3(0, 0, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0, 0), 1)));
 
         //unit AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(1, 0, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(1, 0, 0), 1)));
 
         //unit AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(-1, 0, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(-1, 0, 0), 1)));
 
         //unit AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, 0, 1), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0, 1), 1)));
 
         //unit AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, 0, -1), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0, -1), 1)));
 
         //tangential AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, 0.5, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0.5, 0), 1)));
 
         //-tangential AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, -0.5, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, -0.5, 0), 1)));
 
         //tangential AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(1, 0.5, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(1, 0.5, 0), 1)));
 
         //-tangential AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(-1, -0.5, 0), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(-1, -0.5, 0), 1)));
 
         //tangential AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, 0.5, 1), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0.5, 1), 1)));
 
         //-tangential AABB intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, -0.5, -1), 1)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, -0.5, -1), 1)));
 
         //unit AABB at fuzziness boundary doesn't intersect bounded plane
-        REQUIRE_FALSE(sampler.test(AABB(vec3(0, 1.5, 0), 1)));
+        REQUIRE_FALSE(sampler.intersects(AABB(vec3(0, 1.5, 0), 1)));
 
         //unit AABB at -fuzziness boundary doesn't intersect bounded plane
-        REQUIRE_FALSE(sampler.test(AABB(vec3(0, -1.5, 0), 1)));
+        REQUIRE_FALSE(sampler.intersects(AABB(vec3(0, -1.5, 0), 1)));
 
         //Large straddling aabb intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, 0, 0), 10)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 0, 0), 10)));
 
         //Large aabb with enclosed corners intersects bounded plane
-        REQUIRE(sampler.test(AABB(vec3(0, 4.75, 0), 10)));
+        REQUIRE(sampler.intersects(AABB(vec3(0, 4.75, 0), 10)));
     }
 }
 
@@ -168,7 +168,7 @@ TEST_CASE("CubeSampler", "[samplers]")
 
         // cube from -1 -> +1 on each axis, centered at origin
         auto fuzz = 0;
-        auto cube = CubeVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
+        auto cube = RectangularPrismVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
 
         // test axes
         for (float x = 0; x <= 2; x += 0.25F) {
@@ -189,7 +189,7 @@ TEST_CASE("CubeSampler", "[samplers]")
     {
         // cube from -1 -> +1 on each axis, centered at origin
         auto fuzz = 0.5;
-        auto cube = CubeVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
+        auto cube = RectangularPrismVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
 
         auto eval = [&cube, &fuzz](vec3 p) {
             return cube.valueAt(p, fuzz);
@@ -239,7 +239,7 @@ TEST_CASE("CubeSampler", "[samplers]")
     SECTION("Translation Transform value at")
     {
         auto fuzz = 1;
-        auto cube = CubeVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
+        auto cube = RectangularPrismVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
 
         auto eval = [&cube, &fuzz](vec3 p) {
             return cube.valueAt(p, fuzz);

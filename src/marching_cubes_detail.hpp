@@ -522,15 +522,6 @@ int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction no
     return numTriangles;
 }
 
-int Polygonise(const GridCell& grid, float isolevel, const mc::IIsoSurface& volume, Triangle* triangles, bool computeNormals)
-{
-    auto normalSampler = [&volume](const vec3& p) -> vec3 {
-        return volume.normalAt(p);
-    };
-
-    return Polygonise(grid, isolevel, normalSampler, triangles, computeNormals);
-}
-
 //
 // GridCell Access
 //
@@ -575,15 +566,6 @@ bool GetGridCell(int x, int y, int z, IsoSurfaceValueFunction valueFunction, Gri
     }
 
     return cell.occupied;
-}
-
-bool GetGridCell(int x, int y, int z, const mc::IIsoSurface& volume, GridCell& cell, const mat4& transform)
-{
-    auto valueSampler = [&volume](const vec3& p) -> float {
-        return volume.valueAt(p);
-    };
-
-    return GetGridCell(x, y, z, valueSampler, cell, transform);
 }
 
 } // namespace mc::detail
