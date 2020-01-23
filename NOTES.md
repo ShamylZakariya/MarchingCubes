@@ -4,7 +4,9 @@
     - finding the closest point of the aabb doesn't work
         - possible to find closest point of aabb to the closest point of the plane?
             - YES. But it's greedy and causes false positives which need to be filtered by coarse bounds checks
-    - see http://www.jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
+    - see
+        - http://www.jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
+        - https://www.gamedev.net/forums/topic/628444-collision-detection-between-non-axis-aligned-rectangular-prisms/
 
 # TODO:
 

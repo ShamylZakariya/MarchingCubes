@@ -164,86 +164,30 @@ public:
 
     bool intersects(const AABB bounds) const override
     {
-        // TODO: Use separating axes to get a more precise intersection query
-        // Current implementation is accurate, but could be improved; if I disable
-        // the coarse bounds check, can see that it aggressively matches a lot of nodes on the planes.
-        // if seaprating axes are used, can discard the expensive computation of _bounds.
-        // http://www.jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
+        // this is really coarse, but doesn't cause mismatches
+        return (bounds.intersect(_bounds) != AABB::Intersection::Outside);
+    }
 
+    bool intersects__experimental_bad(const AABB bounds) const
+    {
         // early exit if this prism is contained by bounds
         if (bounds.contains(_origin))
             return true;
 
         // coarse AABB check
         if (bounds.intersect(_bounds) != AABB::Intersection::Outside) {
-            const auto bc = bounds.center();
 
-            auto test = [this](const vec3& p, const vec3& q) {
-                const auto dir = p - q;
-                const auto posXDistance = dot(_posX, dir);
-                const auto posYDistance = dot(_posY, dir);
-                const auto posZDistance = dot(_posZ, dir);
-
-                const auto posX = posXDistance - _halfExtents.x;
-                const auto negX = -posXDistance - _halfExtents.x;
-                const auto posY = posYDistance - _halfExtents.y;
-                const auto negY = -posYDistance - _halfExtents.y;
-                const auto posZ = posZDistance - _halfExtents.z;
-                const auto negZ = -posZDistance - _halfExtents.z;
-
-                return (posX <= 0 && negX <= 0 && posY <= 0 && negY <= 0 && posZ <= 0 && negZ <= 0);
-            };
-
-            {
-                auto dBc = dot(_posX, bc - _origin);
-                auto closestPointOnXPlane = bc + _posX * -dBc;
-
-                // find the point contained by bounds closest to _position
-                const auto closestPointOnBounds = vec3 {
-                    max(bounds.min.x, min(closestPointOnXPlane.x, bounds.max.x)),
-                    max(bounds.min.y, min(closestPointOnXPlane.y, bounds.max.y)),
-                    max(bounds.min.z, min(closestPointOnXPlane.z, bounds.max.z))
-                };
-
-                if (test(closestPointOnBounds, closestPointOnXPlane)) {
+            // first, the easy pass - see if any of our vertices are contained by bounds
+            for (const auto &c : _corners) {
+                if (bounds.contains(c)) {
                     return true;
                 }
             }
 
-            {
-                auto dBc = dot(_posY, bc - _origin);
-                auto closestPointOnYPlane = bc + _posY * -dBc;
+            // TODO: now we have to go into the separating axis theorem
+            // http://www.jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
 
-                // find the point contained by bounds closest to _position
-                const auto closestPointOnBounds = vec3 {
-                    max(bounds.min.x, min(closestPointOnYPlane.x, bounds.max.x)),
-                    max(bounds.min.y, min(closestPointOnYPlane.y, bounds.max.y)),
-                    max(bounds.min.z, min(closestPointOnYPlane.z, bounds.max.z))
-                };
-
-                if (test(closestPointOnBounds, closestPointOnYPlane)) {
-                    return true;
-                }
-            }
-
-            {
-                auto dBc = dot(_posZ, bc - _origin);
-                auto closestPointOnZPlane = bc + _posZ * -dBc;
-
-                // find the point contained by bounds closest to _position
-                const auto closestPointOnBounds = vec3 {
-                    max(bounds.min.x, min(closestPointOnZPlane.x, bounds.max.x)),
-                    max(bounds.min.y, min(closestPointOnZPlane.y, bounds.max.y)),
-                    max(bounds.min.z, min(closestPointOnZPlane.z, bounds.max.z))
-                };
-
-                if (test(closestPointOnBounds, closestPointOnZPlane)) {
-                    return true;
-                }
-            }
         }
-
-        return false;
     }
 
     float valueAt(const vec3& p, float fuzziness) const override
