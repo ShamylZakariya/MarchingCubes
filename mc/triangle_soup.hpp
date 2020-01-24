@@ -9,16 +9,18 @@
 #ifndef triangle_soup_hpp
 #define triangle_soup_hpp
 
-#include "storage.hpp"
+#include "util/util.hpp"
+
+namespace mc {
 
 struct Triangle {
-    Vertex a, b, c;
+    util::Vertex a, b, c;
 
     Triangle()
     {
     }
 
-    Triangle(const Vertex& a, const Vertex& b, const Vertex& c)
+    Triangle(const util::Vertex& a, const util::Vertex& b, const util::Vertex& c)
         : a(a)
         , b(b)
         , c(c)
@@ -107,8 +109,8 @@ private:
  */
 class TriangleConsumer : public ITriangleConsumer {
 private:
-    std::vector<Vertex> _vertices;
-    VertexStorage _gpuStorage { GL_TRIANGLES };
+    std::vector<util::Vertex> _vertices;
+    util::VertexStorage _gpuStorage { GL_TRIANGLES };
     size_t _numTriangles = 0;
 
 public:
@@ -121,8 +123,8 @@ public:
     void finish() override;
     void draw() const override;
 
-    const VertexStorage& storage() const { return _gpuStorage; }
-    VertexStorage& storage() { return _gpuStorage; }
+    const util::VertexStorage& storage() const { return _gpuStorage; }
+    util::VertexStorage& storage() { return _gpuStorage; }
 };
 
 class IndexedTriangleConsumer : public ITriangleConsumer {
@@ -142,8 +144,8 @@ public:
     };
 
 private:
-    std::vector<Vertex> _vertices;
-    IndexedVertexStorage _gpuStorage { GL_TRIANGLES };
+    std::vector<util::Vertex> _vertices;
+    util::IndexedVertexStorage _gpuStorage { GL_TRIANGLES };
     Strategy _strategy;
     size_t _numTriangles;
     float _normalSmoothingDotThreshold = 0.96F; // ~15°
@@ -162,8 +164,8 @@ public:
     void finish() override;
     void draw() const override;
 
-    const IndexedVertexStorage& storage() const { return _gpuStorage; }
-    IndexedVertexStorage& storage() { return _gpuStorage; }
+    const util::IndexedVertexStorage& storage() const { return _gpuStorage; }
+    util::IndexedVertexStorage& storage() { return _gpuStorage; }
 
     /*
      If triangles share a point, the point will be shared iff the triangle's normals for that point
@@ -178,5 +180,7 @@ private:
     void _stitch_Basic();
     void _stitch_NormalSmoothing();
 };
+
+} // namespace mc
 
 #endif /* triangle_soup_hpp */

@@ -9,6 +9,9 @@
 #include "marching_cubes.hpp"
 #include "marching_cubes_detail.hpp"
 
+using namespace glm;
+using namespace mc::util;
+
 namespace mc {
 
 constexpr float IsoLevel = 0.5F;

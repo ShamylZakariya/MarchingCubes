@@ -11,6 +11,10 @@
 #include "marching_cubes.hpp"
 #include "volume.hpp"
 
+using namespace glm;
+
+namespace mc {
+
 void OctreeVolume::march(
     const mat4& transform,
     bool computeNormals,
@@ -18,7 +22,7 @@ void OctreeVolume::march(
 {
     if (!_marchThreads) {
         auto nThreads = _triangleConsumers.size();
-        _marchThreads = std::make_unique<ThreadPool>(nThreads, true);
+        _marchThreads = std::make_unique<util::ThreadPool>(nThreads, true);
     }
 
     _nodesToMarch.clear();
@@ -102,5 +106,7 @@ void OctreeVolume::march(OctreeVolume::Node* node, ITriangleConsumer& tc, const 
         return -normalize(grad);
     };
 
-    mc::march(iAABB(node->bounds), valueSampler, normalSampler, tc, transform, computeNormals);
+    mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform, computeNormals);
 }
+
+} // namespace mc

@@ -11,11 +11,14 @@
 
 #include <memory>
 
-#include <util.hpp>
+#include <util/util.hpp>
 #include <volume.hpp>
 #include <volume_samplers.hpp>
 
 using std::make_unique;
+using namespace glm;
+using namespace mc;
+using namespace mc::util;
 
 TEST_CASE("AABB", "[aabb]")
 {

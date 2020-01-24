@@ -19,13 +19,19 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
-#include <lines.hpp>
+#include <util/lines.hpp>
+#include <util/storage.hpp>
+#include <util/util.hpp>
+
 #include <marching_cubes.hpp>
-#include <storage.hpp>
 #include <triangle_soup.hpp>
-#include <util.hpp>
 #include <volume.hpp>
 #include <volume_samplers.hpp>
+
+using namespace glm;
+using mc::util::unowned_ptr;
+using mc::util::AABB;
+using mc::util::iAABB;
 
 //
 // Constants
@@ -56,9 +62,10 @@ struct ProgramState {
 
     void build(const std::string& vertPath, const std::string& fragPath)
     {
-        auto vertSrc = util::ReadFile(vertPath);
-        auto fragSrc = util::ReadFile(fragPath);
-        program = util::CreateProgram(vertSrc.c_str(), fragSrc.c_str());
+        using namespace mc::util;
+        auto vertSrc = ReadFile(vertPath);
+        auto fragSrc = ReadFile(fragPath);
+        program = CreateProgram(vertSrc.c_str(), fragSrc.c_str());
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         uniformLocModel = glGetUniformLocation(program, "uModel");
     }
@@ -128,15 +135,15 @@ public:
 
 private:
     GLFWwindow* _window;
-    util::FpsCalculator _fpsCalculator;
+    mc::util::FpsCalculator _fpsCalculator;
 
     // render state
     ProgramState _volumeProgram, _lineProgram;
-    std::vector<std::unique_ptr<ITriangleConsumer>> _triangleConsumers;
-    LineSegmentBuffer _octreeAABBLineSegmentStorage;
-    LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
-    LineSegmentBuffer _axes;
-    LineSegmentBuffer _debugLines;
+    std::vector<std::unique_ptr<mc::ITriangleConsumer>> _triangleConsumers;
+    mc::util::LineSegmentBuffer _octreeAABBLineSegmentStorage;
+    mc::util::LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
+    mc::util::LineSegmentBuffer _axes;
+    mc::util::LineSegmentBuffer _debugLines;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -145,9 +152,9 @@ private:
     mat4 _trackballRotation { 1 };
 
     // volume and samplers
-    std::unique_ptr<OctreeVolume> _volume;
-    unowned_ptr<RectangularPrismVolumeSampler> _rectPrism;
-    unowned_ptr<BoundedPlaneVolumeSampler> _plane;
+    std::unique_ptr<mc::OctreeVolume> _volume;
+    unowned_ptr<mc::RectangularPrismVolumeSampler> _rectPrism;
+    unowned_ptr<mc::BoundedPlaneVolumeSampler> _plane;
 
     // app state
     enum class AABBDisplay : int {
@@ -289,6 +296,7 @@ private:
         onResize(fbWidth, fbHeight);
 
         _axes.clear();
+        using mc::util::Vertex;
         _axes.add(Vertex { vec3(0, 0, 0), vec4(1, 0, 0, 1) }, Vertex { vec3(10, 0, 0), vec4(1, 0, 0, 1) });
         _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 1, 0, 1) }, Vertex { vec3(0, 10, 0), vec4(0, 1, 0, 1) });
         _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 0, 1, 1) }, Vertex { vec3(0, 0, 10), vec4(0, 0, 1, 1) });
@@ -511,16 +519,16 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
 
-        std::vector<unowned_ptr<ITriangleConsumer>> unownedTriangleConsumers;
+        std::vector<unowned_ptr<mc::ITriangleConsumer>> unownedTriangleConsumers;
         for (auto i = 0u; i < nThreads; i++) {
-            _triangleConsumers.push_back(std::make_unique<TriangleConsumer>());
+            _triangleConsumers.push_back(std::make_unique<mc::TriangleConsumer>());
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
-        _volume = std::make_unique<OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
+        _volume = std::make_unique<mc::OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
         _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
 
-        _volume->walkOctree([this](OctreeVolume::Node* node) {
+        _volume->walkOctree([this](mc::OctreeVolume::Node* node) {
             auto bounds = node->bounds;
             bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
             _octreeAABBLineSegmentStorage.add(bounds, nodeColor(node->depth));
@@ -532,12 +540,12 @@ private:
         auto size = vec3(_volume->size());
         auto center = size / 2.0F;
 
-        _rectPrism = _volume->add(std::make_unique<RectangularPrismVolumeSampler>(
-            center, vec3(10, 1, 5), mat3 { 1 }, IVolumeSampler::Mode::Additive));
+        _rectPrism = _volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            center, vec3(10, 1, 5), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
 
         if (false) {
-            _plane = _volume->add(std::make_unique<BoundedPlaneVolumeSampler>(
-                center, vec3(0, 1, 0), 8, IVolumeSampler::Mode::Subtractive));
+            _plane = _volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
+                center, vec3(0, 1, 0), 8, mc::IVolumeSampler::Mode::Subtractive));
         }
 
         marchVolume();
@@ -553,7 +561,7 @@ private:
         _marchStats.reset(_volume->depth());
         _octreeOccupiedAABBsLineSegmentStorage.clear();
 
-        _volume->march(mat4(1), false, [this](OctreeVolume::Node* node) {
+        _volume->march(mat4(1), false, [this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
@@ -574,6 +582,7 @@ private:
 
     const vec4 nodeColor(int atDepth) const
     {
+        using namespace mc::util::color;
         static std::vector<vec4> nodeColors;
 
         auto depth = _volume->depth();
@@ -581,8 +590,8 @@ private:
             nodeColors.clear();
             const float hueStep = 360.0F / depth;
             for (auto i = 0U; i <= depth; i++) {
-                const util::color::hsv hC { i * hueStep, 0.6F, 1.0F };
-                const auto rgbC = util::color::Hsv2Rgb(hC);
+                const hsv hC { i * hueStep, 0.6F, 1.0F };
+                const auto rgbC = Hsv2Rgb(hC);
                 nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, mix<float>(0.6, 0.25, static_cast<float>(i) / depth));
             }
         }

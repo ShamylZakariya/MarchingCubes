@@ -11,15 +11,17 @@
 
 #include <glm/gtx/intersect.hpp>
 
-#include "lines.hpp"
+#include "util/util.hpp"
 #include "volume.hpp"
+
+namespace mc {
 
 /*
  Represents a simple sphere
  */
 class SphereVolumeSampler : public IVolumeSampler {
 public:
-    SphereVolumeSampler(vec3 position, float radius, Mode mode)
+    SphereVolumeSampler(glm::vec3 position, float radius, Mode mode)
         : IVolumeSampler(mode)
         , _position(position)
         , _radius(radius)
@@ -29,24 +31,27 @@ public:
 
     ~SphereVolumeSampler() override = default;
 
-    bool intersects(const AABB bounds) const override
+    bool intersects(const util::AABB bounds) const override
     {
+        using glm::max;
+        using glm::min;
+
         // early exit if this sphere is contained by bounds
         if (bounds.contains(_position))
             return true;
 
         // find the point on surface of bounds closest to _position
-        const auto closestPoint = vec3 {
+        const auto closestPoint = glm::vec3 {
             max(bounds.min.x, min(_position.x, bounds.max.x)),
             max(bounds.min.y, min(_position.y, bounds.max.y)),
             max(bounds.min.z, min(_position.z, bounds.max.z))
         };
 
         // confirm the closest point on the aabb is inside the sphere
-        return distance2(_position, closestPoint) <= _radius2;
+        return glm::distance2(_position, closestPoint) <= _radius2;
     }
 
-    float valueAt(const vec3& p, float fuzziness) const override
+    float valueAt(const glm::vec3& p, float fuzziness) const override
     {
         float d2 = distance2(p, _position);
         float innerRadius = _radius - fuzziness;
@@ -64,23 +69,23 @@ public:
         return 1 - (d / fuzziness);
     }
 
-    void setPosition(const vec3& center)
+    void setPosition(const glm::vec3& center)
     {
         _position = center;
     }
 
     void setRadius(float radius)
     {
-        _radius = max<float>(radius, 0);
+        _radius = glm::max<float>(radius, 0);
         _radius2 = _radius * _radius;
     }
 
-    vec3 position() const { return _position; }
+    glm::vec3 position() const { return _position; }
 
     float radius() const { return _radius; }
 
 private:
-    vec3 _position;
+    glm::vec3 _position;
     float _radius;
     float _radius2;
 };
@@ -92,23 +97,27 @@ private:
  */
 class BoundedPlaneVolumeSampler : public IVolumeSampler {
 public:
-    BoundedPlaneVolumeSampler(vec3 planeOrigin, vec3 planeNormal, float planeThickness, Mode mode)
+    BoundedPlaneVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, float planeThickness, Mode mode)
         : IVolumeSampler(mode)
         , _origin(planeOrigin)
-        , _normal(::normalize(planeNormal))
+        , _normal(glm::normalize(planeNormal))
         , _thickness(std::max<float>(planeThickness, 0))
     {
     }
 
-    bool intersects(const AABB bounds) const override
+    bool intersects(const util::AABB bounds) const override
     {
+        using glm::dot;
+        using glm::max;
+        using glm::min;
+
         // find point on plane closest to bounds
         auto bc = bounds.center();
         auto distanceToBoundsCenter = dot(_normal, bc - _origin);
         auto closestPointOnPlane = bc + _normal * -distanceToBoundsCenter;
 
         // find the point bounds closest to closestPointOnPlane
-        const auto closestPointOnBounds = vec3 {
+        const auto closestPointOnBounds = glm::vec3 {
             max(bounds.min.x, min(closestPointOnPlane.x, bounds.max.x)),
             max(bounds.min.y, min(closestPointOnPlane.y, bounds.max.y)),
             max(bounds.min.z, min(closestPointOnPlane.z, bounds.max.z))
@@ -120,10 +129,10 @@ public:
         return (distance < halfThickness && distance > -halfThickness);
     }
 
-    float valueAt(const vec3& p, float fuzziness) const override
+    float valueAt(const glm::vec3& p, float fuzziness) const override
     {
         // distance of p from plane
-        float dist = abs(dot(_normal, p - _origin));
+        float dist = abs(glm::dot(_normal, p - _origin));
         float outerDist = _thickness * 0.5F;
         float innerDist = outerDist - fuzziness;
 
@@ -136,46 +145,46 @@ public:
         return 1 - ((dist - innerDist) / fuzziness);
     }
 
-    void setPlaneOrigin(const vec3 planeOrigin) { _origin = planeOrigin; }
-    vec3 planeOrigin() const { return _origin; }
+    void setPlaneOrigin(const glm::vec3 planeOrigin) { _origin = planeOrigin; }
+    glm::vec3 planeOrigin() const { return _origin; }
 
-    void setPlaneNormal(const vec3 planeNormal) { _normal = ::normalize(planeNormal); }
-    vec3 planeNormal() const { return _normal; }
+    void setPlaneNormal(const glm::vec3 planeNormal) { _normal = glm::normalize(planeNormal); }
+    glm::vec3 planeNormal() const { return _normal; }
 
     void setThickness(float thickness) { _thickness = std::max<float>(thickness, 0); }
     float thickness() const { return _thickness; }
 
 private:
-    vec3 _origin;
-    vec3 _normal;
+    glm::vec3 _origin;
+    glm::vec3 _normal;
     float _thickness;
 };
 
 class RectangularPrismVolumeSampler : public IVolumeSampler {
 public:
-    RectangularPrismVolumeSampler(vec3 origin, vec3 halfExtents, mat3 rotation, Mode mode)
+    RectangularPrismVolumeSampler(glm::vec3 origin, glm::vec3 halfExtents, glm::mat3 rotation, Mode mode)
         : IVolumeSampler(mode)
         , _origin(origin)
-        , _halfExtents(max(halfExtents, vec3(0)))
+        , _halfExtents(max(halfExtents, glm::vec3(0)))
         , _rotation(rotation)
     {
         _update();
     }
 
-    bool intersects(const AABB bounds) const override
+    bool intersects(const util::AABB bounds) const override
     {
         // this is really coarse, but doesn't cause mismatches
-        return (bounds.intersect(_bounds) != AABB::Intersection::Outside);
+        return (bounds.intersect(_bounds) != util::AABB::Intersection::Outside);
     }
 
-    bool intersects__experimental_bad(const AABB bounds) const
+    bool intersects__experimental_bad(const util::AABB bounds) const
     {
         // early exit if this prism is contained by bounds
         if (bounds.contains(_origin))
             return true;
 
         // coarse AABB check
-        if (bounds.intersect(_bounds) != AABB::Intersection::Outside) {
+        if (bounds.intersect(_bounds) != util::AABB::Intersection::Outside) {
 
             // first, the easy pass - see if any of our vertices are contained by bounds
             for (const auto& c : _corners) {
@@ -189,8 +198,10 @@ public:
         }
     }
 
-    float valueAt(const vec3& p, float fuzziness) const override
+    float valueAt(const glm::vec3& p, float fuzziness) const override
     {
+        using glm::min;
+
         fuzziness += 1e-5F;
 
         // postivie values denote that the point is on the positive
@@ -221,47 +232,48 @@ public:
         return 0;
     }
 
-    void setPosition(const vec3& position)
+    void setPosition(const glm::vec3& position)
     {
         _origin = position;
         _update();
     }
 
-    vec3 position() const { return _origin; }
+    glm::vec3 position() const { return _origin; }
 
-    void setSize(const vec3& halfExtents)
+    void setSize(const glm::vec3& halfExtents)
     {
-        _halfExtents = max(halfExtents, vec3(0));
+        _halfExtents = max(halfExtents, glm::vec3(0));
         _update();
     }
 
-    vec3 size() const { return _halfExtents; }
+    glm::vec3 size() const { return _halfExtents; }
 
-    void setRotation(const mat3& rotation)
+    void setRotation(const glm::mat3& rotation)
     {
-        _rotation = mat4 { rotation };
+        _rotation = glm::mat4 { rotation };
         _update();
     }
 
-    mat3 rotation() const { return _rotation; }
+    glm::mat3 rotation() const { return _rotation; }
 
-    void set(const vec3& position, const vec3& halfExtents, const mat3& rotation)
+    void set(const glm::vec3& position, const glm::vec3& halfExtents, const glm::mat3& rotation)
     {
         _origin = position;
-        _halfExtents = max(halfExtents, vec3(0));
+        _halfExtents = max(halfExtents, glm::vec3(0));
         _rotation = rotation;
         _update();
     }
 
-    AABB bounds() const { return _bounds; }
+    util::AABB bounds() const { return _bounds; }
 
-    std::array<vec3, 8> corners() const
+    std::array<glm::vec3, 8> corners() const
     {
         return _corners;
     }
 
-    void addTo(LineSegmentBuffer& lineBuffer, const vec4& color) const
+    void addTo(util::LineSegmentBuffer& lineBuffer, const glm::vec4& color) const
     {
+        using util::Vertex;
         auto corners = this->corners();
 
         // trace bottom
@@ -287,20 +299,20 @@ private:
     void _update()
     {
         // extract plane normals from rotation
-        _posX = vec3 { _rotation[0][0], _rotation[1][0], _rotation[2][0] };
-        _posY = vec3 { _rotation[0][1], _rotation[1][1], _rotation[2][1] };
-        _posZ = vec3 { _rotation[0][2], _rotation[1][2], _rotation[2][2] };
+        _posX = glm::vec3 { _rotation[0][0], _rotation[1][0], _rotation[2][0] };
+        _posY = glm::vec3 { _rotation[0][1], _rotation[1][1], _rotation[2][1] };
+        _posZ = glm::vec3 { _rotation[0][2], _rotation[1][2], _rotation[2][2] };
 
         // generate _corners
         auto e = _halfExtents;
-        _corners[0] = _origin + (vec3(+e.x, -e.y, -e.z) * _rotation);
-        _corners[1] = _origin + (vec3(+e.x, -e.y, +e.z) * _rotation);
-        _corners[2] = _origin + (vec3(-e.x, -e.y, +e.z) * _rotation);
-        _corners[3] = _origin + (vec3(-e.x, -e.y, -e.z) * _rotation);
-        _corners[4] = _origin + (vec3(+e.x, +e.y, -e.z) * _rotation);
-        _corners[5] = _origin + (vec3(+e.x, +e.y, +e.z) * _rotation);
-        _corners[6] = _origin + (vec3(-e.x, +e.y, +e.z) * _rotation);
-        _corners[7] = _origin + (vec3(-e.x, +e.y, -e.z) * _rotation);
+        _corners[0] = _origin + (glm::vec3(+e.x, -e.y, -e.z) * _rotation);
+        _corners[1] = _origin + (glm::vec3(+e.x, -e.y, +e.z) * _rotation);
+        _corners[2] = _origin + (glm::vec3(-e.x, -e.y, +e.z) * _rotation);
+        _corners[3] = _origin + (glm::vec3(-e.x, -e.y, -e.z) * _rotation);
+        _corners[4] = _origin + (glm::vec3(+e.x, +e.y, -e.z) * _rotation);
+        _corners[5] = _origin + (glm::vec3(+e.x, +e.y, +e.z) * _rotation);
+        _corners[6] = _origin + (glm::vec3(-e.x, +e.y, +e.z) * _rotation);
+        _corners[7] = _origin + (glm::vec3(-e.x, +e.y, -e.z) * _rotation);
 
         _bounds.invalidate();
         for (auto& c : _corners) {
@@ -309,13 +321,15 @@ private:
     }
 
 private:
-    vec3 _origin;
-    vec3 _halfExtents;
-    mat3 _rotation;
-    vec3 _posX, _posY, _posZ;
+    glm::vec3 _origin;
+    glm::vec3 _halfExtents;
+    glm::mat3 _rotation;
+    glm::vec3 _posX, _posY, _posZ;
 
-    std::array<vec3, 8> _corners;
-    AABB _bounds;
+    std::array<glm::vec3, 8> _corners;
+    util::AABB _bounds;
 };
+
+} // namespace mc
 
 #endif /* volume_samplers_h */

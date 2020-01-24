@@ -11,12 +11,15 @@
 
 #include <memory>
 
-#include <util.hpp>
+#include <util/util.hpp>
 #include <volume.hpp>
 #include <volume_samplers.hpp>
 
 using std::make_unique;
+using namespace glm;
 using namespace Catch::literals;
+using namespace mc;
+using namespace mc::util;
 
 auto approx(float v, float m = 1e-4F)
 {

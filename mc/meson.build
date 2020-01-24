@@ -1,12 +1,14 @@
-lib_sources = [
+mc_lib_sources = [
     'marching_cubes.cpp',
-    'storage.cpp',
     'triangle_soup.cpp',
     'volume.cpp',
-    'util.cpp'
+    'util/color.cpp',
+    'util/io.cpp',
+    'util/storage.cpp'
 ]
 
+
 mc_lib = static_library('mc',
-    sources: lib_sources,
+    sources: mc_lib_sources,
     include_directories: ['../include'],
     dependencies: dependencies)

@@ -14,9 +14,10 @@
 #include <unordered_set>
 #include <vector>
 
-#include "aabb.hpp"
-#include "marching_cubes.hpp"
-#include "unowned_ptr.hpp"
+#include "triangle_soup.hpp"
+#include "util/util.hpp"
+
+namespace mc {
 
 //
 // VolumeSampler
@@ -42,7 +43,7 @@ public:
     /*
      Return true iff bounds intersects the region affected by this sampler
     */
-    virtual bool intersects(const AABB bounds) const = 0;
+    virtual bool intersects(const util::AABB bounds) const = 0;
 
     /*
      Return the amount a given point in space is "inside" the volume. The
@@ -51,7 +52,7 @@ public:
      returns a value of 1, and a distance >= r returns 0,
      and values in between return a linear transition.
      */
-    virtual float valueAt(const vec3& p, float fuzziness) const = 0;
+    virtual float valueAt(const glm::vec3& p, float fuzziness) const = 0;
 
 private:
     Mode _mode;
@@ -63,7 +64,7 @@ private:
 
 class BaseCompositeVolume {
 public:
-    BaseCompositeVolume(ivec3 size, float fuzziness)
+    BaseCompositeVolume(glm::ivec3 size, float fuzziness)
         : _size(size)
         , _fuzziness(fuzziness)
     {
@@ -72,7 +73,7 @@ public:
     virtual ~BaseCompositeVolume() = default;
 
     template <typename T>
-    unowned_ptr<T> add(std::unique_ptr<T>&& sampler)
+    util::unowned_ptr<T> add(std::unique_ptr<T>&& sampler)
     {
         auto sPtr = sampler.get();
         _samplers.push_back(std::move(sampler));
@@ -92,19 +93,19 @@ public:
         return sPtr;
     }
 
-    ivec3 size() const
+    glm::ivec3 size() const
     {
         return _size;
     }
 
-    void setFuzziness(float ft) { _fuzziness = max<float>(ft, 0); }
+    void setFuzziness(float ft) { _fuzziness = std::max<float>(ft, 0); }
     float fuzziness() const { return _fuzziness; }
 
 protected:
     virtual void onVolumeSamplerAdded(IVolumeSampler* sampler) {}
 
 protected:
-    ivec3 _size;
+    glm::ivec3 _size;
     float _fuzziness;
     std::vector<IVolumeSampler*> _additiveSamplers, _subtractiveSamplers;
     std::vector<std::unique_ptr<IVolumeSampler>> _samplers;
@@ -116,7 +117,7 @@ public:
         Node() = delete;
         Node(const Node&) = delete;
         Node(const Node&&) = delete;
-        Node(const AABB bounds, int depth, int childIdx)
+        Node(const util::AABB bounds, int depth, int childIdx)
             : bounds(bounds)
             , depth(depth)
             , childIdx(childIdx)
@@ -124,7 +125,7 @@ public:
         }
         ~Node() = default;
 
-        AABB bounds;
+        util::AABB bounds;
         int depth = 0;
         int childIdx = 0;
         bool isLeaf = false;
@@ -142,9 +143,9 @@ public:
     };
 
 public:
-    OctreeVolume(int size, float fuzziness, int minNodeSize, const std::vector<unowned_ptr<ITriangleConsumer>>& triangleConsumers)
-        : BaseCompositeVolume(ivec3 { size, size, size }, fuzziness)
-        , _bounds(AABB(ivec3(0, 0, 0), ivec3(size, size, size)))
+    OctreeVolume(int size, float fuzziness, int minNodeSize, const std::vector<util::unowned_ptr<ITriangleConsumer>>& triangleConsumers)
+        : BaseCompositeVolume(glm::ivec3 { size, size, size }, fuzziness)
+        , _bounds(util::AABB(glm::ivec3(0, 0, 0), glm::ivec3(size, size, size)))
         , _root(buildOctreeNode(_bounds, minNodeSize, 0, 0))
         , _triangleConsumers(triangleConsumers)
     {
@@ -178,14 +179,14 @@ public:
     /**
      * March the represented volume into the triangle consumers provided in the constructor
     */
-    void march(const mat4& transform = mat4(1),
+    void march(const glm::mat4& transform = glm::mat4(1),
         bool computeNormals = true,
         std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr);
 
     /**
      * Get the bounds of this volume - no geometry will exceed this region
      */
-    AABB bounds() const
+    util::AABB bounds() const
     {
         return _bounds;
     }
@@ -199,7 +200,7 @@ public:
     }
 
 protected:
-    void march(OctreeVolume::Node* node, ITriangleConsumer& tc, const mat4& transform, bool computeNormals);
+    void march(OctreeVolume::Node* node, ITriangleConsumer& tc, const glm::mat4& transform, bool computeNormals);
 
     /**
      * Mark the nodes which should be marched.
@@ -284,7 +285,7 @@ protected:
         }
     }
 
-    std::unique_ptr<Node> buildOctreeNode(AABB bounds, size_t minNodeSize, size_t depth, size_t childIdx)
+    std::unique_ptr<Node> buildOctreeNode(util::AABB bounds, size_t minNodeSize, size_t depth, size_t childIdx)
     {
         _treeDepth = std::max(depth, _treeDepth);
         auto node = std::make_unique<Node>(bounds, depth, childIdx);
@@ -305,12 +306,14 @@ protected:
     }
 
 private:
-    AABB _bounds;
+    util::AABB _bounds;
     size_t _treeDepth = 0;
     std::unique_ptr<Node> _root;
     std::vector<Node*> _nodesToMarch;
-    std::unique_ptr<ThreadPool> _marchThreads;
-    std::vector<unowned_ptr<ITriangleConsumer>> _triangleConsumers;
+    std::unique_ptr<util::ThreadPool> _marchThreads;
+    std::vector<util::unowned_ptr<ITriangleConsumer>> _triangleConsumers;
 };
+
+} // namespace mc
 
 #endif /* volume_hpp */

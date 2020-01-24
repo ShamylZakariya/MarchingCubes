@@ -12,6 +12,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
+using namespace glm;
+using namespace mc::util;
+
+namespace mc {
+
 //
 // TriangleConsumer
 //
@@ -108,69 +113,72 @@ void IndexedTriangleConsumer::_stitch_Basic()
 }
 
 namespace normal_smoothing {
-// helpers for IndexedTriangleConsumer::_stitch_NormalSmoothing
+    // helpers for IndexedTriangleConsumer::_stitch_NormalSmoothing
 
-// a vertex type that cares only about position and color
-struct Vertex_PosColor {
-    vec3 pos;
-    vec3 color;
+    // a vertex type that cares only about position and color
+    struct Vertex_PosColor {
+        vec3 pos;
+        vec3 color;
 
-    bool operator==(const Vertex_PosColor& other) const
-    {
-        return pos == other.pos && color == other.color;
-    }
-};
+        bool operator==(const Vertex_PosColor& other) const
+        {
+            return pos == other.pos && color == other.color;
+        }
+    };
 
-/*
+    /*
 Looks for best match by normal for v to be merged with one of the vertices referred to by search indices; if none is a good match, adds vertex to vertices. Returns the index to use.
  */
-GLuint addVertex(std::vector<Vertex>& vertices,
-    std::vector<uint32_t>& searchIndices,
-    std::vector<uint32_t>& globalIndices,
-    std::unordered_set<GLuint>& indicesToNormalize,
-    Vertex v,
-    float dotThreshold)
-{
-    Vertex* bestMatch = nullptr;
-    float bestMatchValue = -1;
-    GLuint bestMatchIdx = 0;
-    for (auto searchIndex : searchIndices) {
-        Vertex* refVertex = &(vertices[searchIndex]);
-        vec3 refVertexNormal = normalize(refVertex->normal);
-        float d = dot(refVertexNormal, v.normal);
-        if (d >= dotThreshold && d > bestMatchValue) {
-            bestMatchValue = d;
-            bestMatch = refVertex;
-            bestMatchIdx = searchIndex;
+    GLuint addVertex(std::vector<Vertex>& vertices,
+        std::vector<uint32_t>& searchIndices,
+        std::vector<uint32_t>& globalIndices,
+        std::unordered_set<GLuint>& indicesToNormalize,
+        Vertex v,
+        float dotThreshold)
+    {
+        Vertex* bestMatch = nullptr;
+        float bestMatchValue = -1;
+        GLuint bestMatchIdx = 0;
+        for (auto searchIndex : searchIndices) {
+            Vertex* refVertex = &(vertices[searchIndex]);
+            vec3 refVertexNormal = normalize(refVertex->normal);
+            float d = dot(refVertexNormal, v.normal);
+            if (d >= dotThreshold && d > bestMatchValue) {
+                bestMatchValue = d;
+                bestMatch = refVertex;
+                bestMatchIdx = searchIndex;
+            }
+        }
+
+        if (bestMatch != nullptr) {
+            bestMatch->normal += v.normal;
+            indicesToNormalize.insert(bestMatchIdx);
+
+            return bestMatchIdx;
+        } else {
+            uint32_t idx = static_cast<GLuint>(vertices.size());
+            vertices.push_back(v);
+            searchIndices.push_back(idx);
+            globalIndices.push_back(idx);
+
+            return idx;
         }
     }
 
-    if (bestMatch != nullptr) {
-        bestMatch->normal += v.normal;
-        indicesToNormalize.insert(bestMatchIdx);
-
-        return bestMatchIdx;
-    } else {
-        uint32_t idx = static_cast<GLuint>(vertices.size());
-        vertices.push_back(v);
-        searchIndices.push_back(idx);
-        globalIndices.push_back(idx);
-
-        return idx;
-    }
 }
-
 }
 
 namespace std {
 template <>
-struct hash<normal_smoothing::Vertex_PosColor> {
-    size_t operator()(normal_smoothing::Vertex_PosColor const& vertex) const
+struct hash<mc::normal_smoothing::Vertex_PosColor> {
+    size_t operator()(mc::normal_smoothing::Vertex_PosColor const& vertex) const
     {
-        return (hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1;
+        return (hash<vec3>()(vertex.pos) ^ (hash<vec3>()(vertex.color) << 1)) >> 1;
     }
 };
 }
+
+namespace mc {
 
 void IndexedTriangleConsumer::_stitch_NormalSmoothing()
 {
@@ -209,3 +217,5 @@ void IndexedTriangleConsumer::_stitch_NormalSmoothing()
 
     _gpuStorage.update(vertices, indices);
 }
+
+} // namespace mc

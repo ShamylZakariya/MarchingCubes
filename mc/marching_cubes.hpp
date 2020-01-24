@@ -11,14 +11,13 @@
 
 #include <functional>
 
-#include "aabb.hpp"
 #include "triangle_soup.hpp"
-#include "util.hpp"
+#include "util/util.hpp"
 
 namespace mc {
 
-typedef std::function<float(const vec3& p)> IsoSurfaceValueFunction;
-typedef std::function<vec3(const vec3& p)> IsoSurfaceNormalFunction;
+typedef std::function<float(const glm::vec3& p)> IsoSurfaceValueFunction;
+typedef std::function<glm::vec3(const glm::vec3& p)> IsoSurfaceNormalFunction;
 
 //
 // Marching
@@ -32,8 +31,9 @@ typedef std::function<vec3(const vec3& p)> IsoSurfaceNormalFunction;
  triangleConsumer: Receives each generated triangle
  transform: A transform to apply to each generated vertex
  computeNormals: If true, vertex normals will be computed via IIsoSurface::normalAt; else, generated triangle normals will be used
+ TODO: Make a variant which doesn't take transform and is faster
  */
-void march(iAABB region, IsoSurfaceValueFunction valueSampler, IsoSurfaceNormalFunction normalSampler, ITriangleConsumer& tc, const mat4& transform, bool computeNormals);
+void march(util::iAABB region, IsoSurfaceValueFunction valueSampler, IsoSurfaceNormalFunction normalSampler, ITriangleConsumer& tc, const glm::mat4& transform, bool computeNormals);
 
 }
 
