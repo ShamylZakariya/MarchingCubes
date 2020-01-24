@@ -19,13 +19,13 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
-#include "lines.hpp"
-#include "marching_cubes.hpp"
-#include "storage.hpp"
-#include "triangle_soup.hpp"
-#include "util.hpp"
-#include "volume.hpp"
-#include "volume_samplers.hpp"
+#include <lines.hpp>
+#include <marching_cubes.hpp>
+#include <storage.hpp>
+#include <triangle_soup.hpp>
+#include <util.hpp>
+#include <volume.hpp>
+#include <volume_samplers.hpp>
 
 //
 // Constants

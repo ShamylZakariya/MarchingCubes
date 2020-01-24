@@ -25,21 +25,17 @@ if build_machine.system() == 'darwin'
 endif
 
 include_dirs = [
-    'include'
+    'include',
+    'mc'
 ]
 
-sources = [
-    'src/marching_cubes.cpp',
-    'src/storage.cpp',
-    'src/triangle_soup.cpp',
-    'src/volume.cpp',
-    'src/util.cpp'
-]
+# build the mc_lib marching cubes library
+subdir('mc')
 
-## executable
 
+# build the main executable
 app_sources = [
-    'src/main.cpp',
+    'main.cpp',
     'include/imgui/imgui.cpp',
     'include/imgui/imgui_draw.cpp',
     'include/imgui/imgui_widgets.cpp',
@@ -48,21 +44,12 @@ app_sources = [
 ]
 
 executable('MarchingCubes',
-    sources: sources + app_sources,
+    sources: app_sources,
     include_directories: include_dirs,
+    link_with: mc_lib,
     dependencies: dependencies)
 
-## unit tests
-
-unit_test_sources = [
-    'tests/unit/tests.cpp',
-]
-
-unit_test_exe = executable('UnitTests',
-    sources: sources + unit_test_sources,
-    include_directories: include_dirs,
-    dependencies: dependencies)
-
-test('unit', unit_test_exe)
+## build/register unit tests
+subdir('tests')
 
 

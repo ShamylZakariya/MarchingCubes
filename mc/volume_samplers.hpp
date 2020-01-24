@@ -178,7 +178,7 @@ public:
         if (bounds.intersect(_bounds) != AABB::Intersection::Outside) {
 
             // first, the easy pass - see if any of our vertices are contained by bounds
-            for (const auto &c : _corners) {
+            for (const auto& c : _corners) {
                 if (bounds.contains(c)) {
                     return true;
                 }
@@ -186,7 +186,6 @@ public:
 
             // TODO: now we have to go into the separating axis theorem
             // http://www.jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
-
         }
     }
 
