@@ -91,7 +91,8 @@ public:
         return sPtr;
     }
 
-    void clear() {
+    void clear()
+    {
         _samplers.clear();
         _additiveSamplers.clear();
         _subtractiveSamplers.clear();

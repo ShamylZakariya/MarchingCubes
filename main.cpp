@@ -258,7 +258,7 @@ private:
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
     mat4 _model { 1 };
-    mat4 _trackballRotation { 1 };
+    mat3 _trackballRotation { 1 };
 
     // volume and samplers
     std::unique_ptr<mc::OctreeVolume> _volume;
@@ -281,7 +281,6 @@ private:
     float _aspect = 1;
     float _dolly = 1;
     float _animationTime = 0;
-    bool _drawMarchedVolume = true;
     bool _drawDebugLines = false;
 
     struct {
@@ -435,8 +434,8 @@ private:
         if (_mouseButtonState[0]) {
             // simple x/y trackball
             float trackballSpeed = 0.004 * M_PI;
-            mat4 xRot = rotate(mat4(1), -1 * delta.y * trackballSpeed, vec3(1, 0, 0));
-            mat4 yRot = rotate(mat4(1), 1 * delta.x * trackballSpeed, vec3(0, 1, 0));
+            mat3 xRot = rotate(mat4(1), -1 * delta.y * trackballSpeed, vec3(1, 0, 0));
+            mat3 yRot = rotate(mat4(1), 1 * delta.x * trackballSpeed, vec3(0, 1, 0));
             _trackballRotation = xRot * yRot * _trackballRotation;
         }
     }
@@ -479,8 +478,13 @@ private:
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto model = _trackballRotation * _model;
-        const auto mvp = [this, &model]() {
+        const auto mvp = [this]() {
+
+            // extract trackball Z and Y for building view matrix via lookAt
+            auto trackballY = glm::vec3 { _trackballRotation[0][1], _trackballRotation[1][1], _trackballRotation[2][1] };
+            auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
+            mat4 view, proj;
+
             if (_useOrthoProjection) {
                 auto bounds = _volume->bounds();
                 auto size = length(bounds.size());
@@ -493,34 +497,31 @@ private:
                 auto height = scale * size;
 
                 auto distance = FAR_PLANE / 2;
-                auto view = lookAt(-distance * vec3(0, 0, 1), vec3(0), vec3(0, 1, 0));
+                view = lookAt(-distance * trackballZ, vec3(0), trackballY);
 
-                auto proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
-                return proj * view * model;
+                proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
             } else {
                 auto bounds = _volume->bounds();
                 auto minDistance = 0.1F;
                 auto maxDistance = length(bounds.size()) * 2;
 
                 auto distance = mix(minDistance, maxDistance, pow<float>(_dolly, 2));
-                auto view = lookAt(-distance * vec3(0, 0, 1), vec3(0), vec3(0, 1, 0));
+                view = lookAt(-distance * trackballZ, vec3(0), trackballY);
 
-                auto proj = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
-                return proj * view * model;
+                proj = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
             }
+            return proj * view * _model;
         }();
 
-        if (_drawMarchedVolume) {
-            _volumeProgram.bind(mvp, model);
+        _volumeProgram.bind(mvp, _model);
 
-            glDepthMask(GL_TRUE);
-            for (auto& tc : _triangleConsumers) {
-                tc->draw();
-            }
+        glDepthMask(GL_TRUE);
+        for (auto& tc : _triangleConsumers) {
+            tc->draw();
         }
 
         glDepthMask(GL_FALSE);
-        _lineProgram.bind(mvp, model);
+        _lineProgram.bind(mvp, _model);
 
         _axes.draw();
 
@@ -573,24 +574,22 @@ private:
 
         ImGui::Separator();
 
-        // TODO: Trackball rotations are wrong
         ImGui::Text("Reset Trackball Rotation");
         if (ImGui::Button("+X")) {
-            _trackballRotation = rotate(mat4 { 1 }, 0.0F, vec3(-1, 0, 0));
+            _trackballRotation = rotate(mat4 { 1 }, -half_pi<float>(), vec3(0, 1, 0));
         }
         ImGui::SameLine();
         if (ImGui::Button("+Y")) {
-            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(1, 0, 0));
+            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(1, 0, 0)) * rotate(mat4{1}, half_pi<float>(), vec3(0,1,0));
         }
         ImGui::SameLine();
         if (ImGui::Button("+Z")) {
-            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(0, 1, 0));
+            _trackballRotation = mat3{1};
         }
 
         ImGui::Separator();
 
         ImGui::Checkbox("Ortho Projection", &_useOrthoProjection);
-        ImGui::Checkbox("Draw Marched Volume", &_drawMarchedVolume);
         ImGui::Checkbox("Draw Debug Lines", &_drawDebugLines);
 
         ImGui::Separator();
