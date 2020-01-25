@@ -7,6 +7,7 @@
 //
 
 #include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -19,19 +20,16 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
-#include <util/lines.hpp>
-#include <util/storage.hpp>
-#include <util/util.hpp>
-
-#include <marching_cubes.hpp>
-#include <triangle_soup.hpp>
-#include <volume.hpp>
-#include <volume_samplers.hpp>
+#include <mc/marching_cubes.hpp>
+#include <mc/triangle_soup.hpp>
+#include <mc/util/util.hpp>
+#include <mc/volume.hpp>
+#include <mc/volume_samplers.hpp>
 
 using namespace glm;
-using mc::util::unowned_ptr;
 using mc::util::AABB;
 using mc::util::iAABB;
+using mc::util::unowned_ptr;
 
 //
 // Constants
@@ -53,6 +51,10 @@ struct ProgramState {
     GLint uniformLocMVP = -1;
     GLint uniformLocModel = -1;
 
+    ProgramState() = default;
+    ProgramState(const ProgramState& other) = delete;
+    ProgramState(const ProgramState&& other) = delete;
+
     ~ProgramState()
     {
         if (program > 0) {
@@ -69,7 +71,110 @@ struct ProgramState {
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         uniformLocModel = glGetUniformLocation(program, "uModel");
     }
+
+    void bind(const mat4& mvp, const mat4& model)
+    {
+        glUseProgram(program);
+        glUniformMatrix4fv(uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
+        glUniformMatrix4fv(uniformLocModel, 1, GL_FALSE, value_ptr(model));
+    }
 };
+
+//
+//  Geometry Demos
+//
+
+class Demo {
+public:
+    Demo() = default;
+    virtual ~Demo() = default;
+
+    virtual void build(unowned_ptr<mc::BaseCompositeVolume> volume) = 0;
+    virtual void step(float time) = 0;
+    virtual void drawDebugLines(mc::util::LineSegmentBuffer&) {}
+};
+
+class CubeDemo : public Demo {
+public:
+    CubeDemo() = default;
+
+    void build(unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        auto center = size / 2.0F;
+
+        _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+    }
+
+    void step(float time) override
+    {
+        float angle = static_cast<float>(M_PI * time * 0.1);
+        _rect->setRotation(rotate(mat4 { 1 }, angle, vec3(0, 0, 1)));
+    }
+
+    void drawDebugLines(mc::util::LineSegmentBuffer& debugLinebuf) override
+    {
+        debugLinebuf.add(_rect->bounds(), vec4(1, 1, 0, 1));
+        _rect->addTo(debugLinebuf, vec4(0, 1, 1, 1));
+    }
+
+private:
+    unowned_ptr<mc::RectangularPrismVolumeSampler> _rect;
+};
+
+class CutCubeDemo : public Demo {
+public:
+    CutCubeDemo() = default;
+
+    void build(unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        auto center = size / 2.0F;
+        auto cubeSize = min(size.x, min(size.y, size.z)) * 0.25F;
+        auto planeThickness = cubeSize * 0.2F;
+
+        _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            center, vec3(cubeSize), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+
+        _cuttingPlane = volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
+            center, vec3(0, 1, 0), planeThickness, mc::IVolumeSampler::Mode::Subtractive));
+    }
+
+    void step(float time) override
+    {
+        float angle = static_cast<float>(M_PI * time * 0.1);
+        _rect->setRotation(rotate(mat4 { 1 }, angle, normalize(vec3(0, 1, 1))));
+    }
+
+    void drawDebugLines(mc::util::LineSegmentBuffer& debugLinebuf) override
+    {
+        debugLinebuf.add(_rect->bounds(), vec4(1, 1, 0, 1));
+        _rect->addTo(debugLinebuf, vec4(0, 1, 1, 1));
+    }
+
+private:
+    unowned_ptr<mc::RectangularPrismVolumeSampler> _rect;
+    unowned_ptr<mc::BoundedPlaneVolumeSampler> _cuttingPlane;
+};
+
+constexpr const char* Demos[] = { "Cube", "CutCube" };
+
+std::unique_ptr<Demo> CreateDemo(const std::string& demoName, unowned_ptr<mc::BaseCompositeVolume> volume)
+{
+    std::unique_ptr<Demo> demo;
+    if (demoName == "Cube") {
+        demo = std::make_unique<CubeDemo>();
+    } else if (demoName == "CutCube") {
+        demo = std::make_unique<CutCubeDemo>();
+    }
+
+    if (demo) {
+        demo->build(volume);
+    }
+
+    return demo;
+}
 
 //
 // App
@@ -95,7 +200,11 @@ public:
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
         style.ScaleAllSizes(2);
-        ImGui::GetIO().Fonts->AddFontFromFileTTF("./fonts/ConsolaMono.ttf", 24);
+
+        const auto fontFile = "./fonts/ConsolaMono.ttf";
+        if (std::filesystem::exists(fontFile)) {
+            ImGui::GetIO().Fonts->AddFontFromFileTTF(fontFile, 24);
+        }
 
         // set imgui platform/renderer bindings
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
@@ -153,8 +262,8 @@ private:
 
     // volume and samplers
     std::unique_ptr<mc::OctreeVolume> _volume;
-    unowned_ptr<mc::RectangularPrismVolumeSampler> _rectPrism;
-    unowned_ptr<mc::BoundedPlaneVolumeSampler> _plane;
+    std::unique_ptr<Demo> _currentDemo;
+    int _currentDemoIdx = 0;
 
     // app state
     enum class AABBDisplay : int {
@@ -165,17 +274,17 @@ private:
 
     bool _animateVolume = false;
     bool _running = true;
-    bool _useOrthoProjection = true;
-    AABBDisplay _aabbDisplay = AABBDisplay::MarchNodes;
+    bool _useOrthoProjection = false;
+    AABBDisplay _aabbDisplay = AABBDisplay::None;
     bool _needsMarchVolume = true;
     float _fuzziness = 1.0F;
     float _aspect = 1;
     float _dolly = 1;
-    float _animationPhase = 0.410F;
+    float _animationTime = 0;
     bool _drawMarchedVolume = true;
-    bool _drawDebugLines = true;
+    bool _drawDebugLines = false;
 
-    struct MarchInfo {
+    struct {
         int nodesMarched = 0;
         std::vector<int> nodesMarchedByDepth;
         int voxelsMarched = 0;
@@ -355,22 +464,10 @@ private:
     void step(float now, float deltaT)
     {
         if (_animateVolume) {
-            _animationPhase = now * 0.2F;
+            _animationTime += deltaT;
         }
 
-        float i = 0;
-        _animationPhase = std::modf(_animationPhase, &i);
-
-        if (_rectPrism) {
-            float angle = static_cast<float>(M_PI * _animationPhase);
-            _rectPrism->setRotation(rotate(mat4 { 1 }, angle, vec3(0, 0, 1)));
-        }
-
-        if (_plane) {
-            float angle = static_cast<float>(M_PI * _animationPhase);
-            vec3 normal { rotate(mat4(1), angle, vec3(1, 0, 0)) * vec4(0, 1, 0, 1) };
-            _plane->setPlaneNormal(normal);
-        }
+        _currentDemo->step(_animationTime);
 
         if (_animateVolume || _needsMarchVolume) {
             marchVolume();
@@ -414,9 +511,7 @@ private:
         }();
 
         if (_drawMarchedVolume) {
-            glUseProgram(_volumeProgram.program);
-            glUniformMatrix4fv(_volumeProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-            glUniformMatrix4fv(_volumeProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+            _volumeProgram.bind(mvp, model);
 
             glDepthMask(GL_TRUE);
             for (auto& tc : _triangleConsumers) {
@@ -425,9 +520,7 @@ private:
         }
 
         glDepthMask(GL_FALSE);
-        glUseProgram(_lineProgram.program);
-        glUniformMatrix4fv(_lineProgram.uniformLocMVP, 1, GL_FALSE, value_ptr(mvp));
-        glUniformMatrix4fv(_lineProgram.uniformLocModel, 1, GL_FALSE, value_ptr(model));
+        _lineProgram.bind(mvp, model);
 
         _axes.draw();
 
@@ -444,9 +537,7 @@ private:
 
         if (_drawDebugLines) {
             _debugLines.clear();
-            _debugLines.add(_rectPrism->bounds(), vec4(1, 1, 0, 1));
-            _rectPrism->addTo(_debugLines, vec4(0, 1, 1, 1));
-
+            _currentDemo->drawDebugLines(_debugLines);
             _debugLines.draw();
         }
 
@@ -462,14 +553,16 @@ private:
 
         ImGui::Separator();
 
+        if (ImGui::Combo("Demo", &_currentDemoIdx, Demos, IM_ARRAYSIZE(Demos))) {
+            buildDemo(_currentDemoIdx);
+        }
+
+        ImGui::Separator();
+
         ImGui::Checkbox("Animate", &_animateVolume);
         if (!_animateVolume) {
             ImGui::SameLine();
             _needsMarchVolume = ImGui::Button("March Once");
-        }
-
-        if (ImGui::InputFloat("Animation Phase", &_animationPhase, 0.01F, 0.1F)) {
-            _needsMarchVolume = true;
         }
 
         ImGui::Separator();
@@ -480,9 +573,10 @@ private:
 
         ImGui::Separator();
 
+        // TODO: Trackball rotations are wrong
         ImGui::Text("Reset Trackball Rotation");
         if (ImGui::Button("+X")) {
-            _trackballRotation = rotate(mat4 { 1 }, 0.0F, vec3(1, 0, 0));
+            _trackballRotation = rotate(mat4 { 1 }, 0.0F, vec3(-1, 0, 0));
         }
         ImGui::SameLine();
         if (ImGui::Button("+Y")) {
@@ -535,19 +629,16 @@ private:
             return true;
         });
 
-        // build samplers to populate the volume
+        buildDemo(_currentDemoIdx);
 
-        auto size = vec3(_volume->size());
-        auto center = size / 2.0F;
+        marchVolume();
+    }
 
-        _rectPrism = _volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(10, 1, 5), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
-
-        if (false) {
-            _plane = _volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
-                center, vec3(0, 1, 0), 8, mc::IVolumeSampler::Mode::Subtractive));
-        }
-
+    void buildDemo(int which)
+    {
+        std::cout << "Building demo \"" << Demos[which] << "\"" << std::endl;
+        _volume->clear();
+        _currentDemo = CreateDemo(Demos[which], _volume.get());
         marchVolume();
     }
 

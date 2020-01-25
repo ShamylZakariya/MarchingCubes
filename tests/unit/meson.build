@@ -9,7 +9,7 @@ foreach test_source : unit_test_sources
     test_source = test_source[1]
     test_exe = executable(test_name,
         sources: test_source,
-        include_directories: ['../../include', '../../mc'],
+        include_directories: ['../../include', '../..'],
         link_with: mc_lib,
         dependencies: dependencies)
 

@@ -88,9 +88,13 @@ public:
             break;
         }
 
-        onVolumeSamplerAdded(sPtr);
-
         return sPtr;
+    }
+
+    void clear() {
+        _samplers.clear();
+        _additiveSamplers.clear();
+        _subtractiveSamplers.clear();
     }
 
     glm::ivec3 size() const
@@ -100,9 +104,6 @@ public:
 
     void setFuzziness(float ft) { _fuzziness = std::max<float>(ft, 0); }
     float fuzziness() const { return _fuzziness; }
-
-protected:
-    virtual void onVolumeSamplerAdded(IVolumeSampler* sampler) {}
 
 protected:
     glm::ivec3 _size;

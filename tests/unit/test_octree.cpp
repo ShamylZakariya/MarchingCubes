@@ -11,9 +11,9 @@
 
 #include <memory>
 
-#include <util/util.hpp>
-#include <volume.hpp>
-#include <volume_samplers.hpp>
+#include <mc/util/util.hpp>
+#include <mc/volume.hpp>
+#include <mc/volume_samplers.hpp>
 
 using std::make_unique;
 using namespace glm;

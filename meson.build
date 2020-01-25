@@ -25,8 +25,7 @@ if build_machine.system() == 'darwin'
 endif
 
 include_dirs = [
-    'include',
-    'mc'
+    'include'
 ]
 
 # build the mc_lib marching cubes library
