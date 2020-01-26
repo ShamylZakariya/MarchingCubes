@@ -60,3 +60,11 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# meson build stuff
+build/
+build_release/
+
+# fonts - since we don't own them
+fonts/
+imgui.ini
