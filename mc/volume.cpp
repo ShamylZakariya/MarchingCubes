@@ -112,7 +112,6 @@ void OctreeVolume::marchNode(OctreeVolume::Node* node, ITriangleConsumer& tc, ut
     } else {
         mc::march(util::iAABB(node->bounds), valueSampler, nullptr, tc, transform);
     }
-
 }
 
 } // namespace mc

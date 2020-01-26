@@ -348,6 +348,18 @@ namespace util {
             };
         }
 
+        void corners(std::array<glm::vec<3, T, Q>, 8>& c) const
+        {
+            c[0] = glm::vec<3, T, Q>(min.x, min.y, min.z);
+            c[1] = glm::vec<3, T, Q>(min.x, min.y, max.z);
+            c[2] = glm::vec<3, T, Q>(max.x, min.y, max.z);
+            c[3] = glm::vec<3, T, Q>(max.x, min.y, min.z);
+            c[4] = glm::vec<3, T, Q>(min.x, max.y, min.z);
+            c[5] = glm::vec<3, T, Q>(min.x, max.y, max.z);
+            c[6] = glm::vec<3, T, Q>(max.x, max.y, max.z);
+            c[7] = glm::vec<3, T, Q>(max.x, max.y, min.z);
+        }
+
         /*
         return the intersection type of this AABB_ with other
     */

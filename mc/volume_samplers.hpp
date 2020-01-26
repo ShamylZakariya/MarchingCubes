@@ -16,6 +16,51 @@
 
 namespace mc {
 
+namespace volume_samplers_detail {
+
+    /*
+    Test if the volume defined by vertices intersects the planar volume defined
+    by the plane (origin,normal) with thickness 2*halfExtent
+    */
+    bool testBoundedPlane(glm::vec3 origin, glm::vec3 normal, float halfExtent, const std::array<glm::vec3, 8>& vertices)
+    {
+        // we need to see if the bounds actually intersects
+        int onPositiveSide = 0;
+        int onNegativeSide = 0;
+        for (const auto& v : vertices) {
+            float signedDistance = dot(normal, v - origin);
+
+            if (signedDistance > halfExtent) {
+                onPositiveSide++;
+            } else if (signedDistance < -halfExtent) {
+                onNegativeSide++;
+            } else {
+                // if any vertices are inside the plane thickness we
+                // have an intersection
+                return true;
+            }
+
+            // if we have vertices on both sides of the plane
+            // we have an intersection
+            if (onPositiveSide && onNegativeSide) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /*
+    Test if a given AABB intersects the planar volume defined by the plane (origin,normal)
+    with thickness 2*halfExtent
+    */
+    bool testBoundedPlane(glm::vec3 origin, glm::vec3 normal, float halfExtent, util::AABB bounds)
+    {
+        return testBoundedPlane(origin, normal, halfExtent, bounds.corners());
+    }
+
+} // namespace volume_samplers_detail
+
 /*
  Represents a simple sphere
  */
@@ -107,26 +152,7 @@ public:
 
     bool intersects(const util::AABB bounds) const override
     {
-        using glm::dot;
-        using glm::max;
-        using glm::min;
-
-        // find point on plane closest to bounds
-        auto bc = bounds.center();
-        auto distanceToBoundsCenter = dot(_normal, bc - _origin);
-        auto closestPointOnPlane = bc + _normal * -distanceToBoundsCenter;
-
-        // find the point bounds closest to closestPointOnPlane
-        const auto closestPointOnBounds = glm::vec3 {
-            max(bounds.min.x, min(closestPointOnPlane.x, bounds.max.x)),
-            max(bounds.min.y, min(closestPointOnPlane.y, bounds.max.y)),
-            max(bounds.min.z, min(closestPointOnPlane.z, bounds.max.z))
-        };
-
-        // now test that closestPointOnBounds is inside our volume
-        float halfThickness = _thickness * 0.5F;
-        auto distance = dot(_normal, (closestPointOnBounds - _origin));
-        return (distance < halfThickness && distance > -halfThickness);
+        return volume_samplers_detail::testBoundedPlane(_origin, _normal, _thickness / 2, bounds);
     }
 
     float valueAt(const glm::vec3& p, float fuzziness) const override
@@ -173,29 +199,31 @@ public:
 
     bool intersects(const util::AABB bounds) const override
     {
-        // this is really coarse, but doesn't cause mismatches
-        return (bounds.intersect(_bounds) != util::AABB::Intersection::Outside);
-    }
-
-    bool intersects__experimental_bad(const util::AABB bounds) const
-    {
-        // early exit if this prism is contained by bounds
-        if (bounds.contains(_origin))
-            return true;
+        using volume_samplers_detail::testBoundedPlane;
 
         // coarse AABB check
-        if (bounds.intersect(_bounds) != util::AABB::Intersection::Outside) {
-
-            // first, the easy pass - see if any of our vertices are contained by bounds
-            for (const auto& c : _corners) {
-                if (bounds.contains(c)) {
-                    return true;
-                }
-            }
-
-            // TODO: now we have to go into the separating axis theorem
-            // http://www.jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
+        if (bounds.intersect(_bounds) == util::AABB::Intersection::Outside) {
+            return false;
         }
+
+        // now check if the aabb intersects the bounded planar volumes
+        // represented along x, y and z. This is like a simplification
+        // of separating axes theorem when one prism is an AABB.
+        // if all three volumes intersect bounds, we know bounds intersects
+        // our prism
+        std::array<glm::vec3, 8> corners;
+        bounds.corners(corners);
+        if (!testBoundedPlane(_origin, _posX, _halfExtents.x, corners)) {
+            return false;
+        }
+        if (!testBoundedPlane(_origin, _posY, _halfExtents.y, corners)) {
+            return false;
+        }
+        if (!testBoundedPlane(_origin, _posZ, _halfExtents.z, corners)) {
+            return false;
+        }
+
+        return true;
     }
 
     float valueAt(const glm::vec3& p, float fuzziness) const override

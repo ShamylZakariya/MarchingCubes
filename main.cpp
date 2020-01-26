@@ -104,7 +104,7 @@ public:
         auto center = size / 2.0F;
 
         _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+            center, vec3(10, 1, 5), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -131,8 +131,8 @@ public:
     {
         auto size = vec3(volume->size());
         auto center = size / 2.0F;
-        auto cubeSize = min(size.x, min(size.y, size.z)) * 0.25F;
-        auto planeThickness = cubeSize * 0.2F;
+        auto cubeSize = min(size.x, min(size.y, size.z)) * 0.125F;
+        auto planeThickness = cubeSize * 0.5F;
 
         _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
             center, vec3(cubeSize), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
@@ -145,6 +145,11 @@ public:
     {
         float angle = static_cast<float>(M_PI * time * 0.1);
         _rect->setRotation(rotate(mat4 { 1 }, angle, normalize(vec3(0, 1, 1))));
+
+        angle = static_cast<float>(M_PI * -time * 0.2);
+        auto rot = rotate(mat4{1}, angle, vec3(1,0,0));
+        auto normal = vec3(rot[0][1], rot[1][1], rot[2][1]); // extract +y dir
+        _cuttingPlane->setPlaneNormal(normal);
     }
 
     void drawDebugLines(mc::util::LineSegmentBuffer& debugLinebuf) override
@@ -272,7 +277,8 @@ private:
         MarchNodes
     };
 
-    bool _animateVolume = false;
+    bool _animate = false;
+    float _animationTime = 0;
     bool _running = true;
     bool _useOrthoProjection = false;
     AABBDisplay _aabbDisplay = AABBDisplay::None;
@@ -280,7 +286,6 @@ private:
     float _fuzziness = 1.0F;
     float _aspect = 1;
     float _dolly = 1;
-    float _animationTime = 0;
     bool _drawDebugLines = false;
 
     struct {
@@ -462,13 +467,13 @@ private:
 
     void step(float now, float deltaT)
     {
-        if (_animateVolume) {
+        if (_animate) {
             _animationTime += deltaT;
         }
 
         _currentDemo->step(_animationTime);
 
-        if (_animateVolume || _needsMarchVolume) {
+        if (_animate || _needsMarchVolume) {
             marchVolume();
             _needsMarchVolume = false;
         }
@@ -560,10 +565,9 @@ private:
 
         ImGui::Separator();
 
-        ImGui::Checkbox("Animate", &_animateVolume);
-        if (!_animateVolume) {
-            ImGui::SameLine();
-            _needsMarchVolume = ImGui::Button("March Once");
+        ImGui::Checkbox("Animate", &_animate);
+        if (ImGui::InputFloat("Animation Time", &_animationTime, 0.01f, 0.1f, "%.2f")) {
+            _needsMarchVolume = true;
         }
 
         ImGui::Separator();
