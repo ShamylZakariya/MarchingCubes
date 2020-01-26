@@ -20,8 +20,7 @@ void march(iAABB region,
     IsoSurfaceValueFunction valueSampler,
     IsoSurfaceNormalFunction normalSampler,
     ITriangleConsumer& tc,
-    const mat4& transform,
-    bool computeNormals)
+    const util::unowned_ptr<glm::mat4> transform)
 {
     Triangle triangles[5];
     detail::GridCell cell;
@@ -30,7 +29,7 @@ void march(iAABB region,
         for (int y = region.min.y; y < region.max.y; y++) {
             for (int x = region.min.x; x < region.max.x; x++) {
                 if (detail::GetGridCell(x, y, z, valueSampler, cell, transform)) {
-                    for (int t = 0, nTriangles = detail::Polygonise(cell, IsoLevel, normalSampler, triangles, computeNormals); t < nTriangles; t++) {
+                    for (int t = 0, nTriangles = detail::Polygonise(cell, IsoLevel, normalSampler, triangles); t < nTriangles; t++) {
                         tc.addTriangle(triangles[t]);
                     }
                 }

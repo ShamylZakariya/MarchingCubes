@@ -27,13 +27,16 @@ typedef std::function<glm::vec3(const glm::vec3& p)> IsoSurfaceNormalFunction;
  March region of a volume passing generated triangles into triangleConsumer
  region: The subregion to march
  valueSampler: source of isosurface values
- normalSampler: if computeNormals is true, this will be called to sample the normals at points
+ normalSampler: if provided, will be used to compute per-vertex surface normals. if null,
+    each vertex will receive the normal of the triangle it is a part of
  triangleConsumer: Receives each generated triangle
- transform: A transform to apply to each generated vertex
- computeNormals: If true, vertex normals will be computed via IIsoSurface::normalAt; else, generated triangle normals will be used
- TODO: Make a variant which doesn't take transform and is faster
+ transform: If not null, a transform to apply to each generated vertex
  */
-void march(util::iAABB region, IsoSurfaceValueFunction valueSampler, IsoSurfaceNormalFunction normalSampler, ITriangleConsumer& tc, const glm::mat4& transform, bool computeNormals);
+void march(util::iAABB region,
+    IsoSurfaceValueFunction valueSampler,
+    IsoSurfaceNormalFunction normalSampler,
+    ITriangleConsumer& triangleConsumer,
+    util::unowned_ptr<glm::mat4> transform);
 
 }
 

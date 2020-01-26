@@ -15,8 +15,8 @@ using namespace glm;
 
 namespace mc {
 
-void OctreeVolume::march(
-    const mat4& transform,
+void OctreeVolume::dispatchMarch(
+    util::unowned_ptr<glm::mat4> transform,
     bool computeNormals,
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
@@ -61,13 +61,14 @@ void OctreeVolume::march(
                 {
                     std::lock_guard<std::mutex> popLock(popMutex);
                     if (_nodesToMarch.empty()) {
+                        // we're done, exit the loop
                         return;
                     }
                     node = _nodesToMarch.back();
                     _nodesToMarch.pop_back();
                 }
 
-                march(node, *_triangleConsumers[i % N], transform, computeNormals);
+                marchNode(node, *_triangleConsumers[i % N], transform, computeNormals);
             }
         });
     }
@@ -79,7 +80,7 @@ void OctreeVolume::march(
     }
 }
 
-void OctreeVolume::march(OctreeVolume::Node* node, ITriangleConsumer& tc, const mat4& transform, bool computeNormals)
+void OctreeVolume::marchNode(OctreeVolume::Node* node, ITriangleConsumer& tc, util::unowned_ptr<glm::mat4> transform, bool computeNormals)
 {
     auto fuzziness = this->_fuzziness;
     auto valueSampler = [fuzziness, node](const vec3& p) {
@@ -95,18 +96,23 @@ void OctreeVolume::march(OctreeVolume::Node* node, ITriangleConsumer& tc, const 
         return value;
     };
 
-    auto normalSampler = [&valueSampler](const vec3& p) {
-        // from GPUGems 3 Chap 1 -- compute normal of voxel space
-        const float d = 0.1f;
-        vec3 grad(
-            valueSampler(p + vec3(d, 0, 0)) - valueSampler(p + vec3(-d, 0, 0)),
-            valueSampler(p + vec3(0, d, 0)) - valueSampler(p + vec3(0, -d, 0)),
-            valueSampler(p + vec3(0, 0, d)) - valueSampler(p + vec3(0, 0, -d)));
+    if (computeNormals) {
+        auto normalSampler = [&valueSampler](const vec3& p) {
+            // from GPUGems 3 Chap 1 -- compute normal of voxel space
+            const float d = 0.1f;
+            vec3 grad(
+                valueSampler(p + vec3(d, 0, 0)) - valueSampler(p + vec3(-d, 0, 0)),
+                valueSampler(p + vec3(0, d, 0)) - valueSampler(p + vec3(0, -d, 0)),
+                valueSampler(p + vec3(0, 0, d)) - valueSampler(p + vec3(0, 0, -d)));
 
-        return -normalize(grad);
-    };
+            return -normalize(grad);
+        };
 
-    mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform, computeNormals);
+        mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform);
+    } else {
+        mc::march(util::iAABB(node->bounds), valueSampler, nullptr, tc, transform);
+    }
+
 }
 
 } // namespace mc

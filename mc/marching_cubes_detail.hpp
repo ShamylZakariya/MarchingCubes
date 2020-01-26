@@ -388,7 +388,7 @@ constexpr int triTable[256][16] = {
     of totally below the isolevel.
 */
 
-int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction normalSampler, Triangle* triangles, bool computeNormals)
+int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction normalSampler, Triangle* triangles)
 {
     /*
         Determine the index into the edge table which
@@ -422,6 +422,7 @@ int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction no
         Find the vertices where the surface intersects the cube
     */
     glm::vec3 vertList[12], sourceList[12];
+    const bool computeNormals = normalSampler != nullptr;
 
     if (edgeTable[cubeIndex] & 1) {
         vertList[0] = VertexInterp(isolevel, grid.p[0], grid.p[1], grid.val[0], grid.val[1]);
@@ -526,7 +527,7 @@ int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction no
 // GridCell Access
 //
 
-bool GetGridCell(int x, int y, int z, IsoSurfaceValueFunction valueFunction, GridCell& cell, const glm::mat4& transform)
+bool GetGridCell(int x, int y, int z, IsoSurfaceValueFunction valueFunction, GridCell& cell, const glm::mat4* transform)
 {
     // store the location in the voxel array
     cell.v[0] = glm::vec3(x, y, z);
@@ -554,15 +555,26 @@ bool GetGridCell(int x, int y, int z, IsoSurfaceValueFunction valueFunction, Gri
 
     if (cell.occupied) {
         // now compute the location of vertices in world space
-        cell.p[0] = glm::vec3(transform * glm::vec4(x, y, z, 1));
-        cell.p[1] = glm::vec3(transform * glm::vec4(x + 1, y, z, 1));
-        cell.p[2] = glm::vec3(transform * glm::vec4(x + 1, y + 1, z, 1));
-        cell.p[3] = glm::vec3(transform * glm::vec4(x, y + 1, z, 1));
+        if (transform) {
+            cell.p[0] = glm::vec3(*transform * glm::vec4(x, y, z, 1));
+            cell.p[1] = glm::vec3(*transform * glm::vec4(x + 1, y, z, 1));
+            cell.p[2] = glm::vec3(*transform * glm::vec4(x + 1, y + 1, z, 1));
+            cell.p[3] = glm::vec3(*transform * glm::vec4(x, y + 1, z, 1));
 
-        cell.p[4] = glm::vec3(transform * glm::vec4(x, y, z + 1, 1));
-        cell.p[5] = glm::vec3(transform * glm::vec4(x + 1, y, z + 1, 1));
-        cell.p[6] = glm::vec3(transform * glm::vec4(x + 1, y + 1, z + 1, 1));
-        cell.p[7] = glm::vec3(transform * glm::vec4(x, y + 1, z + 1, 1));
+            cell.p[4] = glm::vec3(*transform * glm::vec4(x, y, z + 1, 1));
+            cell.p[5] = glm::vec3(*transform * glm::vec4(x + 1, y, z + 1, 1));
+            cell.p[6] = glm::vec3(*transform * glm::vec4(x + 1, y + 1, z + 1, 1));
+            cell.p[7] = glm::vec3(*transform * glm::vec4(x, y + 1, z + 1, 1));
+        } else {
+            cell.p[0] = glm::vec3(x, y, z);
+            cell.p[1] = glm::vec3(x + 1, y, z);
+            cell.p[2] = glm::vec3(x + 1, y + 1, z);
+            cell.p[3] = glm::vec3(x, y + 1, z);
+            cell.p[4] = glm::vec3(x, y, z + 1);
+            cell.p[5] = glm::vec3(x + 1, y, z + 1);
+            cell.p[6] = glm::vec3(x + 1, y + 1, z + 1);
+            cell.p[7] = glm::vec3(x, y + 1, z + 1);
+        }
     }
 
     return cell.occupied;

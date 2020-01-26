@@ -651,7 +651,7 @@ private:
         _marchStats.reset(_volume->depth());
         _octreeOccupiedAABBsLineSegmentStorage.clear();
 
-        _volume->march(mat4(1), false, [this](mc::OctreeVolume::Node* node) {
+        _volume->march(false, [this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
