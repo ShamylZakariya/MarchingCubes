@@ -20,7 +20,9 @@ namespace volume_samplers_detail {
 
     /*
     Test if the volume defined by vertices intersects the planar volume defined
-    by the plane (origin,normal) with thickness 2*halfExtent
+    by the plane (origin,normal) with thickness 2*halfExtent. Note, it's assumed
+    that the volume defined by vertices is a rectangular prism. It may not be
+    strictly necessary, but it's only been tested as such.
     */
     bool testBoundedPlane(glm::vec3 origin, glm::vec3 normal, float halfExtent, const std::array<glm::vec3, 8>& vertices)
     {
@@ -133,6 +135,55 @@ private:
     glm::vec3 _position;
     float _radius;
     float _radius2;
+};
+
+/*
+HalfspaceVolumeSampler represents a plane, where values on the positive side
+(e.g., in the direction of the normal) are NOT in the plane's volume, and values
+on the negative side are inside.
+*/
+class HalfspaceVolumeSampler : public IVolumeSampler {
+public:
+
+    HalfspaceVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, Mode mode)
+        :IVolumeSampler(mode)
+        ,_origin(planeOrigin)
+        ,_normal(planeNormal)
+        {}
+
+    bool intersects(const util::AABB bounds) const override
+    {
+        for (const auto &v : bounds.corners()) {
+            auto signedDistance = dot(_normal, v - _origin);
+            if (signedDistance < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    float valueAt(const glm::vec3& p, float fuzziness) const override
+    {
+        float signedDist = dot(_normal, p - _origin);
+        if (signedDist < -fuzziness) {
+            return 1;
+        } else if (signedDist > 0) {
+            return 0;
+        }
+        return -signedDist / fuzziness;
+    }
+
+    void setPlaneOrigin(const glm::vec3 planeOrigin) { _origin = planeOrigin; }
+    glm::vec3 planeOrigin() const { return _origin; }
+
+    void setPlaneNormal(const glm::vec3 planeNormal) { _normal = glm::normalize(planeNormal); }
+    glm::vec3 planeNormal() const { return _normal; }
+
+private:
+
+    glm::vec3 _origin;
+    glm::vec3 _normal;
+
 };
 
 /*

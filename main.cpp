@@ -9,6 +9,8 @@
 #include <chrono>
 #include <filesystem>
 #include <iostream>
+#include <map>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -123,6 +125,68 @@ private:
     unowned_ptr<mc::RectangularPrismVolumeSampler> _rect;
 };
 
+class BoundedPlaneDemo : public Demo {
+public:
+    BoundedPlaneDemo() = default;
+
+    void build(unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        auto center = size / 2.0F;
+        _plane = volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
+            center, planeNormal(mat4{1}), 10, mc::IVolumeSampler::Mode::Additive
+        ));
+    }
+
+    void step(float time) override
+    {
+        auto angle = static_cast<float>(pi<float>() * -time * 0.2F);
+        auto rot = rotate(mat4 { 1 }, angle, normalize(vec3(1, 1, 0)));
+        _plane->setPlaneNormal(planeNormal(rot));
+    }
+
+private:
+
+    static vec3 planeNormal(const glm::mat4 &rot) {
+        return vec3(rot[0][1], rot[1][1], rot[2][1]);
+    }
+
+    unowned_ptr<mc::BoundedPlaneVolumeSampler> _plane;
+    mat3 _rotation{1};
+
+};
+
+class HalfspaceDemo : public Demo {
+public:
+    HalfspaceDemo() = default;
+
+    void build(unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        auto center = size / 2.0F;
+        _plane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
+            center, planeNormal(mat4{1}), mc::IVolumeSampler::Mode::Additive
+        ));
+    }
+
+    void step(float time) override
+    {
+        auto angle = static_cast<float>(pi<float>() * -time * 0.2F);
+        auto rot = rotate(mat4 { 1 }, angle, normalize(vec3(1, 1, 0)));
+        _plane->setPlaneNormal(planeNormal(rot));
+    }
+
+private:
+
+    static vec3 planeNormal(const glm::mat4 &rot) {
+        return vec3(rot[0][1], rot[1][1], rot[2][1]);
+    }
+
+    unowned_ptr<mc::HalfspaceVolumeSampler> _plane;
+    mat3 _rotation{1};
+
+};
+
 class CutCubeDemo : public Demo {
 public:
     CutCubeDemo() = default;
@@ -143,11 +207,11 @@ public:
 
     void step(float time) override
     {
-        float angle = static_cast<float>(M_PI * time * 0.1);
+        float angle = static_cast<float>(pi<float>() * time * 0.1F);
         _rect->setRotation(rotate(mat4 { 1 }, angle, normalize(vec3(0, 1, 1))));
 
-        angle = static_cast<float>(M_PI * -time * 0.2);
-        auto rot = rotate(mat4{1}, angle, vec3(1,0,0));
+        angle = static_cast<float>(pi<float>() * -time * 0.2F);
+        auto rot = rotate(mat4 { 1 }, angle, vec3(1, 0, 0));
         auto normal = vec3(rot[0][1], rot[1][1], rot[2][1]); // extract +y dir
         _cuttingPlane->setPlaneNormal(normal);
     }
@@ -163,23 +227,78 @@ private:
     unowned_ptr<mc::BoundedPlaneVolumeSampler> _cuttingPlane;
 };
 
-constexpr const char* Demos[] = { "Cube", "CutCube" };
+class CompoundShapesDemo : public Demo {
+public:
+    CompoundShapesDemo() = default;
 
-std::unique_ptr<Demo> CreateDemo(const std::string& demoName, unowned_ptr<mc::BaseCompositeVolume> volume)
-{
-    std::unique_ptr<Demo> demo;
-    if (demoName == "Cube") {
-        demo = std::make_unique<CubeDemo>();
-    } else if (demoName == "CutCube") {
-        demo = std::make_unique<CutCubeDemo>();
+    void build(unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = volume->size();
+        std::random_device rng;
+        std::default_random_engine gen { static_cast<long unsigned int>(12345) };
+
+        std::uniform_real_distribution<float> xDist(0, size.x);
+        std::uniform_real_distribution<float> zDist(0, size.z);
+        std::uniform_real_distribution<float> yDist(size.y * 0.4, size.y * 0.6);
+        std::uniform_real_distribution<float> radiusDist(size.x / 20, size.x / 6);
+        std::uniform_real_distribution<float> rateDist(1, 5);
+        std::uniform_real_distribution<float> phaseDist(0, pi<float>());
+        std::uniform_real_distribution<float> bobDist(1, 6);
+
+        for (int i = 0; i < 40; i++) {
+            float x = xDist(gen);
+            float y = yDist(gen);
+            float z = zDist(gen);
+            float radius = radiusDist(gen);
+            float rate = rateDist(gen);
+            float phase = phaseDist(gen);
+            float bobExtent = bobDist(gen);
+
+            auto position = vec3(x, y, z);
+            auto sphere = volume->add(std::make_unique<mc::SphereVolumeSampler>(
+                position, radius, mc::IVolumeSampler::Mode::Additive));
+
+            _spheres.push_back(SphereState {
+                sphere, position, rate, phase, bobExtent });
+        }
     }
 
-    if (demo) {
-        demo->build(volume);
+    void step(float time) override
+    {
+        for (auto& sphereState : _spheres) {
+            auto cycle = time * sphereState.rate + sphereState.phase;
+            vec3 pos = sphereState.position;
+            pos.y += sin(cycle);
+            sphereState.sphereShape->setPosition(pos);
+        }
     }
 
-    return demo;
-}
+private:
+    struct SphereState {
+        unowned_ptr<mc::SphereVolumeSampler> sphereShape;
+        vec3 position;
+        float rate;
+        float phase;
+        float bobExtent;
+    };
+
+    std::vector<SphereState> _spheres;
+};
+
+//
+//  Demo Registry
+//
+
+typedef std::function<std::unique_ptr<Demo>()> DemoFactory;
+typedef std::pair<const char *, DemoFactory> DemoEntry;
+
+const static std::vector<DemoEntry> DemoRegistry = {
+    DemoEntry("Cube", [](){ return std::make_unique<CubeDemo>(); }),
+    DemoEntry("CutCube", [](){ return std::make_unique<CutCubeDemo>(); }),
+    DemoEntry("BoundedPlane", [](){ return std::make_unique<BoundedPlaneDemo>(); }),
+    DemoEntry("Halfspace", [](){ return std::make_unique<HalfspaceDemo>(); }),
+    DemoEntry("CompountShapes", [](){ return std::make_unique<CompoundShapesDemo>(); }),
+};
 
 //
 // App
@@ -191,7 +310,7 @@ public:
     {
         initWindow();
         initGl();
-        buildVolume();
+        initApp();
     }
 
     ~App() = default;
@@ -267,8 +386,9 @@ private:
 
     // volume and samplers
     std::unique_ptr<mc::OctreeVolume> _volume;
+    std::vector<const char*> _demoNames;
     std::unique_ptr<Demo> _currentDemo;
-    int _currentDemoIdx = 0;
+    int _currentDemoIdx = 2;
 
     // app state
     enum class AABBDisplay : int {
@@ -484,7 +604,6 @@ private:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const auto mvp = [this]() {
-
             // extract trackball Z and Y for building view matrix via lookAt
             auto trackballY = glm::vec3 { _trackballRotation[0][1], _trackballRotation[1][1], _trackballRotation[2][1] };
             auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
@@ -559,7 +678,7 @@ private:
 
         ImGui::Separator();
 
-        if (ImGui::Combo("Demo", &_currentDemoIdx, Demos, IM_ARRAYSIZE(Demos))) {
+        if (ImGui::Combo("Demo", &_currentDemoIdx, _demoNames.data(), _demoNames.size())) {
             buildDemo(_currentDemoIdx);
         }
 
@@ -584,11 +703,11 @@ private:
         }
         ImGui::SameLine();
         if (ImGui::Button("+Y")) {
-            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(1, 0, 0)) * rotate(mat4{1}, half_pi<float>(), vec3(0,1,0));
+            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(1, 0, 0)) * rotate(mat4 { 1 }, half_pi<float>(), vec3(0, 1, 0));
         }
         ImGui::SameLine();
         if (ImGui::Button("+Z")) {
-            _trackballRotation = mat3{1};
+            _trackballRotation = mat3 { 1 };
         }
 
         ImGui::Separator();
@@ -610,8 +729,12 @@ private:
         ImGui::End();
     }
 
-    void buildVolume()
-    {
+    void initApp() {
+        // copy demo names to local storage so we can feed imgui::combo
+        _demoNames.resize(DemoRegistry.size());
+        std::transform(DemoRegistry.begin(), DemoRegistry.end(), _demoNames.begin(),
+            [](const DemoEntry &entry){ return entry.first; });
+
         // build a volume
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
@@ -639,9 +762,10 @@ private:
 
     void buildDemo(int which)
     {
-        std::cout << "Building demo \"" << Demos[which] << "\"" << std::endl;
+        std::cout << "Building demo \"" << DemoRegistry[which].first << "\"" << std::endl;
         _volume->clear();
-        _currentDemo = CreateDemo(Demos[which], _volume.get());
+        _currentDemo = DemoRegistry[which].second();
+        _currentDemo->build(_volume.get());
         marchVolume();
     }
 

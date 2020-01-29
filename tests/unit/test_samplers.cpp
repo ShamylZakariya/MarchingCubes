@@ -150,11 +150,11 @@ TEST_CASE("PlaneSampler", "[samplers]")
         //-tangential AABB intersects bounded plane
         REQUIRE(sampler.intersects(AABB(vec3(0, -0.5, -1), 1)));
 
-        //unit AABB at fuzziness boundary doesn't intersect bounded plane
-        REQUIRE_FALSE(sampler.intersects(AABB(vec3(0, 1.5, 0), 1)));
+        //unit AABB slightly beyond fuzziness boundary doesn't intersect bounded plane
+        REQUIRE_FALSE(sampler.intersects(AABB(vec3(0, 1.51, 0), 1)));
 
-        //unit AABB at -fuzziness boundary doesn't intersect bounded plane
-        REQUIRE_FALSE(sampler.intersects(AABB(vec3(0, -1.5, 0), 1)));
+        //unit AABB at slightly beyond -fuzziness boundary doesn't intersect bounded plane
+        REQUIRE_FALSE(sampler.intersects(AABB(vec3(0, -1.51, 0), 1)));
 
         //Large straddling aabb intersects bounded plane
         REQUIRE(sampler.intersects(AABB(vec3(0, 0, 0), 10)));
