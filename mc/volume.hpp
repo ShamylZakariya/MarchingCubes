@@ -25,6 +25,13 @@ namespace mc {
 
 class IVolumeSampler {
 public:
+
+    enum class AABBIntersection {
+        None,
+        IntersectsAABB,
+        ContainsAABB
+    };
+
     enum class Mode {
         Additive,
         Subtractive
@@ -43,7 +50,17 @@ public:
     /*
      Return true iff bounds intersects the region affected by this sampler
     */
-    virtual bool intersects(const util::AABB bounds) const = 0;
+    virtual bool intersects(util::AABB bounds) const = 0;
+
+    /*
+    Subtractive samplers can offer an optimization by overriding this method
+    to return one of AABBIntersection. In the case that an AABB is completely
+    contained by the volume, this method should return AABBIntersection::ContainsAABB
+    which allows the OctreeVolume to optimize the set of nodes to march.
+    */
+    virtual AABBIntersection intersection(util::AABB bounds) const {
+        return intersects(bounds) ? AABBIntersection::IntersectsAABB : AABBIntersection::None;
+    }
 
     /*
      Return the amount a given point in space is "inside" the volume. The

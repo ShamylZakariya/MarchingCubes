@@ -9,8 +9,6 @@
 #ifndef volume_samplers_h
 #define volume_samplers_h
 
-#include <glm/gtx/intersect.hpp>
-
 #include "util/util.hpp"
 #include "volume.hpp"
 
@@ -19,16 +17,22 @@ namespace mc {
 namespace volume_samplers_detail {
 
     /*
-    Test if the volume defined by vertices intersects the planar volume defined
+    Test for intersection type of the volume defined by vertices and the planar volume defined
     by the plane (origin,normal) with thickness 2*halfExtent. Note, it's assumed
     that the volume defined by vertices is a rectangular prism. It may not be
     strictly necessary, but it's only been tested as such.
     */
-    bool testBoundedPlane(glm::vec3 origin, glm::vec3 normal, float halfExtent, const std::array<glm::vec3, 8>& vertices)
+    IVolumeSampler::AABBIntersection
+    boundedPlaneIntersection(
+        glm::vec3 origin,
+        glm::vec3 normal,
+        float halfExtent,
+        const std::array<glm::vec3, 8>& vertices)
     {
         // we need to see if the bounds actually intersects
         int onPositiveSide = 0;
         int onNegativeSide = 0;
+        int inside = 0;
         for (const auto& v : vertices) {
             float signedDistance = dot(normal, v - origin);
 
@@ -37,28 +41,31 @@ namespace volume_samplers_detail {
             } else if (signedDistance < -halfExtent) {
                 onNegativeSide++;
             } else {
-                // if any vertices are inside the plane thickness we
-                // have an intersection
-                return true;
+                inside++;
             }
 
             // if we have vertices on both sides of the plane
-            // we have an intersection
+            // we have an intersection (but not containment)
             if (onPositiveSide && onNegativeSide) {
-                return true;
+                return IVolumeSampler::AABBIntersection::IntersectsAABB;
             }
         }
 
-        return false;
+        switch(inside) {
+            case 0: return IVolumeSampler::AABBIntersection::None;
+            case 8: return IVolumeSampler::AABBIntersection::ContainsAABB;
+            default: return IVolumeSampler::AABBIntersection::IntersectsAABB;
+        }
     }
 
-    /*
-    Test if a given AABB intersects the planar volume defined by the plane (origin,normal)
-    with thickness 2*halfExtent
-    */
-    bool testBoundedPlane(glm::vec3 origin, glm::vec3 normal, float halfExtent, util::AABB bounds)
+    IVolumeSampler::AABBIntersection
+    boundedPlaneIntersection(
+        glm::vec3 origin,
+        glm::vec3 normal,
+        float halfExtent,
+        util::AABB bounds)
     {
-        return testBoundedPlane(origin, normal, halfExtent, bounds.corners());
+        return boundedPlaneIntersection(origin, normal, halfExtent, bounds.corners());
     }
 
 } // namespace volume_samplers_detail
@@ -78,7 +85,7 @@ public:
 
     ~SphereVolumeSampler() override = default;
 
-    bool intersects(const util::AABB bounds) const override
+    bool intersects(util::AABB bounds) const override
     {
         using glm::max;
         using glm::min;
@@ -96,6 +103,22 @@ public:
 
         // confirm the closest point on the aabb is inside the sphere
         return glm::distance2(_position, closestPoint) <= _radius2;
+    }
+
+    AABBIntersection intersection(util::AABB bounds) const override
+    {
+        int inside = 0;
+        for (auto& v : bounds.corners()) {
+            if (distance2(v, _position) < _radius2) {
+                inside++;
+            }
+        }
+
+        switch(inside) {
+            case 0: return IVolumeSampler::AABBIntersection::None;
+            case 8: return IVolumeSampler::AABBIntersection::ContainsAABB;
+            default: return IVolumeSampler::AABBIntersection::IntersectsAABB;
+        }
     }
 
     float valueAt(const glm::vec3& p, float fuzziness) const override
@@ -144,22 +167,39 @@ on the negative side are inside.
 */
 class HalfspaceVolumeSampler : public IVolumeSampler {
 public:
-
     HalfspaceVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, Mode mode)
-        :IVolumeSampler(mode)
-        ,_origin(planeOrigin)
-        ,_normal(planeNormal)
-        {}
-
-    bool intersects(const util::AABB bounds) const override
+        : IVolumeSampler(mode)
+        , _origin(planeOrigin)
+        , _normal(planeNormal)
     {
-        for (const auto &v : bounds.corners()) {
+    }
+
+    bool intersects(util::AABB bounds) const override
+    {
+        for (const auto& v : bounds.corners()) {
             auto signedDistance = dot(_normal, v - _origin);
             if (signedDistance < 0) {
                 return true;
             }
         }
         return false;
+    }
+
+    AABBIntersection intersection(util::AABB bounds) const override
+    {
+        int inside = 0;
+        for (const auto& v : bounds.corners()) {
+            auto signedDistance = dot(_normal, v - _origin);
+            if (signedDistance < 0) {
+                inside++;
+            }
+        }
+
+        switch(inside) {
+            case 0: return IVolumeSampler::AABBIntersection::None;
+            case 8: return IVolumeSampler::AABBIntersection::ContainsAABB;
+            default: return IVolumeSampler::AABBIntersection::IntersectsAABB;
+        }
     }
 
     float valueAt(const glm::vec3& p, float fuzziness) const override
@@ -180,10 +220,8 @@ public:
     glm::vec3 planeNormal() const { return _normal; }
 
 private:
-
     glm::vec3 _origin;
     glm::vec3 _normal;
-
 };
 
 /*
@@ -201,9 +239,14 @@ public:
     {
     }
 
-    bool intersects(const util::AABB bounds) const override
+    bool intersects(util::AABB bounds) const override
     {
-        return volume_samplers_detail::testBoundedPlane(_origin, _normal, _thickness / 2, bounds);
+        return volume_samplers_detail::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds) != AABBIntersection::None;
+    }
+
+    AABBIntersection intersection(util::AABB bounds) const override
+    {
+        return volume_samplers_detail::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds);
     }
 
     float valueAt(const glm::vec3& p, float fuzziness) const override
@@ -248,9 +291,9 @@ public:
         _update();
     }
 
-    bool intersects(const util::AABB bounds) const override
+    bool intersects(util::AABB bounds) const override
     {
-        using volume_samplers_detail::testBoundedPlane;
+        using volume_samplers_detail::boundedPlaneIntersection;
 
         // coarse AABB check
         if (bounds.intersect(_bounds) == util::AABB::Intersection::Outside) {
@@ -264,17 +307,49 @@ public:
         // our prism
         std::array<glm::vec3, 8> corners;
         bounds.corners(corners);
-        if (!testBoundedPlane(_origin, _posX, _halfExtents.x, corners)) {
+        if (boundedPlaneIntersection(_origin, _posX, _halfExtents.x, corners) == AABBIntersection::None) {
             return false;
         }
-        if (!testBoundedPlane(_origin, _posY, _halfExtents.y, corners)) {
+        if (boundedPlaneIntersection(_origin, _posY, _halfExtents.y, corners) == AABBIntersection::None) {
             return false;
         }
-        if (!testBoundedPlane(_origin, _posZ, _halfExtents.z, corners)) {
+        if (boundedPlaneIntersection(_origin, _posZ, _halfExtents.z, corners) == AABBIntersection::None) {
             return false;
         }
 
         return true;
+    }
+
+    AABBIntersection intersection(util::AABB bounds) const override
+    {
+        using volume_samplers_detail::boundedPlaneIntersection;
+
+        // coarse AABB check
+        if (bounds.intersect(_bounds) == util::AABB::Intersection::Outside) {
+            return AABBIntersection::None;
+        }
+
+        std::array<glm::vec3, 8> corners;
+        bounds.corners(corners);
+
+        // check for intersection type; if it's not ContainsAABB, early exit
+        // if all 3 are ContainsAABB, we can return ContainsAABB
+        auto intersection = boundedPlaneIntersection(_origin, _posX, _halfExtents.x, corners);
+        if (intersection != AABBIntersection::ContainsAABB) {
+            return intersection;
+        }
+
+        intersection = boundedPlaneIntersection(_origin, _posY, _halfExtents.y, corners);
+        if (intersection != AABBIntersection::ContainsAABB) {
+            return intersection;
+        }
+
+        intersection = boundedPlaneIntersection(_origin, _posZ, _halfExtents.z, corners);
+        if (intersection != AABBIntersection::ContainsAABB) {
+            return intersection;
+        }
+
+        return AABBIntersection::ContainsAABB;
     }
 
     float valueAt(const glm::vec3& p, float fuzziness) const override

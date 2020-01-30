@@ -1,4 +1,5 @@
 # TODO:
+- should AABBs be immutable data objects? If I do this I can make them cache their corners, which could be a speedup
 
 - room for big optimization: an IVolumeSampler should be able to say it *completely* overwrites
 all the values in an OctreeVolume::Node, thereby guaranteeing all samples in it to be 1 or 0; this

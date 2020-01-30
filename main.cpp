@@ -106,7 +106,7 @@ public:
         auto center = size / 2.0F;
 
         _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(10, 1, 5), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -123,6 +123,36 @@ public:
 
 private:
     unowned_ptr<mc::RectangularPrismVolumeSampler> _rect;
+};
+
+class SphereDemo : public Demo {
+public:
+    SphereDemo() = default;
+
+    void build(unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        _pos = size / 2.0F;
+        _radius = 10;
+
+        _sphere = volume->add(std::make_unique<mc::SphereVolumeSampler>(
+            _pos, _radius, mc::IVolumeSampler::Mode::Additive));
+    }
+
+    void step(float time) override
+    {
+        auto cycle = static_cast<float>(M_PI * time * 0.1);
+        auto yOffset = sin(cycle) * 5;
+        auto radiusOffset = cos(cycle) * _radius * 0.25F;
+
+        _sphere->setPosition(_pos + vec3(0,yOffset,0));
+        _sphere->setRadius(_radius + radiusOffset);
+    }
+
+private:
+    vec3 _pos;
+    float _radius;
+    unowned_ptr<mc::SphereVolumeSampler> _sphere;
 };
 
 class BoundedPlaneDemo : public Demo {
@@ -187,46 +217,6 @@ private:
 
 };
 
-class CutCubeDemo : public Demo {
-public:
-    CutCubeDemo() = default;
-
-    void build(unowned_ptr<mc::BaseCompositeVolume> volume) override
-    {
-        auto size = vec3(volume->size());
-        auto center = size / 2.0F;
-        auto cubeSize = min(size.x, min(size.y, size.z)) * 0.125F;
-        auto planeThickness = cubeSize * 0.5F;
-
-        _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(cubeSize), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
-
-        _cuttingPlane = volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
-            center, vec3(0, 1, 0), planeThickness, mc::IVolumeSampler::Mode::Subtractive));
-    }
-
-    void step(float time) override
-    {
-        float angle = static_cast<float>(pi<float>() * time * 0.1F);
-        _rect->setRotation(rotate(mat4 { 1 }, angle, normalize(vec3(0, 1, 1))));
-
-        angle = static_cast<float>(pi<float>() * -time * 0.2F);
-        auto rot = rotate(mat4 { 1 }, angle, vec3(1, 0, 0));
-        auto normal = vec3(rot[0][1], rot[1][1], rot[2][1]); // extract +y dir
-        _cuttingPlane->setPlaneNormal(normal);
-    }
-
-    void drawDebugLines(mc::util::LineSegmentBuffer& debugLinebuf) override
-    {
-        debugLinebuf.add(_rect->bounds(), vec4(1, 1, 0, 1));
-        _rect->addTo(debugLinebuf, vec4(0, 1, 1, 1));
-    }
-
-private:
-    unowned_ptr<mc::RectangularPrismVolumeSampler> _rect;
-    unowned_ptr<mc::BoundedPlaneVolumeSampler> _cuttingPlane;
-};
-
 class CompoundShapesDemo : public Demo {
 public:
     CompoundShapesDemo() = default;
@@ -237,13 +227,18 @@ public:
         std::random_device rng;
         std::default_random_engine gen { static_cast<long unsigned int>(12345) };
 
-        std::uniform_real_distribution<float> xDist(0, size.x);
-        std::uniform_real_distribution<float> zDist(0, size.z);
+        _bottomPlane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
+            vec3(0,size.y*0.35,0), vec3(0,1,0), mc::IVolumeSampler::Mode::Subtractive
+        ));
+
+        auto maxRadius = size.x / 6;
+        std::uniform_real_distribution<float> xDist(maxRadius, size.x - maxRadius);
+        std::uniform_real_distribution<float> zDist(maxRadius, size.z - maxRadius);
         std::uniform_real_distribution<float> yDist(size.y * 0.4, size.y * 0.6);
-        std::uniform_real_distribution<float> radiusDist(size.x / 20, size.x / 6);
+        std::uniform_real_distribution<float> radiusDist(size.x / 20, maxRadius);
         std::uniform_real_distribution<float> rateDist(1, 5);
         std::uniform_real_distribution<float> phaseDist(0, pi<float>());
-        std::uniform_real_distribution<float> bobDist(1, 6);
+        std::uniform_real_distribution<float> bobDist(size.y * 0.0625, size.y * 0.125);
 
         for (int i = 0; i < 40; i++) {
             float x = xDist(gen);
@@ -268,12 +263,13 @@ public:
         for (auto& sphereState : _spheres) {
             auto cycle = time * sphereState.rate + sphereState.phase;
             vec3 pos = sphereState.position;
-            pos.y += sin(cycle);
+            pos.y += sphereState.bobExtent * sin(cycle);
             sphereState.sphereShape->setPosition(pos);
         }
     }
 
 private:
+
     struct SphereState {
         unowned_ptr<mc::SphereVolumeSampler> sphereShape;
         vec3 position;
@@ -283,6 +279,7 @@ private:
     };
 
     std::vector<SphereState> _spheres;
+    unowned_ptr<mc::HalfspaceVolumeSampler> _bottomPlane;
 };
 
 //
@@ -294,7 +291,7 @@ typedef std::pair<const char *, DemoFactory> DemoEntry;
 
 const static std::vector<DemoEntry> DemoRegistry = {
     DemoEntry("Cube", [](){ return std::make_unique<CubeDemo>(); }),
-    DemoEntry("CutCube", [](){ return std::make_unique<CutCubeDemo>(); }),
+    DemoEntry("Sphere", [](){ return std::make_unique<SphereDemo>(); }),
     DemoEntry("BoundedPlane", [](){ return std::make_unique<BoundedPlaneDemo>(); }),
     DemoEntry("Halfspace", [](){ return std::make_unique<HalfspaceDemo>(); }),
     DemoEntry("CompountShapes", [](){ return std::make_unique<CompoundShapesDemo>(); }),
@@ -698,12 +695,24 @@ private:
         ImGui::Separator();
 
         ImGui::Text("Reset Trackball Rotation");
+        if (ImGui::Button("-X")) {
+            _trackballRotation = rotate(mat4 { 1 }, +half_pi<float>(), vec3(0, 1, 0));
+        }
+        ImGui::SameLine();
         if (ImGui::Button("+X")) {
             _trackballRotation = rotate(mat4 { 1 }, -half_pi<float>(), vec3(0, 1, 0));
         }
         ImGui::SameLine();
+        if (ImGui::Button("-Y")) {
+            _trackballRotation = rotate(mat4 { 1 }, -half_pi<float>(), vec3(1, 0, 0)) * rotate(mat4 { 1 }, half_pi<float>(), vec3(0, 1, 0));
+        }
+        ImGui::SameLine();
         if (ImGui::Button("+Y")) {
             _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(1, 0, 0)) * rotate(mat4 { 1 }, half_pi<float>(), vec3(0, 1, 0));
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("-Z")) {
+            _trackballRotation = rotate(mat4 { 1 }, pi<float>(), vec3(0, 1, 0));
         }
         ImGui::SameLine();
         if (ImGui::Button("+Z")) {
