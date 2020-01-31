@@ -223,7 +223,7 @@ TEST_CASE("CubeSampler", "[samplers]")
         REQUIRE(eval(vec3(0, 0, -1.0)) == approx(0.0F));
 
         // now we should be at value 1 from -1 to +1 and ramp to 0 from +1->+2 and -1->-2
-        cube.setSize(vec3(2, 2, 2));
+        cube.setHalfExtents(vec3(2, 2, 2));
         fuzz = 1.0F;
         for (float x = -3; x <= +3; x += 0.5F) {
             auto v = eval(vec3(x, 0, 0));
@@ -250,7 +250,7 @@ TEST_CASE("CubeSampler", "[samplers]")
 
         auto test = [&eval, &cube](vec3 cubeOrigin) {
             // now we should be at value 1 from -1 to +1 and ramp to 0 from +1->+2 and -1->-2
-            cube.setSize(vec3(2, 2, 2));
+            cube.setHalfExtents(vec3(2, 2, 2));
             cube.setPosition(cubeOrigin);
 
             for (float x = -3; x <= +3; x += 0.5F) {

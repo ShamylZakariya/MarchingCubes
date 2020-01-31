@@ -257,8 +257,26 @@ protected:
         // additive samplers, there is no volume to subtract from
         if (!currentNode->empty) {
             for (const auto sampler : _subtractiveSamplers) {
-                if (sampler->intersects(currentNode->bounds)) {
-                    currentNode->subtractiveSamplers.insert(sampler);
+                auto intersection = sampler->intersection(currentNode->bounds);
+                switch(intersection) {
+                    case IVolumeSampler::AABBIntersection::IntersectsAABB:
+                        currentNode->subtractiveSamplers.insert(sampler);
+                        break;
+                    case IVolumeSampler::AABBIntersection::ContainsAABB:
+                        // special case - this node is completely contained
+                        // by the volume, which means it is EMPTY.
+                        currentNode->additiveSamplers.clear();
+                        currentNode->subtractiveSamplers.clear();
+                        currentNode->empty = true;
+                        break;
+                    case IVolumeSampler::AABBIntersection::None:
+                        break;
+                }
+
+                // if a subtractive sampler cleared this node,
+                // break the loop, we're done
+                if (currentNode->empty) {
+                    break;
                 }
             }
         }

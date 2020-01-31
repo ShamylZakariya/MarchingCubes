@@ -394,13 +394,13 @@ public:
 
     glm::vec3 position() const { return _origin; }
 
-    void setSize(const glm::vec3& halfExtents)
+    void setHalfExtents(const glm::vec3& halfExtents)
     {
         _halfExtents = max(halfExtents, glm::vec3(0));
         _update();
     }
 
-    glm::vec3 size() const { return _halfExtents; }
+    glm::vec3 halfExtents() const { return _halfExtents; }
 
     void setRotation(const glm::mat3& rotation)
     {

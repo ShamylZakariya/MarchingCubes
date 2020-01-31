@@ -32,6 +32,8 @@ using namespace glm;
 using mc::util::AABB;
 using mc::util::iAABB;
 using mc::util::unowned_ptr;
+using std::make_unique;
+using std::unique_ptr;
 
 //
 // Constants
@@ -105,7 +107,7 @@ public:
         auto size = vec3(volume->size());
         auto center = size / 2.0F;
 
-        _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+        _rect = volume->add(make_unique<mc::RectangularPrismVolumeSampler>(
             center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
     }
 
@@ -135,7 +137,7 @@ public:
         _pos = size / 2.0F;
         _radius = 10;
 
-        _sphere = volume->add(std::make_unique<mc::SphereVolumeSampler>(
+        _sphere = volume->add(make_unique<mc::SphereVolumeSampler>(
             _pos, _radius, mc::IVolumeSampler::Mode::Additive));
     }
 
@@ -145,7 +147,7 @@ public:
         auto yOffset = sin(cycle) * 5;
         auto radiusOffset = cos(cycle) * _radius * 0.25F;
 
-        _sphere->setPosition(_pos + vec3(0,yOffset,0));
+        _sphere->setPosition(_pos + vec3(0, yOffset, 0));
         _sphere->setRadius(_radius + radiusOffset);
     }
 
@@ -163,9 +165,8 @@ public:
     {
         auto size = vec3(volume->size());
         auto center = size / 2.0F;
-        _plane = volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
-            center, planeNormal(mat4{1}), 10, mc::IVolumeSampler::Mode::Additive
-        ));
+        _plane = volume->add(make_unique<mc::BoundedPlaneVolumeSampler>(
+            center, planeNormal(mat4 { 1 }), 10, mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -176,14 +177,13 @@ public:
     }
 
 private:
-
-    static vec3 planeNormal(const glm::mat4 &rot) {
+    static vec3 planeNormal(const glm::mat4& rot)
+    {
         return vec3(rot[0][1], rot[1][1], rot[2][1]);
     }
 
     unowned_ptr<mc::BoundedPlaneVolumeSampler> _plane;
-    mat3 _rotation{1};
-
+    mat3 _rotation { 1 };
 };
 
 class HalfspaceDemo : public Demo {
@@ -194,9 +194,8 @@ public:
     {
         auto size = vec3(volume->size());
         auto center = size / 2.0F;
-        _plane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
-            center, planeNormal(mat4{1}), mc::IVolumeSampler::Mode::Additive
-        ));
+        _plane = volume->add(make_unique<mc::HalfspaceVolumeSampler>(
+            center, planeNormal(mat4 { 1 }), mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -207,14 +206,13 @@ public:
     }
 
 private:
-
-    static vec3 planeNormal(const glm::mat4 &rot) {
+    static vec3 planeNormal(const glm::mat4& rot)
+    {
         return vec3(rot[0][1], rot[1][1], rot[2][1]);
     }
 
     unowned_ptr<mc::HalfspaceVolumeSampler> _plane;
-    mat3 _rotation{1};
-
+    mat3 _rotation { 1 };
 };
 
 class CompoundShapesDemo : public Demo {
@@ -227,34 +225,78 @@ public:
         std::random_device rng;
         std::default_random_engine gen { static_cast<long unsigned int>(12345) };
 
-        _bottomPlane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
-            vec3(0,size.y*0.35,0), vec3(0,1,0), mc::IVolumeSampler::Mode::Subtractive
-        ));
+        _bottomPlane = volume->add(make_unique<mc::HalfspaceVolumeSampler>(
+            vec3(0, size.y * 0.35, 0), vec3(0, 1, 0), mc::IVolumeSampler::Mode::Subtractive));
 
-        auto maxRadius = size.x / 6;
-        std::uniform_real_distribution<float> xDist(maxRadius, size.x - maxRadius);
-        std::uniform_real_distribution<float> zDist(maxRadius, size.z - maxRadius);
-        std::uniform_real_distribution<float> yDist(size.y * 0.4, size.y * 0.6);
-        std::uniform_real_distribution<float> radiusDist(size.x / 20, maxRadius);
-        std::uniform_real_distribution<float> rateDist(1, 5);
-        std::uniform_real_distribution<float> phaseDist(0, pi<float>());
-        std::uniform_real_distribution<float> bobDist(size.y * 0.0625, size.y * 0.125);
+        const int numSpheres = 30;
+        const int numCubes = 10;
 
-        for (int i = 0; i < 40; i++) {
-            float x = xDist(gen);
-            float y = yDist(gen);
-            float z = zDist(gen);
-            float radius = radiusDist(gen);
-            float rate = rateDist(gen);
-            float phase = phaseDist(gen);
-            float bobExtent = bobDist(gen);
+        if (numSpheres > 0) {
+            // create spheres
+            auto maxRadius = size.x / 6;
+            std::uniform_real_distribution<float> xDist(maxRadius, size.x - maxRadius);
+            std::uniform_real_distribution<float> zDist(maxRadius, size.z - maxRadius);
+            std::uniform_real_distribution<float> yDist(size.y * 0.4, size.y * 0.6);
+            std::uniform_real_distribution<float> radiusDist(size.x / 20, maxRadius);
+            std::uniform_real_distribution<float> bobRateDist(0.4, 2);
+            std::uniform_real_distribution<float> bobPhaseDist(0, pi<float>());
+            std::uniform_real_distribution<float> bobExtentDist(size.y * 0.0625, size.y * 0.125);
 
-            auto position = vec3(x, y, z);
-            auto sphere = volume->add(std::make_unique<mc::SphereVolumeSampler>(
-                position, radius, mc::IVolumeSampler::Mode::Additive));
+            for (int i = 0; i < 40; i++) {
+                auto pos = vec3 { xDist(gen), yDist(gen), zDist(gen) };
+                auto radius = radiusDist(gen);
+                auto rate = bobRateDist(gen);
+                auto phase = bobPhaseDist(gen);
+                auto bobExtent = bobExtentDist(gen);
 
-            _spheres.push_back(SphereState {
-                sphere, position, rate, phase, bobExtent });
+                auto sphere = volume->add(make_unique<mc::SphereVolumeSampler>(
+                    pos, radius, mc::IVolumeSampler::Mode::Additive));
+
+                _spheres.push_back(SphereState {
+                    sphere, pos, rate, phase, bobExtent });
+            }
+        }
+
+        if (numCubes > 0) {
+            auto maxSize = size.x / 5;
+            std::uniform_real_distribution<float> xDist(maxSize, size.x - maxSize);
+            std::uniform_real_distribution<float> zDist(maxSize, size.z - maxSize);
+            std::uniform_real_distribution<float> yDist(size.y * 0.4, size.y * 0.6);
+            std::uniform_real_distribution<float> sizeDist(size.x / 10, maxSize);
+            std::uniform_real_distribution<float> bobRateDist(0.4, 2);
+            std::uniform_real_distribution<float> bobPhaseDist(0, pi<float>());
+            std::uniform_real_distribution<float> bobExtentDist(size.y * 0.0625, size.y * 0.125);
+            std::uniform_real_distribution<float> spinRateDist(0.2, 0.6);
+            std::uniform_real_distribution<float> spinPhaseDist(0, pi<float>());
+            std::uniform_real_distribution<float> axisComponentDist(-1, 1);
+
+            for (int i = 0; i < numCubes; i++) {
+                auto pos = vec3 { xDist(gen), yDist(gen), zDist(gen) };
+                auto size = sizeDist(gen);
+                auto bobRate = bobRateDist(gen);
+                auto bobPhase = bobPhaseDist(gen);
+                auto bobExtent = bobExtentDist(gen);
+                auto spinRate = spinRateDist(gen);
+                auto spinPhase = spinPhaseDist(gen);
+                auto spinAxis = normalize(vec3 {
+                    axisComponentDist(gen),
+                    axisComponentDist(gen),
+                    axisComponentDist(gen) });
+
+                auto cube = volume->add(make_unique<mc::RectangularPrismVolumeSampler>(
+                    pos, vec3(size) / 2.0F, rotation(0, spinPhase, spinRate, spinAxis),
+                    mc::IVolumeSampler::Mode::Additive));
+
+                _cubes.push_back(CubeState {
+                    cube,
+                    pos,
+                    bobRate,
+                    bobPhase,
+                    bobExtent,
+                    spinRate,
+                    spinPhase,
+                    spinAxis });
+            }
         }
     }
 
@@ -264,21 +306,45 @@ public:
             auto cycle = time * sphereState.rate + sphereState.phase;
             vec3 pos = sphereState.position;
             pos.y += sphereState.bobExtent * sin(cycle);
-            sphereState.sphereShape->setPosition(pos);
+            sphereState.shape->setPosition(pos);
+        }
+
+        for (auto &cubeState : _cubes) {
+            auto bobExtent = cubeState.bobExtent * sin(time * cubeState.bobRate + cubeState.bobPhase);
+            auto rot = rotation(time, cubeState.spinPhase, cubeState.spinRate, cubeState.spinAxis);
+            auto pos = cubeState.position + vec3(0,bobExtent,0);
+            cubeState.shape->set(pos, cubeState.shape->halfExtents(), rot);
         }
     }
 
 private:
+    mat3 rotation(float time, float phase, float rate, vec3 axis)
+    {
+        auto angle = sin(time * rate + phase);
+        return rotate(mat4 { 1 }, angle, axis);
+    }
 
     struct SphereState {
-        unowned_ptr<mc::SphereVolumeSampler> sphereShape;
+        unowned_ptr<mc::SphereVolumeSampler> shape;
         vec3 position;
         float rate;
         float phase;
         float bobExtent;
     };
 
+    struct CubeState {
+        unowned_ptr<mc::RectangularPrismVolumeSampler> shape;
+        vec3 position;
+        float bobRate;
+        float bobPhase;
+        float bobExtent;
+        float spinRate;
+        float spinPhase;
+        vec3 spinAxis;
+    };
+
     std::vector<SphereState> _spheres;
+    std::vector<CubeState> _cubes;
     unowned_ptr<mc::HalfspaceVolumeSampler> _bottomPlane;
 };
 
@@ -286,15 +352,15 @@ private:
 //  Demo Registry
 //
 
-typedef std::function<std::unique_ptr<Demo>()> DemoFactory;
-typedef std::pair<const char *, DemoFactory> DemoEntry;
+typedef std::function<unique_ptr<Demo>()> DemoFactory;
+typedef std::pair<const char*, DemoFactory> DemoEntry;
 
 const static std::vector<DemoEntry> DemoRegistry = {
-    DemoEntry("Cube", [](){ return std::make_unique<CubeDemo>(); }),
-    DemoEntry("Sphere", [](){ return std::make_unique<SphereDemo>(); }),
-    DemoEntry("BoundedPlane", [](){ return std::make_unique<BoundedPlaneDemo>(); }),
-    DemoEntry("Halfspace", [](){ return std::make_unique<HalfspaceDemo>(); }),
-    DemoEntry("CompountShapes", [](){ return std::make_unique<CompoundShapesDemo>(); }),
+    DemoEntry("Cube", []() { return make_unique<CubeDemo>(); }),
+    DemoEntry("Sphere", []() { return make_unique<SphereDemo>(); }),
+    DemoEntry("BoundedPlane", []() { return make_unique<BoundedPlaneDemo>(); }),
+    DemoEntry("Halfspace", []() { return make_unique<HalfspaceDemo>(); }),
+    DemoEntry("CompountShapes", []() { return make_unique<CompoundShapesDemo>(); }),
 };
 
 //
@@ -369,7 +435,7 @@ private:
 
     // render state
     ProgramState _volumeProgram, _lineProgram;
-    std::vector<std::unique_ptr<mc::ITriangleConsumer>> _triangleConsumers;
+    std::vector<unique_ptr<mc::ITriangleConsumer>> _triangleConsumers;
     mc::util::LineSegmentBuffer _octreeAABBLineSegmentStorage;
     mc::util::LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
     mc::util::LineSegmentBuffer _axes;
@@ -382,9 +448,9 @@ private:
     mat3 _trackballRotation { 1 };
 
     // volume and samplers
-    std::unique_ptr<mc::OctreeVolume> _volume;
+    unique_ptr<mc::OctreeVolume> _volume;
     std::vector<const char*> _demoNames;
-    std::unique_ptr<Demo> _currentDemo;
+    unique_ptr<Demo> _currentDemo;
     int _currentDemoIdx = 2;
 
     // app state
@@ -738,11 +804,12 @@ private:
         ImGui::End();
     }
 
-    void initApp() {
+    void initApp()
+    {
         // copy demo names to local storage so we can feed imgui::combo
         _demoNames.resize(DemoRegistry.size());
         std::transform(DemoRegistry.begin(), DemoRegistry.end(), _demoNames.begin(),
-            [](const DemoEntry &entry){ return entry.first; });
+            [](const DemoEntry& entry) { return entry.first; });
 
         // build a volume
         auto nThreads = std::thread::hardware_concurrency();
@@ -750,11 +817,11 @@ private:
 
         std::vector<unowned_ptr<mc::ITriangleConsumer>> unownedTriangleConsumers;
         for (auto i = 0u; i < nThreads; i++) {
-            _triangleConsumers.push_back(std::make_unique<mc::TriangleConsumer>());
+            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer>());
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
-        _volume = std::make_unique<mc::OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
+        _volume = make_unique<mc::OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
         _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
 
         _volume->walkOctree([this](mc::OctreeVolume::Node* node) {
