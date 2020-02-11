@@ -50,6 +50,45 @@ constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
 // Data
 //
 
+struct SkydomeMaterial {
+    GLuint program = 0;
+    GLint uniformLocProjectionInverse = -1;
+    GLint uniformLocModelViewInverse = -1;
+    GLint uniformSkyboxSampler = -1;
+    GLuint skyboxTexture;
+
+    SkydomeMaterial() = default;
+    SkydomeMaterial(const SkydomeMaterial& other) = delete;
+    SkydomeMaterial(const SkydomeMaterial&& other) = delete;
+
+    ~SkydomeMaterial()
+    {
+        if (program > 0) {
+            glDeleteProgram(program);
+        }
+    }
+
+    void build(const std::string& vertPath, const std::string& fragPath, const std::string &facesFolder)
+    {
+        using namespace mc::util;
+        program = CreateProgramFromFiles(vertPath.c_str(), fragPath.c_str());
+        uniformLocProjectionInverse = glGetUniformLocation(program, "uProjectionInverse");
+        uniformLocModelViewInverse = glGetUniformLocation(program, "uModelViewInverse");
+        uniformSkyboxSampler = glGetUniformLocation(program, "skyboxSampler");
+        skyboxTexture = LoadTextureCube(facesFolder, ".jpg");
+    }
+
+    void bind(const mat4& projection, const mat4& modelview)
+    {
+        glUseProgram(program);
+        glUniformMatrix4fv(uniformLocProjectionInverse, 1, GL_FALSE, value_ptr(inverse(projection)));
+        glUniformMatrix4fv(uniformLocModelViewInverse, 1, GL_FALSE, value_ptr(inverse(modelview)));
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+        glUniform1i(uniformSkyboxSampler, 0);
+    }
+};
+
 struct ProgramState {
     GLuint program = 0;
     GLint uniformLocMVP = -1;
@@ -69,9 +108,7 @@ struct ProgramState {
     void build(const std::string& vertPath, const std::string& fragPath)
     {
         using namespace mc::util;
-        auto vertSrc = ReadFile(vertPath);
-        auto fragSrc = ReadFile(fragPath);
-        program = CreateProgram(vertSrc.c_str(), fragSrc.c_str());
+        program = CreateProgramFromFiles(vertPath.c_str(), fragPath.c_str());
         uniformLocMVP = glGetUniformLocation(program, "uMVP");
         uniformLocModel = glGetUniformLocation(program, "uModel");
     }
@@ -309,10 +346,10 @@ public:
             sphereState.shape->setPosition(pos);
         }
 
-        for (auto &cubeState : _cubes) {
+        for (auto& cubeState : _cubes) {
             auto bobExtent = cubeState.bobExtent * sin(time * cubeState.bobRate + cubeState.bobPhase);
             auto rot = rotation(time, cubeState.spinPhase, cubeState.spinRate, cubeState.spinAxis);
-            auto pos = cubeState.position + vec3(0,bobExtent,0);
+            auto pos = cubeState.position + vec3(0, bobExtent, 0);
             cubeState.shape->set(pos, cubeState.shape->halfExtents(), rot);
         }
     }
@@ -441,6 +478,9 @@ private:
     mc::util::LineSegmentBuffer _axes;
     mc::util::LineSegmentBuffer _debugLines;
 
+    SkydomeMaterial _skydomeProgram;
+    mc::TriangleConsumer _skydomeQuad;
+
     // input state
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
@@ -451,7 +491,7 @@ private:
     unique_ptr<mc::OctreeVolume> _volume;
     std::vector<const char*> _demoNames;
     unique_ptr<Demo> _currentDemo;
-    int _currentDemoIdx = 2;
+    int _currentDemoIdx = 4;
 
     // app state
     enum class AABBDisplay : int {
@@ -570,6 +610,7 @@ private:
 
         _volumeProgram.build("shaders/gl/volume_vert.glsl", "shaders/gl/volume_frag.glsl");
         _lineProgram.build("shaders/gl/line_vert.glsl", "shaders/gl/line_frag.glsl");
+        _skydomeProgram.build("shaders/gl/skydome_vert.glsl", "shaders/gl/skydome_frag.glsl", "textures/skybox");
 
         //
         // some constant GL state
@@ -596,6 +637,17 @@ private:
         _axes.add(Vertex { vec3(0, 0, 0), vec4(1, 0, 0, 1) }, Vertex { vec3(10, 0, 0), vec4(1, 0, 0, 1) });
         _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 1, 0, 1) }, Vertex { vec3(0, 10, 0), vec4(0, 1, 0, 1) });
         _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 0, 1, 1) }, Vertex { vec3(0, 0, 10), vec4(0, 0, 1, 1) });
+
+        _skydomeQuad.start();
+        _skydomeQuad.addTriangle(mc::Triangle {
+            Vertex { vec3(-1, -1, 0), vec4(1, 0, 0, 1), vec3(0, 0, -1) },
+            Vertex { vec3(+1, -1, 0), vec4(0, 1, 0, 1), vec3(0, 0, -1) },
+            Vertex { vec3(+1, +1, 0), vec4(0, 0, 1, 1), vec3(0, 0, -1) } });
+        _skydomeQuad.addTriangle(mc::Triangle {
+            Vertex { vec3(-1, -1, 0), vec4(0, 1, 1, 1), vec3(0, 0, -1) },
+            Vertex { vec3(+1, +1, 0), vec4(1, 0, 1, 1), vec3(0, 0, -1) },
+            Vertex { vec3(-1, +1, 0), vec4(1, 1, 0, 1), vec3(0, 0, -1) } });
+        _skydomeQuad.finish();
     }
 
     void onResize(int width, int height)
@@ -664,49 +716,24 @@ private:
 
     void drawFrame()
     {
+        mat4 model, view, projection;
+        auto mvp = MVP(model, view, projection);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto mvp = [this]() {
-            // extract trackball Z and Y for building view matrix via lookAt
-            auto trackballY = glm::vec3 { _trackballRotation[0][1], _trackballRotation[1][1], _trackballRotation[2][1] };
-            auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
-            mat4 view, proj;
+        // draw skydome
+        glDepthMask(GL_FALSE);
+        _skydomeProgram.bind(projection, (view * model));
+        _skydomeQuad.draw();
 
-            if (_useOrthoProjection) {
-                auto bounds = _volume->bounds();
-                auto size = length(bounds.size());
-
-                auto scaleMin = 0.1F;
-                auto scaleMax = 5.0F;
-                auto scale = mix(scaleMin, scaleMax, pow<float>(_dolly, 2.5));
-
-                auto width = scale * _aspect * size;
-                auto height = scale * size;
-
-                auto distance = FAR_PLANE / 2;
-                view = lookAt(-distance * trackballZ, vec3(0), trackballY);
-
-                proj = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
-            } else {
-                auto bounds = _volume->bounds();
-                auto minDistance = 0.1F;
-                auto maxDistance = length(bounds.size()) * 2;
-
-                auto distance = mix(minDistance, maxDistance, pow<float>(_dolly, 2));
-                view = lookAt(-distance * trackballZ, vec3(0), trackballY);
-
-                proj = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
-            }
-            return proj * view * _model;
-        }();
-
-        _volumeProgram.bind(mvp, _model);
-
+        // draw marching cubes output
         glDepthMask(GL_TRUE);
+        _volumeProgram.bind(mvp, _model);
         for (auto& tc : _triangleConsumers) {
             tc->draw();
         }
 
+        // draw lines
         glDepthMask(GL_FALSE);
         _lineProgram.bind(mvp, _model);
 
@@ -908,6 +935,43 @@ private:
         }
 
         std::cout << std::endl;
+    }
+
+    mat4 MVP(mat4& model, mat4& view, mat4& projection) const
+    {
+        model = _model;
+
+        // extract trackball Z and Y for building view matrix via lookAt
+        auto trackballY = glm::vec3 { _trackballRotation[0][1], _trackballRotation[1][1], _trackballRotation[2][1] };
+        auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
+
+        if (_useOrthoProjection) {
+            auto bounds = _volume->bounds();
+            auto size = length(bounds.size());
+
+            auto scaleMin = 0.1F;
+            auto scaleMax = 5.0F;
+            auto scale = mix(scaleMin, scaleMax, pow<float>(_dolly, 2.5));
+
+            auto width = scale * _aspect * size;
+            auto height = scale * size;
+
+            auto distance = FAR_PLANE / 2;
+            view = lookAt(-distance * trackballZ, vec3(0), trackballY);
+
+            projection = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
+        } else {
+            auto bounds = _volume->bounds();
+            auto minDistance = 0.1F;
+            auto maxDistance = length(bounds.size()) * 2;
+
+            auto distance = mix(minDistance, maxDistance, pow<float>(_dolly, 2));
+            view = lookAt(-distance * trackballZ, vec3(0), trackballY);
+
+            projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
+        }
+
+        return projection * view * model;
     }
 };
 

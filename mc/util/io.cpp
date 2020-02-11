@@ -19,25 +19,65 @@ namespace util {
         return buffer.str();
     }
 
-    GLuint LoadTexture(const std::string& filename)
+    GLuint LoadTexture2D(const std::string& filename)
     {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load(filename.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* data = stbi_load(filename.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
-        if (!pixels) {
+        if (!data) {
             throw std::runtime_error("failed to load texture image!");
         }
 
-        GLuint texture;
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        GLuint textureId;
+        glGenTextures(1, &textureId);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glGenerateMipmap(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        return texture;
+        return textureId;
+    }
+
+    GLuint LoadTextureCube(const std::array<std::string, 6>& faces)
+    {
+        unsigned int textureId;
+        glGenTextures(1, &textureId);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, textureId);
+
+        int width, height, nrChannels;
+        for (unsigned int i = 0; i < faces.size(); i++) {
+            stbi_uc* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+            if (data) {
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                    0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+                stbi_image_free(data);
+            } else {
+                std::cout << "Unable to load cubemap face[" << i << "] path(" << faces[i] << ")" << std::endl;
+                stbi_image_free(data);
+            }
+        }
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        return textureId;
+    }
+
+    GLuint LoadTextureCube(const std::string& folder, const std::string &ext)
+    {
+        return LoadTextureCube({
+            folder + "/right" + ext,
+            folder + "/left" + ext,
+            folder + "/top" + ext,
+            folder + "/bottom" + ext,
+            folder + "/front" + ext,
+            folder + "/back" + ext,
+        });
     }
 
     void CheckGlError(const char* ctx)
@@ -51,7 +91,7 @@ namespace util {
 #endif
     }
 
-    GLuint CreateShader(GLenum shader_type, const char* src)
+    GLuint CreateShader(GLenum shader_type, const char* src, const char* filename)
     {
         GLuint shader = glCreateShader(shader_type);
         if (!shader) {
@@ -70,7 +110,16 @@ namespace util {
                 auto* infoLog = (GLchar*)malloc(static_cast<size_t>(infoLogLen));
                 if (infoLog) {
                     glGetShaderInfoLog(shader, infoLogLen, nullptr, infoLog);
-                    std::cerr << "Could not compile " << (shader_type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " error: " << std::string(infoLog) << std::endl;
+                    if (filename) {
+                        std::cerr << "Could not compile "
+                                  << (shader_type == GL_VERTEX_SHADER ? "vertex" : "fragment")
+                                  << " file (" << filename << ")\t error: "
+                                  << std::string(infoLog) << std::endl;
+                    } else {
+                        std::cerr << "Could not compile "
+                                  << (shader_type == GL_VERTEX_SHADER ? "vertex" : "fragment")
+                                  << " error: " << std::string(infoLog) << std::endl;
+                    }
 
                     throw std::runtime_error("Could not compile shader");
                 }
@@ -94,6 +143,66 @@ namespace util {
             goto exit;
 
         fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc);
+        if (!fragShader)
+            goto exit;
+
+        program = glCreateProgram();
+        if (!program) {
+            CheckGlError("glCreateProgram");
+            goto exit;
+        }
+        glAttachShader(program, vtxShader);
+        glAttachShader(program, fragShader);
+
+        glLinkProgram(program);
+        glGetProgramiv(program, GL_LINK_STATUS, &linked);
+        if (!linked) {
+            GLint infoLogLen = 0;
+            glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLen);
+            if (infoLogLen) {
+                auto* infoLog = (GLchar*)malloc(static_cast<size_t>(infoLogLen));
+                if (infoLog) {
+                    glGetProgramInfoLog(program, infoLogLen, nullptr, infoLog);
+                    std::cerr << "Could not link program: " << infoLog << std::endl;
+                    throw std::runtime_error("Could not link program");
+                }
+            }
+            glDeleteProgram(program);
+            program = 0;
+            std::cerr << "Could not link program" << std::endl;
+            throw std::runtime_error("Could not link program");
+        }
+
+    exit:
+        glDeleteShader(vtxShader);
+        glDeleteShader(fragShader);
+        return program;
+    }
+
+    GLuint CreateProgramFromFiles(const char* vtxFile, const char* fragFile)
+    {
+        auto vertSrc = ReadFile(vtxFile);
+        if (vertSrc.length() == 0) {
+            std::cerr << "Unable to read vertex file: " << vtxFile << std::endl;
+            return 0;
+        }
+
+        auto fragSrc = ReadFile(fragFile);
+        if (fragSrc.length() == 0) {
+            std::cerr << "Unable to read fragment file: " << fragFile << std::endl;
+            return 0;
+        }
+
+        GLuint vtxShader = 0;
+        GLuint fragShader = 0;
+        GLuint program = 0;
+        GLint linked = GL_FALSE;
+
+        vtxShader = CreateShader(GL_VERTEX_SHADER, vertSrc.c_str(), vtxFile);
+        if (!vtxShader)
+            goto exit;
+
+        fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc.c_str(), fragFile);
         if (!fragShader)
             goto exit;
 
