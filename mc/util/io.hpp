@@ -11,6 +11,7 @@
 
 #include <array>
 #include <limits>
+#include <memory>
 #include <string>
 
 #include <epoxy/gl.h>
@@ -23,10 +24,33 @@ namespace util {
     */
     std::string ReadFile(const std::string& filename);
 
+    class TextureHandle {
+    private:
+        GLuint _id;
+        GLenum _target;
+
+    public:
+        TextureHandle(GLuint id, GLenum target)
+            : _id(id)
+            , _target(target)
+        {
+        }
+
+        ~TextureHandle()
+        {
+            glDeleteTextures(1, &_id);
+        }
+
+        GLuint id() const { return _id; }
+        GLenum target() const { return _target; }
+    };
+
+    typedef std::shared_ptr<TextureHandle> TextureHandleRef;
+
     /**
     Loads image into a texture 2d
     */
-    GLuint LoadTexture2D(const std::string& filename);
+    TextureHandleRef LoadTexture2D(const std::string& filename);
 
     /**
     Loads images into a cubemap texture in this order:
@@ -37,9 +61,13 @@ namespace util {
     4: GL_TEXTURE_CUBE_MAP_POSITIVE_Z 	Back
     5: GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 	Front
     */
-    GLuint LoadTextureCube(const std::array<std::string,6> &faces);
+    TextureHandleRef LoadTextureCube(const std::array<std::string, 6>& faces);
 
-    GLuint LoadTextureCube(const std::string &folder, const std::string &ext = ".jpg");
+    /**
+     * Helper function to load a skybox from a folder, where the faces are named
+     * [right, left, top, bottom, front, back]
+     */
+    TextureHandleRef LoadTextureCube(const std::string& folder, const std::string& ext = ".jpg");
 
     /**
     Checks for GL error, throwing if there is one

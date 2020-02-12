@@ -51,10 +51,13 @@ namespace volume_samplers_detail {
             }
         }
 
-        switch(inside) {
-            case 0: return IVolumeSampler::AABBIntersection::None;
-            case 8: return IVolumeSampler::AABBIntersection::ContainsAABB;
-            default: return IVolumeSampler::AABBIntersection::IntersectsAABB;
+        switch (inside) {
+        case 0:
+            return IVolumeSampler::AABBIntersection::None;
+        case 8:
+            return IVolumeSampler::AABBIntersection::ContainsAABB;
+        default:
+            return IVolumeSampler::AABBIntersection::IntersectsAABB;
         }
     }
 
@@ -114,10 +117,13 @@ public:
             }
         }
 
-        switch(inside) {
-            case 0: return IVolumeSampler::AABBIntersection::None;
-            case 8: return IVolumeSampler::AABBIntersection::ContainsAABB;
-            default: return IVolumeSampler::AABBIntersection::IntersectsAABB;
+        switch (inside) {
+        case 0:
+            return IVolumeSampler::AABBIntersection::None;
+        case 8:
+            return IVolumeSampler::AABBIntersection::ContainsAABB;
+        default:
+            return IVolumeSampler::AABBIntersection::IntersectsAABB;
         }
     }
 
@@ -195,10 +201,13 @@ public:
             }
         }
 
-        switch(inside) {
-            case 0: return IVolumeSampler::AABBIntersection::None;
-            case 8: return IVolumeSampler::AABBIntersection::ContainsAABB;
-            default: return IVolumeSampler::AABBIntersection::IntersectsAABB;
+        switch (inside) {
+        case 0:
+            return IVolumeSampler::AABBIntersection::None;
+        case 8:
+            return IVolumeSampler::AABBIntersection::ContainsAABB;
+        default:
+            return IVolumeSampler::AABBIntersection::IntersectsAABB;
         }
     }
 

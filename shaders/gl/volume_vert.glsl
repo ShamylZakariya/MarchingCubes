@@ -9,14 +9,18 @@ out VS_OUT
     vec4 color;
     vec3 normal;
     vec3 worldNormal;
-} vs_out;
+    vec3 worldPosition;
+}
+vs_out;
 
 uniform mat4 uMVP;
 uniform mat4 uModel;
 
-void main() {
+void main()
+{
     gl_Position = uMVP * vec4(inPosition, 1.0);
     vs_out.color = inColor;
     vs_out.normal = inNormal;
     vs_out.worldNormal = mat3(uModel) * inNormal;
+    vs_out.worldPosition = vec3(uModel * vec4(inPosition, 1.0));
 }

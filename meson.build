@@ -32,23 +32,7 @@ include_dirs = [
 
 # build the mc_lib marching cubes library
 subdir('mc')
-
-
-# build the main executable
-app_sources = [
-    'main.cpp',
-    'include/imgui/imgui.cpp',
-    'include/imgui/imgui_draw.cpp',
-    'include/imgui/imgui_widgets.cpp',
-    'include/imgui/imgui_impl_glfw.cpp',
-    'include/imgui/imgui_impl_opengl3.cpp'
-]
-
-executable('MarchingCubes',
-    sources: app_sources,
-    include_directories: include_dirs,
-    link_with: mc_lib,
-    dependencies: dependencies)
+subdir('demo')
 
 ## build/register unit tests
 subdir('tests')

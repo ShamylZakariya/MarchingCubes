@@ -25,7 +25,6 @@ namespace mc {
 
 class IVolumeSampler {
 public:
-
     enum class AABBIntersection {
         None,
         IntersectsAABB,
@@ -58,7 +57,8 @@ public:
     contained by the volume, this method should return AABBIntersection::ContainsAABB
     which allows the OctreeVolume to optimize the set of nodes to march.
     */
-    virtual AABBIntersection intersection(util::AABB bounds) const {
+    virtual AABBIntersection intersection(util::AABB bounds) const
+    {
         return intersects(bounds) ? AABBIntersection::IntersectsAABB : AABBIntersection::None;
     }
 
@@ -258,19 +258,19 @@ protected:
         if (!currentNode->empty) {
             for (const auto sampler : _subtractiveSamplers) {
                 auto intersection = sampler->intersection(currentNode->bounds);
-                switch(intersection) {
-                    case IVolumeSampler::AABBIntersection::IntersectsAABB:
-                        currentNode->subtractiveSamplers.insert(sampler);
-                        break;
-                    case IVolumeSampler::AABBIntersection::ContainsAABB:
-                        // special case - this node is completely contained
-                        // by the volume, which means it is EMPTY.
-                        currentNode->additiveSamplers.clear();
-                        currentNode->subtractiveSamplers.clear();
-                        currentNode->empty = true;
-                        break;
-                    case IVolumeSampler::AABBIntersection::None:
-                        break;
+                switch (intersection) {
+                case IVolumeSampler::AABBIntersection::IntersectsAABB:
+                    currentNode->subtractiveSamplers.insert(sampler);
+                    break;
+                case IVolumeSampler::AABBIntersection::ContainsAABB:
+                    // special case - this node is completely contained
+                    // by the volume, which means it is EMPTY.
+                    currentNode->additiveSamplers.clear();
+                    currentNode->subtractiveSamplers.clear();
+                    currentNode->empty = true;
+                    break;
+                case IVolumeSampler::AABBIntersection::None:
+                    break;
                 }
 
                 // if a subtractive sampler cleared this node,

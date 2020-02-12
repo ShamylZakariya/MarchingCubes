@@ -19,7 +19,7 @@ namespace util {
         return buffer.str();
     }
 
-    GLuint LoadTexture2D(const std::string& filename)
+    TextureHandleRef LoadTexture2D(const std::string& filename)
     {
         int texWidth, texHeight, texChannels;
         stbi_uc* data = stbi_load(filename.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
@@ -37,10 +37,10 @@ namespace util {
         glGenerateMipmap(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        return textureId;
+        return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_2D);
     }
 
-    GLuint LoadTextureCube(const std::array<std::string, 6>& faces)
+    TextureHandleRef LoadTextureCube(const std::array<std::string, 6>& faces)
     {
         unsigned int textureId;
         glGenTextures(1, &textureId);
@@ -59,16 +59,18 @@ namespace util {
             }
         }
 
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-        return textureId;
+        return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_CUBE_MAP);
     }
 
-    GLuint LoadTextureCube(const std::string& folder, const std::string &ext)
+    TextureHandleRef LoadTextureCube(const std::string& folder, const std::string& ext)
     {
         return LoadTextureCube({
             folder + "/right" + ext,

@@ -61,6 +61,17 @@
         "shared_mutex": "cpp",
         "cinttypes": "cpp",
         "variant": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "cassert": "cpp",
+        "cerrno": "cpp",
+        "cfloat": "cpp",
+        "ciso646": "cpp",
+        "climits": "cpp",
+        "filesystem": "cpp",
+        "ios": "cpp",
+        "locale": "cpp",
+        "queue": "cpp",
+        "stack": "cpp",
+        "cstdbool": "cpp"
     }
 }
