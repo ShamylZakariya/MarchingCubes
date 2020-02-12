@@ -102,14 +102,17 @@ private:
     GLint _uSkyboxSampler = -1;
     GLint _uReflectionBlurLevel = -1;
     GLint _uShininess = -1;
+    GLint _uAmbientLight;
 
     mc::util::TextureHandleRef _skyboxTex;
+    vec3 _ambientLight;
     float _shininess;
     float _reflectionBlurLevel;
 
 public:
-    VolumeMaterial(mc::util::TextureHandleRef skybox, float shininess, float reflectionBlurLevel)
+    VolumeMaterial(mc::util::TextureHandleRef skybox, vec3 ambientLight, float shininess, float reflectionBlurLevel)
         : _skyboxTex(skybox)
+        , _ambientLight(ambientLight)
         , _shininess(clamp(shininess, 0.0F, 1.0F))
         , _reflectionBlurLevel(reflectionBlurLevel)
     {
@@ -121,6 +124,7 @@ public:
         _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
         _uReflectionBlurLevel = glGetUniformLocation(_program, "uReflectionBlurLevel");
         _uShininess = glGetUniformLocation(_program, "uShininess");
+        _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
     }
 
     VolumeMaterial(const VolumeMaterial& other) = delete;
@@ -145,6 +149,7 @@ public:
         glUniform1i(_uSkyboxSampler, 0);
         glUniform1f(_uReflectionBlurLevel, _reflectionBlurLevel);
         glUniform1f(_uShininess, _shininess);
+        glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
     }
 };
 
@@ -387,11 +392,12 @@ private:
         // load materials
         //
 
-        float volumeShininess = 0.25F;
+        float volumeShininess = 0.75F;
         float volumeReflectionBlurLevel = 4;
+        vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
-        _volumeMaterial = std::make_unique<VolumeMaterial>(skyboxTexture, volumeShininess, volumeReflectionBlurLevel);
+        _volumeMaterial = std::make_unique<VolumeMaterial>(skyboxTexture, ambientLight, volumeShininess, volumeReflectionBlurLevel);
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
 
