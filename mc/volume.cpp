@@ -99,7 +99,7 @@ void OctreeVolume::marchNode(OctreeVolume::Node* node, ITriangleConsumer& tc, ut
     if (computeNormals) {
         auto normalSampler = [&valueSampler](const vec3& p) {
             // from GPUGems 3 Chap 1 -- compute normal of voxel space
-            const float d = 0.1f;
+            const float d = 0.75f;
             vec3 grad(
                 valueSampler(p + vec3(d, 0, 0)) - valueSampler(p + vec3(-d, 0, 0)),
                 valueSampler(p + vec3(0, d, 0)) - valueSampler(p + vec3(0, -d, 0)),
