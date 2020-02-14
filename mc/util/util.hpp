@@ -17,6 +17,12 @@
 
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/hash.hpp>
+#include <glm/gtx/norm.hpp>
+
 #include "aabb.hpp"
 #include "color.hpp"
 #include "fps_calc.hpp"
@@ -25,10 +31,5 @@
 #include "storage.hpp"
 #include "thread_pool.hpp"
 #include "unowned_ptr.hpp"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/hash.hpp>
-#include <glm/gtx/norm.hpp>
 
 #endif /* mc_util_h */

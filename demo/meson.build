@@ -1,6 +1,7 @@
 # build the main executable
 app_sources = [
     'main.cpp',
+    'cubemap_blur.cpp',
     '../include/imgui/imgui.cpp',
     '../include/imgui/imgui_draw.cpp',
     '../include/imgui/imgui_widgets.cpp',

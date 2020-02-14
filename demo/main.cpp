@@ -29,6 +29,7 @@
 #include <mc/volume_samplers.hpp>
 
 #include "demos.hpp"
+#include "cubemap_blur.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -397,6 +398,8 @@ private:
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
+        skyboxTexture = BlurCubemap(skyboxTexture, radians(5.0F), 32);
+
         _volumeMaterial = std::make_unique<VolumeMaterial>(skyboxTexture, ambientLight, volumeShininess, volumeReflectionBlurLevel);
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
