@@ -152,7 +152,7 @@ public:
         glUniform3fv(_uCameraPos, 1, value_ptr(cameraPosition));
         glUniform1i(_uLightprobeSampler, 0);
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
-        glUniform1i(_uReflectionMapSampler, 0);
+        glUniform1i(_uReflectionMapSampler, 1);
         glUniform1f(_uShininess, _shininess);
     }
 };
