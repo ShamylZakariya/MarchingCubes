@@ -5,6 +5,6 @@
 
 #include <mc/util/io.hpp>
 
-mc::util::TextureHandleRef BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int size);
+std::unique_ptr<mc::util::TextureHandle> BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int size);
 
 #endif

@@ -28,8 +28,8 @@
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
 
-#include "demos.hpp"
 #include "cubemap_blur.hpp"
+#include "demos.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -100,32 +100,32 @@ private:
     GLint _uMVP = -1;
     GLint _uModel = -1;
     GLint _uCameraPos = -1;
-    GLint _uSkyboxSampler = -1;
-    GLint _uReflectionBlurLevel = -1;
-    GLint _uShininess = -1;
+    GLint _uLightprobeSampler = -1;
     GLint _uAmbientLight;
+    GLint _uReflectionMapSampler = -1;
+    GLint _uShininess = -1;
 
-    mc::util::TextureHandleRef _skyboxTex;
+    mc::util::TextureHandleRef _lightprobe;
     vec3 _ambientLight;
+    mc::util::TextureHandleRef _reflectionMap;
     float _shininess;
-    float _reflectionBlurLevel;
 
 public:
-    VolumeMaterial(mc::util::TextureHandleRef skybox, vec3 ambientLight, float shininess, float reflectionBlurLevel)
-        : _skyboxTex(skybox)
+    VolumeMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
+        : _lightprobe(lightProbe)
         , _ambientLight(ambientLight)
+        , _reflectionMap(reflectionMap)
         , _shininess(clamp(shininess, 0.0F, 1.0F))
-        , _reflectionBlurLevel(reflectionBlurLevel)
     {
         using namespace mc::util;
         _program = CreateProgramFromFiles("shaders/gl/volume_vert.glsl", "shaders/gl/volume_frag.glsl");
         _uMVP = glGetUniformLocation(_program, "uMVP");
         _uModel = glGetUniformLocation(_program, "uModel");
         _uCameraPos = glGetUniformLocation(_program, "uCameraPosition");
-        _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
-        _uReflectionBlurLevel = glGetUniformLocation(_program, "uReflectionBlurLevel");
-        _uShininess = glGetUniformLocation(_program, "uShininess");
+        _uLightprobeSampler = glGetUniformLocation(_program, "uLightprobeSampler");
         _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
+        _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
+        _uShininess = glGetUniformLocation(_program, "uShininess");
     }
 
     VolumeMaterial(const VolumeMaterial& other) = delete;
@@ -141,16 +141,19 @@ public:
     void bind(const mat4& mvp, const mat4& model, const vec3& cameraPosition)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _skyboxTex->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _lightprobe->id());
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->id());
 
         glUseProgram(_program);
         glUniformMatrix4fv(_uMVP, 1, GL_FALSE, value_ptr(mvp));
         glUniformMatrix4fv(_uModel, 1, GL_FALSE, value_ptr(model));
         glUniform3fv(_uCameraPos, 1, value_ptr(cameraPosition));
-        glUniform1i(_uSkyboxSampler, 0);
-        glUniform1f(_uReflectionBlurLevel, _reflectionBlurLevel);
-        glUniform1f(_uShininess, _shininess);
+        glUniform1i(_uLightprobeSampler, 0);
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
+        glUniform1i(_uReflectionMapSampler, 0);
+        glUniform1f(_uShininess, _shininess);
     }
 };
 
@@ -225,6 +228,7 @@ private:
     };
 
     bool _animate = false;
+    bool _smoothNormals = false;
     float _animationTime = 0;
     bool _running = true;
     bool _useOrthoProjection = false;
@@ -394,13 +398,13 @@ private:
         //
 
         float volumeShininess = 0.75F;
-        float volumeReflectionBlurLevel = 4;
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
-        skyboxTexture = BlurCubemap(skyboxTexture, radians(5.0F), 32);
+        auto reflectionTex = BlurCubemap(skyboxTexture, radians<float>(5), 512);
+        auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(20), 64);
 
-        _volumeMaterial = std::make_unique<VolumeMaterial>(skyboxTexture, ambientLight, volumeShininess, volumeReflectionBlurLevel);
+        _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, std::move(reflectionTex), volumeShininess);
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
 
@@ -615,8 +619,13 @@ private:
         }
 
         ImGui::Separator();
+
         if (ImGui::SliderFloat("Fuzziness", &_fuzziness, 0, 5, "%.2f")) {
             _volume->setFuzziness(_fuzziness);
+            _needsMarchVolume = true;
+        }
+
+        if (ImGui::Checkbox("Smooth Normals", &_smoothNormals)) {
             _needsMarchVolume = true;
         }
 
@@ -685,7 +694,7 @@ private:
         _marchStats.reset(_volume->depth());
         _octreeOccupiedAABBsLineSegmentStorage.clear();
 
-        _volume->march(false, [this](mc::OctreeVolume::Node* node) {
+        _volume->march(_smoothNormals, [this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
