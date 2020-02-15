@@ -63,13 +63,10 @@ std::unique_ptr<mc::util::TextureHandle> CreateGaussianKernel(int size)
     glGenTextures(1, &textureId);
     glBindTexture(GL_TEXTURE_2D, textureId);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, size, size, 0, GL_RED, GL_FLOAT, float_data.data());
-    mc::util::CheckGlError("[CreateGaussianKernel] - glTexImage2D");
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    mc::util::CheckGlError("[CreateGaussianKernel] - glTexParam");
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    mc::util::CheckGlError("[CreateGaussianKernel] - Done");
     return std::make_unique<mc::util::TextureHandle>(textureId, GL_TEXTURE_2D);
 }
 
@@ -157,12 +154,10 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
 
     // Attach only the +X cubemap texture (for completeness)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, destCubemapTexId, 0);
-    CheckGlError("[BlurCubemap] Set framebuffer texture attachment");
 
     // Check if current configuration of framebuffer is correct
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        CheckGlError("[BlurCubemap] Framebuffer status");
-        std::cout << "Framebuffer not complete!" << std::endl;
+        throw std::runtime_error("Framebuffer not complete");;
     }
 
     const vec3 lookAts[6] = {
@@ -197,11 +192,8 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
         fullscreenQuad.finish();
     }
 
-    CheckGlError("[BlurCubemap] Created fullscreen quad");
 
     BlurMaterial material(srcCubemap, CreateGaussianKernel(9), blurHalfArcWidth);
-    CheckGlError("[BlurCubemap] Created blur material");
-
     const mat4 projection = perspective<float>(radians(90.0F), 1.0F, 1.0F, 100.0F);
     const mat4 model = mat4 { 1 };
 
@@ -209,11 +201,9 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
 
-    std::cout << "[BlurCubemap] - Starting..." << std::endl;
     for (GLuint face = 0; face < 6; ++face) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
             GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, destCubemapTexId, 0);
-        CheckGlError("[BlurCubemap] Bound face" + std::to_string(face));
 
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -221,18 +211,13 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
 
         // now render using this state
         material.bind(projection, view, model);
-        CheckGlError("[BlurCubemap] Bound material while drawing face " + std::to_string(face));
         fullscreenQuad.draw();
-        CheckGlError("[BlurCubemap] Drew fullscreen quad while drawing face " + std::to_string(face));
     }
-    std::cout << "[BlurCubemap] - Finished!" << std::endl;
 
     // clean up
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDeleteFramebuffers(1, &framebuffer);
     glEnable(GL_DEPTH_TEST);
-
-    CheckGlError("[BlurCubemap] Finished cleanup");
 
     return std::make_unique<mc::util::TextureHandle>(destCubemapTexId, GL_TEXTURE_CUBE_MAP);
 }
