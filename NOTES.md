@@ -1,5 +1,4 @@
 # NEXT:
-- generate correct cubemap mips via FBO rendering
 - each vertex should have triangle and vertex normals (which means I need to calc all vertex normals)
     - I can then in the vert shader use a crease threshold (dot(triangleNormal,vertexNormal)) to select the normal
     to interpolate in the fragment shader. This would allow for nice smooth surfaces, with creases at edges
