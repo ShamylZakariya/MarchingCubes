@@ -8,6 +8,13 @@
             - add sphere to cube: The cube's normals override the sphere's
             - subtract cube from sphere: Same story, but normals inverted
 
+    STEPS:
+        1: Get rid of indexed storage, we're not using it
+        2: Make VertexStorage templated on vertex types; so we can have Vertex_P3F, Vertex_P3FC4FN3F, etc
+        3: Update IVolumeSampler implementations to report surface normal
+        4: Use that surface normal instead of the expensive fallback local-gradient sampler
+        5: Make marchingcubes use a new Vertex type with position, color, vertex-normal, & triangle-normal per vertex
+        6: Make shader perform a crease threshold test to determine which normal to use
 
 
 # TODO:
