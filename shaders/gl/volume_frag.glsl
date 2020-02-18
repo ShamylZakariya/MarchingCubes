@@ -25,11 +25,10 @@ void main()
     vec3 R = reflect(I, normalize(fs_in.worldNormal));
 
     vec3 reflectionColor = texture(uReflectionMapSampler, R).rgb;
-    reflectionColor = mix(vec3(0), reflectionColor, uShininess);
 
     vec3 lightProbeColor = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
 
-    vec3 color = (fs_in.color.rgb * uAmbientLight) + lightProbeColor + reflectionColor;
+    vec3 color = (fs_in.color.rgb * uAmbientLight) + mix(lightProbeColor, reflectionColor, uShininess);
 
     fragColor = vec4(color, fs_in.color.a);
 }

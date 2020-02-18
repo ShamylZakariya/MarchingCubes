@@ -138,6 +138,12 @@ public:
         }
     }
 
+    void setShininess(float s) {
+        _shininess = clamp<float>(s, 0, 1);
+    }
+
+    float shininess() const { return _shininess; }
+
     void bind(const mat4& mvp, const mat4& model, const vec3& cameraPosition)
     {
         glActiveTexture(GL_TEXTURE0);
@@ -402,7 +408,7 @@ private:
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
         auto reflectionTex = BlurCubemap(skyboxTexture, radians<float>(5), 512);
-        auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(20), 64);
+        auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(60), 16);
 
         _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, std::move(reflectionTex), volumeShininess);
         _lineMaterial = std::make_unique<LineMaterial>();
@@ -627,6 +633,11 @@ private:
 
         if (ImGui::Checkbox("Smooth Normals", &_smoothNormals)) {
             _needsMarchVolume = true;
+        }
+
+        float shininess = _volumeMaterial->shininess();
+        if (ImGui::SliderFloat("Shininess", &shininess, 0, 1)) {
+            _volumeMaterial->setShininess(shininess);
         }
 
         ImGui::Separator();
