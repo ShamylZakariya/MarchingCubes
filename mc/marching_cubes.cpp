@@ -19,10 +19,10 @@ constexpr float IsoLevel = 0.5F;
 void march(iAABB region,
     IsoSurfaceValueFunction valueSampler,
     IsoSurfaceNormalFunction normalSampler,
-    ITriangleConsumer& tc,
+    TriangleConsumer<Vertex>& tc,
     const util::unowned_ptr<glm::mat4> transform)
 {
-    Triangle triangles[5];
+    Triangle<Vertex> triangles[5];
     detail::GridCell cell;
 
     for (int z = region.min.z; z < region.max.z; z++) {

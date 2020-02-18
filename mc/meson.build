@@ -1,6 +1,5 @@
 mc_lib_sources = [
     'marching_cubes.cpp',
-    'triangle_soup.cpp',
     'volume.cpp',
     'util/color.cpp',
     'util/io.cpp',

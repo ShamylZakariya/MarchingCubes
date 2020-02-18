@@ -80,7 +80,7 @@ void OctreeVolume::dispatchMarch(
     }
 }
 
-void OctreeVolume::marchNode(OctreeVolume::Node* node, ITriangleConsumer& tc, util::unowned_ptr<glm::mat4> transform, bool computeNormals)
+void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<util::Vertex>& tc, util::unowned_ptr<glm::mat4> transform, bool computeNormals)
 {
     auto fuzziness = this->_fuzziness;
     auto valueSampler = [fuzziness, node](const vec3& p) {

@@ -177,7 +177,7 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
         vec3 { 0.0f, -1.0f, 0.0f }
     };
 
-    mc::TriangleConsumer fullscreenQuad;
+    mc::TriangleConsumer<mc::util::Vertex> fullscreenQuad;
     {
         using mc::util::Vertex;
         fullscreenQuad.start();

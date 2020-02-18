@@ -210,12 +210,12 @@ private:
     std::unique_ptr<VolumeMaterial> _volumeMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    std::vector<unique_ptr<mc::ITriangleConsumer>> _triangleConsumers;
+    std::vector<unique_ptr<mc::TriangleConsumer<mc::util::Vertex>>> _triangleConsumers;
     mc::util::LineSegmentBuffer _octreeAABBLineSegmentStorage;
     mc::util::LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
     mc::util::LineSegmentBuffer _axes;
     mc::util::LineSegmentBuffer _debugLines;
-    mc::TriangleConsumer _skydomeQuad;
+    mc::TriangleConsumer<mc::util::Vertex> _skydomeQuad;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -473,9 +473,9 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
 
-        std::vector<unowned_ptr<mc::ITriangleConsumer>> unownedTriangleConsumers;
+        std::vector<unowned_ptr<mc::TriangleConsumer<mc::util::Vertex>>> unownedTriangleConsumers;
         for (auto i = 0u; i < nThreads; i++) {
-            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer>());
+            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer<mc::util::Vertex>>());
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 

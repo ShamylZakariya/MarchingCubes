@@ -63,7 +63,7 @@ namespace util {
     private:
         bool _dirty = false;
         std::vector<Vertex> _vertices;
-        VertexStorage _gpuStorage { GL_LINES };
+        VertexStorage<Vertex> _gpuStorage { GL_LINES };
     };
 
     class LineStripBuffer {
@@ -103,7 +103,7 @@ namespace util {
     private:
         bool _dirty = false;
         std::vector<Vertex> _vertices;
-        VertexStorage _gpuStorage { GL_LINE_STRIP };
+        VertexStorage<Vertex> _gpuStorage { GL_LINE_STRIP };
     };
 
 }
