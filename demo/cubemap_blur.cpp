@@ -67,7 +67,7 @@ std::unique_ptr<mc::util::TextureHandle> CreateGaussianKernel(int size)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    return std::make_unique<mc::util::TextureHandle>(textureId, GL_TEXTURE_2D);
+    return std::make_unique<mc::util::TextureHandle>(textureId, GL_TEXTURE_2D, size, size);
 }
 
 struct BlurMaterial {
@@ -219,5 +219,5 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
     glDeleteFramebuffers(1, &framebuffer);
     glEnable(GL_DEPTH_TEST);
 
-    return std::make_unique<mc::util::TextureHandle>(destCubemapTexId, GL_TEXTURE_CUBE_MAP);
+    return std::make_unique<mc::util::TextureHandle>(destCubemapTexId, GL_TEXTURE_CUBE_MAP, size, size);
 }

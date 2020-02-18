@@ -37,7 +37,7 @@ namespace util {
         glGenerateMipmap(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_2D);
+        return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_2D, texWidth, texHeight);
     }
 
     TextureHandleRef LoadTextureCube(const std::array<std::string, 6>& faces)
@@ -64,10 +64,12 @@ namespace util {
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        // note, sampling mipmap lods requires glEnable(GL_TEXTURE_CUBEMAP_SEAMLESS)
         glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-        return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_CUBE_MAP);
+        return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_CUBE_MAP, width, height);
     }
 
     TextureHandleRef LoadTextureCube(const std::string& folder, const std::string& ext)

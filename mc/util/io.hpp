@@ -10,6 +10,7 @@
 #define mc_io_h
 
 #include <array>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <string>
@@ -28,12 +29,18 @@ namespace util {
     private:
         GLuint _id;
         GLenum _target;
+        int _width;
+        int _height;
+        int _mipLevels;
 
     public:
-        TextureHandle(GLuint id, GLenum target)
+        TextureHandle(GLuint id, GLenum target, int width, int height)
             : _id(id)
             , _target(target)
+            , _width(width)
+            , _height(height)
         {
+            _mipLevels = static_cast<int>(std::log2(std::min(_width, _height)));
         }
 
         ~TextureHandle()
@@ -43,6 +50,9 @@ namespace util {
 
         GLuint id() const { return _id; }
         GLenum target() const { return _target; }
+        int width() const { return _width; }
+        int height() const { return _height; }
+        int mipLevels() const { return _mipLevels; }
     };
 
     typedef std::shared_ptr<TextureHandle> TextureHandleRef;

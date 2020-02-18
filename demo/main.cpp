@@ -103,6 +103,7 @@ private:
     GLint _uLightprobeSampler = -1;
     GLint _uAmbientLight;
     GLint _uReflectionMapSampler = -1;
+    GLint _uReflectionMapMipLevels = -1;
     GLint _uShininess = -1;
 
     mc::util::TextureHandleRef _lightprobe;
@@ -125,6 +126,7 @@ public:
         _uLightprobeSampler = glGetUniformLocation(_program, "uLightprobeSampler");
         _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
         _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
+        _uReflectionMapMipLevels = glGetUniformLocation(_program, "uReflectionMapMipLevels");
         _uShininess = glGetUniformLocation(_program, "uShininess");
     }
 
@@ -159,6 +161,7 @@ public:
         glUniform1i(_uLightprobeSampler, 0);
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
         glUniform1i(_uReflectionMapSampler, 1);
+        glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
         glUniform1f(_uShininess, _shininess);
     }
 };
@@ -407,10 +410,9 @@ private:
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
-        auto reflectionTex = BlurCubemap(skyboxTexture, radians<float>(5), 512);
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(60), 16);
 
-        _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, std::move(reflectionTex), volumeShininess);
+        _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, volumeShininess);
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
 
@@ -424,6 +426,7 @@ private:
         glEnable(GL_CULL_FACE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS); // required for cubemap miplevels
 
         //
         // force a single call to onResize so we can set up viewport, aspect ratio, etc

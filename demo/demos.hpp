@@ -289,7 +289,7 @@ const static std::vector<DemoEntry> DemoRegistry = {
     DemoEntry("Sphere", []() { return std::make_unique<SphereDemo>(); }),
     DemoEntry("BoundedPlane", []() { return std::make_unique<BoundedPlaneDemo>(); }),
     DemoEntry("Halfspace", []() { return std::make_unique<HalfspaceDemo>(); }),
-    DemoEntry("CompountShapes", []() { return std::make_unique<CompoundShapesDemo>(); }),
+    DemoEntry("CompoundShapes", []() { return std::make_unique<CompoundShapesDemo>(); }),
 };
 
 #endif

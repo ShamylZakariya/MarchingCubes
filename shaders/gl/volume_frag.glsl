@@ -13,6 +13,7 @@ uniform vec3 uCameraPosition;
 uniform samplerCube uLightprobeSampler;
 uniform vec3 uAmbientLight;
 uniform samplerCube uReflectionMapSampler;
+uniform float uReflectionMapMipLevels;
 uniform float uShininess;
 
 out vec4 fragColor;
@@ -24,7 +25,8 @@ void main()
     vec3 I = normalize(fs_in.worldPosition - uCameraPosition);
     vec3 R = reflect(I, normalize(fs_in.worldNormal));
 
-    vec3 reflectionColor = texture(uReflectionMapSampler, R).rgb;
+    float mipLevel = mix(uReflectionMapMipLevels, 0, uShininess);
+    vec3 reflectionColor = textureLod(uReflectionMapSampler, R, mipLevel).rgb;
 
     vec3 lightProbeColor = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
 
