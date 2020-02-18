@@ -17,37 +17,58 @@ namespace mc {
 namespace util {
 
     //
-    // Vertex
+    // Vertex storage
     //
 
-    void Vertex::bindVertexAttributes()
+    void VertexP3C4::bindVertexAttributes()
     {
         glVertexAttribPointer(
-            static_cast<GLuint>(Vertex::AttributeLayout::Pos),
+            static_cast<GLuint>(AttributeLayout::Pos),
             3,
             GL_FLOAT,
             GL_FALSE,
-            sizeof(Vertex),
-            (const GLvoid*)offsetof(Vertex, pos));
-        glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Pos));
+            sizeof(VertexP3C4),
+            (const GLvoid*)offsetof(VertexP3C4, pos));
+        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Pos));
 
         glVertexAttribPointer(
-            static_cast<GLuint>(Vertex::AttributeLayout::Color),
+            static_cast<GLuint>(AttributeLayout::Color),
             4,
             GL_FLOAT,
             GL_FALSE,
-            sizeof(Vertex),
-            (const GLvoid*)offsetof(Vertex, color));
-        glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Color));
+            sizeof(VertexP3C4),
+            (const GLvoid*)offsetof(VertexP3C4, color));
+        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Color));
+    }
 
+    void VertexP3C4N3::bindVertexAttributes()
+    {
         glVertexAttribPointer(
-            static_cast<GLuint>(Vertex::AttributeLayout::Normal),
+            static_cast<GLuint>(AttributeLayout::Pos),
             3,
             GL_FLOAT,
             GL_FALSE,
-            sizeof(Vertex),
-            (const GLvoid*)offsetof(Vertex, normal));
-        glEnableVertexAttribArray(static_cast<GLuint>(Vertex::AttributeLayout::Normal));
+            sizeof(VertexP3C4N3),
+            (const GLvoid*)offsetof(VertexP3C4N3, pos));
+        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Pos));
+
+        glVertexAttribPointer(
+            static_cast<GLuint>(AttributeLayout::Color),
+            4,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(VertexP3C4N3),
+            (const GLvoid*)offsetof(VertexP3C4N3, color));
+        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Color));
+
+        glVertexAttribPointer(
+            static_cast<GLuint>(VertexP3C4N3::AttributeLayout::Normal),
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(VertexP3C4N3),
+            (const GLvoid*)offsetof(VertexP3C4N3, normal));
+        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Normal));
     }
 
 }

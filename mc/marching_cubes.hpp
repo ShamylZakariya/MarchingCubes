@@ -35,7 +35,7 @@ typedef std::function<glm::vec3(const glm::vec3& p)> IsoSurfaceNormalFunction;
 void march(util::iAABB region,
     IsoSurfaceValueFunction valueSampler,
     IsoSurfaceNormalFunction normalSampler,
-    TriangleConsumer<util::Vertex>& triangleConsumer,
+    TriangleConsumer<util::VertexP3C4N3>& triangleConsumer,
     util::unowned_ptr<glm::mat4> transform);
 
 }

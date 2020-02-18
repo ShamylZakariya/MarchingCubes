@@ -55,6 +55,8 @@ private:
     size_t _numTriangles = 0;
 
 public:
+    using vertex_type = VertexType;
+
     TriangleConsumer() = default;
     virtual ~TriangleConsumer() = default;
 

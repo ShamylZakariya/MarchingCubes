@@ -388,7 +388,7 @@ constexpr int triTable[256][16] = {
     of totally below the isolevel.
 */
 
-int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction normalSampler, Triangle<util::Vertex>* triangles)
+int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction normalSampler, Triangle<util::VertexP3C4N3>* triangles)
 {
     /*
         Determine the index into the edge table which

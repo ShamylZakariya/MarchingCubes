@@ -163,7 +163,7 @@ public:
 
 public:
     OctreeVolume(int size, float fuzziness, int minNodeSize,
-        const std::vector<util::unowned_ptr<TriangleConsumer<util::Vertex>>>& triangleConsumers)
+        const std::vector<util::unowned_ptr<TriangleConsumer<util::VertexP3C4N3>>>& triangleConsumers)
         : BaseCompositeVolume(glm::ivec3 { size, size, size }, fuzziness)
         , _bounds(util::AABB(glm::ivec3(0, 0, 0), glm::ivec3(size, size, size)))
         , _root(buildOctreeNode(_bounds, minNodeSize, 0, 0))
@@ -233,7 +233,7 @@ protected:
         bool computeNormals,
         std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
 
-    void marchNode(OctreeVolume::Node* node, TriangleConsumer<util::Vertex>& tc, util::unowned_ptr<glm::mat4> transform, bool computeNormals);
+    void marchNode(OctreeVolume::Node* node, TriangleConsumer<util::VertexP3C4N3>& tc, util::unowned_ptr<glm::mat4> transform, bool computeNormals);
 
     /**
      * Mark the nodes which should be marched.
@@ -362,7 +362,7 @@ private:
     std::unique_ptr<Node> _root;
     std::vector<Node*> _nodesToMarch;
     std::unique_ptr<util::ThreadPool> _marchThreads;
-    std::vector<util::unowned_ptr<TriangleConsumer<util::Vertex>>> _triangleConsumers;
+    std::vector<util::unowned_ptr<TriangleConsumer<util::VertexP3C4N3>>> _triangleConsumers;
 };
 
 } // namespace mc

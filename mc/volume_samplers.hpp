@@ -436,26 +436,28 @@ public:
 
     void addTo(util::LineSegmentBuffer& lineBuffer, const glm::vec4& color) const
     {
-        using util::Vertex;
         auto corners = this->corners();
 
         // trace bottom
-        lineBuffer.add(Vertex { corners[0], color }, Vertex { corners[1], color });
-        lineBuffer.add(Vertex { corners[1], color }, Vertex { corners[2], color });
-        lineBuffer.add(Vertex { corners[2], color }, Vertex { corners[3], color });
-        lineBuffer.add(Vertex { corners[3], color }, Vertex { corners[0], color });
+        {
+            using V = util::LineSegmentBuffer::vertex_type;
+            lineBuffer.add(V { corners[0], color }, V { corners[1], color });
+            lineBuffer.add(V { corners[1], color }, V { corners[2], color });
+            lineBuffer.add(V { corners[2], color }, V { corners[3], color });
+            lineBuffer.add(V { corners[3], color }, V { corners[0], color });
 
-        // trace top
-        lineBuffer.add(Vertex { corners[4], color }, Vertex { corners[5], color });
-        lineBuffer.add(Vertex { corners[5], color }, Vertex { corners[6], color });
-        lineBuffer.add(Vertex { corners[6], color }, Vertex { corners[7], color });
-        lineBuffer.add(Vertex { corners[7], color }, Vertex { corners[4], color });
+            // trace top
+            lineBuffer.add(V { corners[4], color }, V { corners[5], color });
+            lineBuffer.add(V { corners[5], color }, V { corners[6], color });
+            lineBuffer.add(V { corners[6], color }, V { corners[7], color });
+            lineBuffer.add(V { corners[7], color }, V { corners[4], color });
 
-        // add bars connecting bottom to top
-        lineBuffer.add(Vertex { corners[0], color }, Vertex { corners[4], color });
-        lineBuffer.add(Vertex { corners[1], color }, Vertex { corners[5], color });
-        lineBuffer.add(Vertex { corners[2], color }, Vertex { corners[6], color });
-        lineBuffer.add(Vertex { corners[3], color }, Vertex { corners[7], color });
+            // add bars connecting bottom to top
+            lineBuffer.add(V { corners[0], color }, V { corners[4], color });
+            lineBuffer.add(V { corners[1], color }, V { corners[5], color });
+            lineBuffer.add(V { corners[2], color }, V { corners[6], color });
+            lineBuffer.add(V { corners[3], color }, V { corners[7], color });
+        }
     }
 
 private:

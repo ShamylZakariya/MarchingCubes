@@ -170,7 +170,6 @@ struct LineMaterial {
 private:
     GLuint _program = 0;
     GLint _uMVP = -1;
-    GLint _uModel = -1;
 
 public:
     LineMaterial()
@@ -178,7 +177,6 @@ public:
         using namespace mc::util;
         _program = CreateProgramFromFiles("shaders/gl/line_vert.glsl", "shaders/gl/line_frag.glsl");
         _uMVP = glGetUniformLocation(_program, "uMVP");
-        _uModel = glGetUniformLocation(_program, "uModel");
     }
     LineMaterial(const LineMaterial& other) = delete;
     LineMaterial(const LineMaterial&& other) = delete;
@@ -189,11 +187,10 @@ public:
             glDeleteProgram(_program);
         }
     }
-    void bind(const mat4& mvp, const mat4& model)
+    void bind(const mat4& mvp)
     {
         glUseProgram(_program);
         glUniformMatrix4fv(_uMVP, 1, GL_FALSE, value_ptr(mvp));
-        glUniformMatrix4fv(_uModel, 1, GL_FALSE, value_ptr(model));
     }
 };
 
@@ -210,12 +207,12 @@ private:
     std::unique_ptr<VolumeMaterial> _volumeMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    std::vector<unique_ptr<mc::TriangleConsumer<mc::util::Vertex>>> _triangleConsumers;
+    std::vector<unique_ptr<mc::TriangleConsumer<mc::util::VertexP3C4N3>>> _triangleConsumers;
     mc::util::LineSegmentBuffer _octreeAABBLineSegmentStorage;
     mc::util::LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
     mc::util::LineSegmentBuffer _axes;
     mc::util::LineSegmentBuffer _debugLines;
-    mc::TriangleConsumer<mc::util::Vertex> _skydomeQuad;
+    mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -441,22 +438,27 @@ private:
         // Build static geometry (axes, skybox quad, etc)
         //
 
-        _axes.clear();
-        using mc::util::Vertex;
-        _axes.add(Vertex { vec3(0, 0, 0), vec4(1, 0, 0, 1) }, Vertex { vec3(10, 0, 0), vec4(1, 0, 0, 1) });
-        _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 1, 0, 1) }, Vertex { vec3(0, 10, 0), vec4(0, 1, 0, 1) });
-        _axes.add(Vertex { vec3(0, 0, 0), vec4(0, 0, 1, 1) }, Vertex { vec3(0, 0, 10), vec4(0, 0, 1, 1) });
+        {
+            using V = decltype(_axes)::vertex_type;
+            _axes.clear();
+            _axes.add(V { vec3(0, 0, 0), vec4(1, 0, 0, 1) }, V { vec3(10, 0, 0), vec4(1, 0, 0, 1) });
+            _axes.add(V { vec3(0, 0, 0), vec4(0, 1, 0, 1) }, V { vec3(0, 10, 0), vec4(0, 1, 0, 1) });
+            _axes.add(V { vec3(0, 0, 0), vec4(0, 0, 1, 1) }, V { vec3(0, 0, 10), vec4(0, 0, 1, 1) });
+        }
 
-        _skydomeQuad.start();
-        _skydomeQuad.addTriangle(mc::Triangle {
-            Vertex { vec3(-1, -1, 1), vec4(1, 0, 0, 1), vec3(0, 0, -1) },
-            Vertex { vec3(+1, -1, 1), vec4(0, 1, 0, 1), vec3(0, 0, -1) },
-            Vertex { vec3(+1, +1, 1), vec4(0, 0, 1, 1), vec3(0, 0, -1) } });
-        _skydomeQuad.addTriangle(mc::Triangle {
-            Vertex { vec3(-1, -1, 1), vec4(0, 1, 1, 1), vec3(0, 0, -1) },
-            Vertex { vec3(+1, +1, 1), vec4(1, 0, 1, 1), vec3(0, 0, -1) },
-            Vertex { vec3(-1, +1, 1), vec4(1, 1, 0, 1), vec3(0, 0, -1) } });
-        _skydomeQuad.finish();
+        {
+            using V = decltype(_skydomeQuad)::vertex_type;
+            _skydomeQuad.start();
+            _skydomeQuad.addTriangle(mc::Triangle {
+                V { vec3(-1, -1, 1), vec4(1, 0, 0, 1) },
+                V { vec3(+1, -1, 1), vec4(0, 1, 0, 1) },
+                V { vec3(+1, +1, 1), vec4(0, 0, 1, 1) } });
+            _skydomeQuad.addTriangle(mc::Triangle {
+                V { vec3(-1, -1, 1), vec4(0, 1, 1, 1) },
+                V { vec3(+1, +1, 1), vec4(1, 0, 1, 1) },
+                V { vec3(-1, +1, 1), vec4(1, 1, 0, 1) } });
+            _skydomeQuad.finish();
+        }
 
         //
         // copy demo names to local storage so we can feed imgui::combo
@@ -473,9 +475,9 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
 
-        std::vector<unowned_ptr<mc::TriangleConsumer<mc::util::Vertex>>> unownedTriangleConsumers;
+        std::vector<unowned_ptr<mc::TriangleConsumer<mc::util::VertexP3C4N3>>> unownedTriangleConsumers;
         for (auto i = 0u; i < nThreads; i++) {
-            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer<mc::util::Vertex>>());
+            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer<mc::util::VertexP3C4N3>>());
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
@@ -583,7 +585,7 @@ private:
 
         // draw lines
         glDepthMask(GL_FALSE);
-        _lineMaterial->bind(mvp, _model);
+        _lineMaterial->bind(mvp);
 
         _axes.draw();
 

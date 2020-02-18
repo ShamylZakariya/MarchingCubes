@@ -9,6 +9,8 @@ namespace util {
 
     class LineSegmentBuffer {
     public:
+        using vertex_type = VertexP3C4;
+
         LineSegmentBuffer() = default;
         LineSegmentBuffer(const LineSegmentBuffer&) = delete;
         LineSegmentBuffer(const LineSegmentBuffer&&) = delete;
@@ -20,7 +22,7 @@ namespace util {
             _dirty = true;
         }
 
-        void add(const Vertex& a, const Vertex& b)
+        void add(const vertex_type& a, const vertex_type& b)
         {
             _vertices.push_back(a);
             _vertices.push_back(b);
@@ -33,22 +35,22 @@ namespace util {
             auto corners = bounds.corners();
 
             // trace bottom
-            add(Vertex { corners[0], color }, Vertex { corners[1], color });
-            add(Vertex { corners[1], color }, Vertex { corners[2], color });
-            add(Vertex { corners[2], color }, Vertex { corners[3], color });
-            add(Vertex { corners[3], color }, Vertex { corners[0], color });
+            add(vertex_type { corners[0], color }, vertex_type { corners[1], color });
+            add(vertex_type { corners[1], color }, vertex_type { corners[2], color });
+            add(vertex_type { corners[2], color }, vertex_type { corners[3], color });
+            add(vertex_type { corners[3], color }, vertex_type { corners[0], color });
 
             // trace top
-            add(Vertex { corners[4], color }, Vertex { corners[5], color });
-            add(Vertex { corners[5], color }, Vertex { corners[6], color });
-            add(Vertex { corners[6], color }, Vertex { corners[7], color });
-            add(Vertex { corners[7], color }, Vertex { corners[4], color });
+            add(vertex_type { corners[4], color }, vertex_type { corners[5], color });
+            add(vertex_type { corners[5], color }, vertex_type { corners[6], color });
+            add(vertex_type { corners[6], color }, vertex_type { corners[7], color });
+            add(vertex_type { corners[7], color }, vertex_type { corners[4], color });
 
             // add bars connecting bottom to top
-            add(Vertex { corners[0], color }, Vertex { corners[4], color });
-            add(Vertex { corners[1], color }, Vertex { corners[5], color });
-            add(Vertex { corners[2], color }, Vertex { corners[6], color });
-            add(Vertex { corners[3], color }, Vertex { corners[7], color });
+            add(vertex_type { corners[0], color }, vertex_type { corners[4], color });
+            add(vertex_type { corners[1], color }, vertex_type { corners[5], color });
+            add(vertex_type { corners[2], color }, vertex_type { corners[6], color });
+            add(vertex_type { corners[3], color }, vertex_type { corners[7], color });
         }
 
         void draw()
@@ -62,12 +64,14 @@ namespace util {
 
     private:
         bool _dirty = false;
-        std::vector<Vertex> _vertices;
-        VertexStorage<Vertex> _gpuStorage { GL_LINES };
+        std::vector<vertex_type> _vertices;
+        VertexStorage<vertex_type> _gpuStorage { GL_LINES };
     };
 
     class LineStripBuffer {
     public:
+        using vertex_type = VertexP3C4;
+
         LineStripBuffer() = default;
         LineStripBuffer(const LineStripBuffer&) = delete;
         LineStripBuffer(const LineStripBuffer&&) = delete;
@@ -79,7 +83,7 @@ namespace util {
             _dirty = true;
         }
 
-        void add(const Vertex& a)
+        void add(const vertex_type& a)
         {
             _vertices.push_back(a);
             _dirty = true;
@@ -102,8 +106,8 @@ namespace util {
 
     private:
         bool _dirty = false;
-        std::vector<Vertex> _vertices;
-        VertexStorage<Vertex> _gpuStorage { GL_LINE_STRIP };
+        std::vector<vertex_type> _vertices;
+        VertexStorage<vertex_type> _gpuStorage { GL_LINE_STRIP };
     };
 
 }

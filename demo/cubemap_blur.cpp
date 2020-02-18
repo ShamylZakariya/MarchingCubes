@@ -177,18 +177,19 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
         vec3 { 0.0f, -1.0f, 0.0f }
     };
 
-    mc::TriangleConsumer<mc::util::Vertex> fullscreenQuad;
+
+    mc::TriangleConsumer<mc::util::VertexP3C4> fullscreenQuad;
     {
-        using mc::util::Vertex;
+        using V = decltype(fullscreenQuad)::vertex_type;
         fullscreenQuad.start();
         fullscreenQuad.addTriangle(mc::Triangle {
-            Vertex { vec3(-1, -1, 1), vec4(1, 1, 1, 1), vec3(0, 0, -1) },
-            Vertex { vec3(+1, -1, 1), vec4(1, 1, 1, 1), vec3(0, 0, -1) },
-            Vertex { vec3(+1, +1, 1), vec4(1, 1, 1, 1), vec3(0, 0, -1) } });
+            V { vec3(-1, -1, 1), vec4(1, 1, 1, 1) },
+            V { vec3(+1, -1, 1), vec4(1, 1, 1, 1) },
+            V { vec3(+1, +1, 1), vec4(1, 1, 1, 1) } });
         fullscreenQuad.addTriangle(mc::Triangle {
-            Vertex { vec3(-1, -1, 1), vec4(1, 1, 1, 1), vec3(0, 0, -1) },
-            Vertex { vec3(+1, +1, 1), vec4(1, 1, 1, 1), vec3(0, 0, -1) },
-            Vertex { vec3(-1, +1, 1), vec4(1, 1, 1, 1), vec3(0, 0, -1) } });
+            V { vec3(-1, -1, 1), vec4(1, 1, 1, 1) },
+            V { vec3(+1, +1, 1), vec4(1, 1, 1, 1) },
+            V { vec3(-1, +1, 1), vec4(1, 1, 1, 1) } });
         fullscreenQuad.finish();
     }
 
