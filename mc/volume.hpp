@@ -71,6 +71,13 @@ public:
      */
     virtual float valueAt(const glm::vec3& p, float fuzziness) const = 0;
 
+    /*
+    Return the normal of the gradient of the volume at
+    a particular point in space; the magnitude of the
+    normal goes to 0 as the distanbce of point p from the isosurface
+    */
+    virtual glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const = 0;
+
 private:
     Mode _mode;
 };

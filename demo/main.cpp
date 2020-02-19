@@ -224,7 +224,7 @@ private:
     unique_ptr<mc::OctreeVolume> _volume;
     std::vector<const char*> _demoNames;
     unique_ptr<Demo> _currentDemo;
-    int _currentDemoIdx = 4;
+    int _currentDemoIdx = 0;
 
     // app state
     enum class AABBDisplay : int {
@@ -407,7 +407,7 @@ private:
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
-        auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(60), 16);
+        auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
         _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, volumeShininess);
         _lineMaterial = std::make_unique<LineMaterial>();

@@ -96,22 +96,24 @@ void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<util::Ve
         return value;
     };
 
-    if (computeNormals) {
-        auto normalSampler = [&valueSampler](const vec3& p) {
-            // from GPUGems 3 Chap 1 -- compute normal of voxel space
-            const float d = 0.05f;
-            vec3 grad(
-                valueSampler(p + vec3(d, 0, 0)) - valueSampler(p + vec3(-d, 0, 0)),
-                valueSampler(p + vec3(0, d, 0)) - valueSampler(p + vec3(0, -d, 0)),
-                valueSampler(p + vec3(0, 0, d)) - valueSampler(p + vec3(0, 0, -d)));
+    auto normalSampler = [fuzziness, node](const vec3& p) {
+        vec3 normal { 0 };
 
-            return -normalize(grad);
-        };
+        for (auto additiveSampler : node->_additiveSamplersVec) {
+            normal += additiveSampler->normalAt(p, fuzziness);
+        }
 
-        mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform);
-    } else {
-        mc::march(util::iAABB(node->bounds), valueSampler, nullptr, tc, transform);
-    }
+        normal = normalize(normal);
+
+        for (auto subtractiveSampler : node->_subtractiveSamplersVec) {
+            normal -= subtractiveSampler->normalAt(p, fuzziness);
+        }
+
+        normal = normalize(normal);
+        return normal;
+    };
+
+    mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform);
 }
 
 } // namespace mc
