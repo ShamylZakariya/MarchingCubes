@@ -104,11 +104,13 @@ private:
     GLint _uReflectionMapSampler = -1;
     GLint _uReflectionMapMipLevels = -1;
     GLint _uShininess = -1;
+    GLint _uDotCreaseThreshold = -1;
 
     mc::util::TextureHandleRef _lightprobe;
     vec3 _ambientLight;
     mc::util::TextureHandleRef _reflectionMap;
     float _shininess;
+    float _creaseThresholdRadians;
 
 public:
     VolumeMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
@@ -116,6 +118,7 @@ public:
         , _ambientLight(ambientLight)
         , _reflectionMap(reflectionMap)
         , _shininess(clamp(shininess, 0.0F, 1.0F))
+        , _creaseThresholdRadians(radians<float>(15))
     {
         using namespace mc::util;
         _program = CreateProgramFromFiles("shaders/gl/volume_vert.glsl", "shaders/gl/volume_frag.glsl");
@@ -127,6 +130,7 @@ public:
         _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
         _uReflectionMapMipLevels = glGetUniformLocation(_program, "uReflectionMapMipLevels");
         _uShininess = glGetUniformLocation(_program, "uShininess");
+        _uDotCreaseThreshold = glGetUniformLocation(_program, "uDotCreaseThreshold");
     }
 
     VolumeMaterial(const VolumeMaterial& other) = delete;
@@ -145,6 +149,12 @@ public:
 
     float shininess() const { return _shininess; }
 
+    void setCreaseThreshold(float thresholdRadians) {
+        _creaseThresholdRadians = std::max<float>(thresholdRadians, 0);
+    }
+
+    float creaseThreshold() const { return _creaseThresholdRadians; }
+
     void bind(const mat4& mvp, const mat4& model, const vec3& cameraPosition)
     {
         glActiveTexture(GL_TEXTURE0);
@@ -162,6 +172,7 @@ public:
         glUniform1i(_uReflectionMapSampler, 1);
         glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
         glUniform1f(_uShininess, _shininess);
+        glUniform1f(_uDotCreaseThreshold, cos(_creaseThresholdRadians));
     }
 };
 
@@ -233,7 +244,6 @@ private:
     };
 
     bool _animate = false;
-    bool _smoothNormals = false;
     float _animationTime = 0;
     bool _running = true;
     bool _useOrthoProjection = false;
@@ -635,13 +645,14 @@ private:
             _needsMarchVolume = true;
         }
 
-        if (ImGui::Checkbox("Smooth Normals", &_smoothNormals)) {
-            _needsMarchVolume = true;
-        }
-
         float shininess = _volumeMaterial->shininess();
         if (ImGui::SliderFloat("Shininess", &shininess, 0, 1)) {
             _volumeMaterial->setShininess(shininess);
+        }
+
+        float creaseThreshold = glm::degrees(_volumeMaterial->creaseThreshold());
+        if (ImGui::SliderFloat("Crease Threshold", &creaseThreshold, 0, 90)) {
+            _volumeMaterial->setCreaseThreshold(glm::radians(creaseThreshold));
         }
 
         ImGui::Separator();
@@ -709,7 +720,7 @@ private:
         _marchStats.reset(_volume->depth());
         _octreeOccupiedAABBsLineSegmentStorage.clear();
 
-        _volume->march(_smoothNormals, [this](mc::OctreeVolume::Node* node) {
+        _volume->march([this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;

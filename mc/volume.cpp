@@ -16,7 +16,6 @@ namespace mc {
 
 void OctreeVolume::dispatchMarch(
     util::unowned_ptr<glm::mat4> transform,
-    bool computeNormals,
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
     if (!_marchThreads) {
@@ -54,7 +53,7 @@ void OctreeVolume::dispatchMarch(
 
     std::mutex popMutex;
     for (std::size_t i = 0, N = _marchThreads->size(); i < N; i++) {
-        _marchThreads->enqueue([&popMutex, this, i, N, &transform, computeNormals]() {
+        _marchThreads->enqueue([&popMutex, this, i, N, &transform]() {
             while (true) {
                 Node* node = nullptr;
                 {
@@ -67,7 +66,7 @@ void OctreeVolume::dispatchMarch(
                     _nodesToMarch.pop_back();
                 }
 
-                marchNode(node, *_triangleConsumers[i % N], transform, computeNormals);
+                marchNode(node, *_triangleConsumers[i % N], transform);
             }
         });
     }
@@ -79,7 +78,7 @@ void OctreeVolume::dispatchMarch(
     }
 }
 
-void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, util::unowned_ptr<glm::mat4> transform, bool computeNormals)
+void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, util::unowned_ptr<glm::mat4> transform)
 {
     auto fuzziness = this->_fuzziness;
     auto valueSampler = [fuzziness, node](const vec3& p) {

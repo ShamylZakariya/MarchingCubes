@@ -39,13 +39,23 @@ void Vertex::bindVertexAttributes()
     glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Color));
 
     glVertexAttribPointer(
-        static_cast<GLuint>(Vertex::AttributeLayout::Normal),
+        static_cast<GLuint>(Vertex::AttributeLayout::VertexNormal),
         3,
         GL_FLOAT,
         GL_FALSE,
         sizeof(Vertex),
-        (const GLvoid*)offsetof(Vertex, normal));
-    glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Normal));
+        (const GLvoid*)offsetof(Vertex, vertexNormal));
+    glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::VertexNormal));
+
+    glVertexAttribPointer(
+        static_cast<GLuint>(Vertex::AttributeLayout::TriangleNormal),
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(Vertex),
+        (const GLvoid*)offsetof(Vertex, triangleNormal));
+    glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::TriangleNormal));
+
 }
 
 void march(iAABB region,

@@ -3,7 +3,6 @@
 in VS_OUT
 {
     vec4 color;
-    vec3 normal;
     vec3 worldNormal;
     vec3 worldPosition;
 }

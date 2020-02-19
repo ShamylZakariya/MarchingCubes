@@ -25,17 +25,22 @@ typedef std::function<glm::vec3(const glm::vec3& p)> IsoSurfaceNormalFunction;
 struct Vertex {
     glm::vec3 pos;
     glm::vec4 color { 1 };
-    glm::vec3 normal { 0, 1, 0 };
+    glm::vec3 vertexNormal { 0, 1, 0 };
+    glm::vec3 triangleNormal { 0, 1, 0 };
 
     enum class AttributeLayout : GLuint {
         Pos = 0,
         Color = 1,
-        Normal = 2
+        VertexNormal = 2,
+        TriangleNormal = 3
     };
 
     bool operator==(const Vertex& other) const
     {
-        return pos == other.pos && color == other.color && normal == other.normal;
+        return pos == other.pos
+            && color == other.color
+            && vertexNormal == other.vertexNormal
+            && triangleNormal == other.triangleNormal;
     }
 
     static void bindVertexAttributes();

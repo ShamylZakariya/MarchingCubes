@@ -20,6 +20,10 @@
 namespace mc {
 namespace util {
 
+    /**
+     * Simple vertex type with a 3-component position and 4 component color
+     * used by LineSegmentBuffer and skydome rendering
+     */
     struct VertexP3C4 {
         glm::vec3 pos;
         glm::vec4 color { 1 };
