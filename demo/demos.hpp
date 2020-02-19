@@ -23,7 +23,7 @@ public:
     virtual ~Demo() = default;
 
     virtual void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) = 0;
-    virtual void step(float time) = 0;
+    virtual void step(float time) {}
     virtual void drawDebugLines(mc::util::LineSegmentBuffer&) {}
 };
 
@@ -43,7 +43,7 @@ public:
     void step(float time) override
     {
         float angle = static_cast<float>(M_PI * time * 0.1);
-        _rect->setRotation(rotate(mat4 { 1 }, angle, vec3(0, 0, 1)));
+        _rect->setRotation(rotate(mat4 { 1 }, angle, normalize(vec3(0, 1, 1))));
     }
 
     void drawDebugLines(mc::util::LineSegmentBuffer& debugLinebuf) override
@@ -143,6 +143,7 @@ private:
     mc::util::unowned_ptr<mc::HalfspaceVolumeSampler> _plane;
     mat3 _rotation { 1 };
 };
+
 
 class CompoundShapesDemo : public Demo {
 public:
@@ -277,6 +278,86 @@ private:
     mc::util::unowned_ptr<mc::HalfspaceVolumeSampler> _bottomPlane;
 };
 
+class SubtractiveCubeDemo : public Demo {
+public:
+    SubtractiveCubeDemo() = default;
+
+    void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        auto center = size / 2.0F;
+
+        volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+
+        _cube = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            center + vec3(0,-5,0), vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Subtractive));
+    }
+
+    void step(float time) override
+    {
+        auto angle = static_cast<float>(pi<float>() * -time * 0.2F);
+        auto rot = rotate(mat4 { 1 }, angle, normalize(vec3(1, 1, 0)));
+        _cube->setRotation(mat3(rot));
+    }
+
+private:
+
+    mc::util::unowned_ptr<mc::RectangularPrismVolumeSampler> _cube;
+};
+
+
+class SubtractiveHalfspaceDemo : public Demo {
+public:
+    SubtractiveHalfspaceDemo() = default;
+
+    void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        auto center = size / 2.0F;
+
+        volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+
+        _plane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
+            center, planeNormal(mat4 { 1 }), mc::IVolumeSampler::Mode::Subtractive));
+    }
+
+    void step(float time) override
+    {
+        auto angle = static_cast<float>(pi<float>() * -time * 0.2F);
+        auto rot = rotate(mat4 { 1 }, angle, normalize(vec3(1, 1, 0)));
+        _plane->setPlaneNormal(planeNormal(rot));
+    }
+
+private:
+    static vec3 planeNormal(const glm::mat4& rot)
+    {
+        return vec3(rot[0][1], rot[1][1], rot[2][1]);
+    }
+
+    mc::util::unowned_ptr<mc::HalfspaceVolumeSampler> _plane;
+    mat3 _rotation { 1 };
+};
+
+class SubtractiveSphereDemo : public Demo {
+public:
+    SubtractiveSphereDemo() = default;
+
+    void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
+    {
+        auto size = vec3(volume->size());
+        auto center = size / 2.0F;
+
+        volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+
+        volume->add(std::make_unique<mc::SphereVolumeSampler>(
+            center + vec3(0,-10,0), 10, mc::IVolumeSampler::Mode::Subtractive));
+    }
+};
+
+
 //
 //  Demo Registry
 //
@@ -285,6 +366,9 @@ typedef std::function<std::unique_ptr<Demo>()> DemoFactory;
 typedef std::pair<const char*, DemoFactory> DemoEntry;
 
 const static std::vector<DemoEntry> DemoRegistry = {
+    DemoEntry("SubtractiveCube", []() { return std::make_unique<SubtractiveCubeDemo>(); }),
+    DemoEntry("SubtractiveHalfspace", []() { return std::make_unique<SubtractiveHalfspaceDemo>(); }),
+    DemoEntry("SubtractiveSphere", []() { return std::make_unique<SubtractiveSphereDemo>(); }),
     DemoEntry("Cube", []() { return std::make_unique<CubeDemo>(); }),
     DemoEntry("Sphere", []() { return std::make_unique<SphereDemo>(); }),
     DemoEntry("BoundedPlane", []() { return std::make_unique<BoundedPlaneDemo>(); }),

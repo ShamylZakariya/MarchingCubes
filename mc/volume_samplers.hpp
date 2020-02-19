@@ -243,13 +243,20 @@ public:
     glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const override
     {
         float signedDist = dot(_normal, p - _origin);
-        if (signedDist < -fuzziness) {
-            return glm::vec3 { 0 };
-        } else if (signedDist > fuzziness) {
-            return glm::vec3 { 0 };
+
+        // if (signedDist > 0) {
+        //     return glm::vec3{0};
+        // } else {
+        //     return _normal;
+        // }
+
+        if (signedDist >= 0) {
+            return glm::vec3{0};
+        } else if (signedDist < -fuzziness) {
+            return _normal;
         } else {
-            float scale = 1.0F - (abs(signedDist) / fuzziness);
-            return scale * _normal;
+            // signedDist (-fuzziness -> 0)
+            return _normal * (-signedDist / fuzziness);
         }
     }
 

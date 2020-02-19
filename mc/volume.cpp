@@ -95,20 +95,29 @@ void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>&
     };
 
     auto normalSampler = [fuzziness, node](const vec3& p) {
-        vec3 normal { 0 };
-
-        for (auto additiveSampler : node->_additiveSamplersVec) {
-            normal += additiveSampler->normalAt(p, fuzziness);
-        }
-
-        normal = normalize(normal);
-
+        constexpr float thresh2 = 0.01F * 0.01F;
+        bool haveSubtractiveNormals = false;
+        vec3 subtractiveNormal{0};
         for (auto subtractiveSampler : node->_subtractiveSamplersVec) {
-            normal -= subtractiveSampler->normalAt(p, fuzziness);
+            auto sn = subtractiveSampler->normalAt(p, fuzziness);
+            if (length2(sn) >= thresh2) {
+                subtractiveNormal -= sn;
+                haveSubtractiveNormals = true;
+            }
         }
 
-        normal = normalize(normal);
-        return normal;
+        if (haveSubtractiveNormals) {
+            subtractiveNormal = normalize(subtractiveNormal);
+            return subtractiveNormal;
+        }
+
+        vec3 additiveNormal { 0 };
+        for (auto additiveSampler : node->_additiveSamplersVec) {
+            additiveNormal += additiveSampler->normalAt(p, fuzziness);
+        }
+        additiveNormal = normalize(additiveNormal);
+
+        return additiveNormal;
     };
 
     mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform);

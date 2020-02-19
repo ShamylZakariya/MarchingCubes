@@ -244,7 +244,7 @@ private:
     };
 
     bool _animate = false;
-    float _animationTime = 0;
+    float _animationTime = 1.4F;
     bool _running = true;
     bool _useOrthoProjection = false;
     AABBDisplay _aabbDisplay = AABBDisplay::None;

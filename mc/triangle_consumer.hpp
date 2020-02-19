@@ -6,8 +6,8 @@
 //  Copyright © 2019 Shamyl Zakariya. All rights reserved.
 //
 
-#ifndef triangle_soup_hpp
-#define triangle_soup_hpp
+#ifndef triangle_consumer_hpp
+#define triangle_consumer_hpp
 
 #include "util/util.hpp"
 

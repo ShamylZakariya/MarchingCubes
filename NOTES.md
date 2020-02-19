@@ -1,5 +1,6 @@
 # NEXT:
-
+    - my crease threshold isn't quite right - I should see smooth transition from flat joins to the crease, but I see instead fully flat triangles
+    - normalSampler kind of works, but has errors in CompoundShapeDemo when dealing with the subtractiveplane
 
 # TODO:
 - should AABBs be immutable data objects? If I do this I can make them cache their corners, which could be a speedup
