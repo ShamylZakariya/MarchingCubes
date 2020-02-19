@@ -477,12 +477,12 @@ public:
             auto negZAmt = 1 - min<float>(-negZ / fuzziness, 1);
 
             return normalize(
-                mix(glm::vec3 { 0 }, _posX, posXAmt)
-                + mix(glm::vec3 { 0 }, -_posX, negXAmt)
-                + mix(glm::vec3 { 0 }, _posY, posYAmt)
-                + mix(glm::vec3 { 0 }, -_posY, negYAmt)
-                + mix(glm::vec3 { 0 }, _posZ, posZAmt)
-                + mix(glm::vec3 { 0 }, -_posZ, negZAmt));
+                (_posX * posXAmt)
+                + (-_posX * negXAmt)
+                + (_posY * posYAmt)
+                + (-_posY * negYAmt)
+                + (_posZ * posZAmt)
+                + (-_posZ * negZAmt));
         }
         return glm::vec3 { 0 };
     }

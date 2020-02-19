@@ -14,15 +14,47 @@ using namespace mc::util;
 
 namespace mc {
 
-constexpr float IsoLevel = 0.5F;
+namespace {
+    constexpr float IsoLevel = 0.5F;
+}
+
+void Vertex::bindVertexAttributes()
+{
+    glVertexAttribPointer(
+        static_cast<GLuint>(AttributeLayout::Pos),
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(Vertex),
+        (const GLvoid*)offsetof(Vertex, pos));
+    glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Pos));
+
+    glVertexAttribPointer(
+        static_cast<GLuint>(AttributeLayout::Color),
+        4,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(Vertex),
+        (const GLvoid*)offsetof(Vertex, color));
+    glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Color));
+
+    glVertexAttribPointer(
+        static_cast<GLuint>(Vertex::AttributeLayout::Normal),
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(Vertex),
+        (const GLvoid*)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Normal));
+}
 
 void march(iAABB region,
     IsoSurfaceValueFunction valueSampler,
     IsoSurfaceNormalFunction normalSampler,
-    TriangleConsumer<VertexP3C4N3>& tc,
+    TriangleConsumer<Vertex>& tc,
     const util::unowned_ptr<glm::mat4> transform)
 {
-    Triangle<VertexP3C4N3> triangles[5];
+    Triangle<Vertex> triangles[5];
     detail::GridCell cell;
 
     for (int z = region.min.z; z < region.max.z; z++) {

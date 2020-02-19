@@ -23,7 +23,6 @@
 #include <imgui/imgui_impl_opengl3.h>
 
 #include <mc/marching_cubes.hpp>
-#include <mc/triangle_soup.hpp>
 #include <mc/util/util.hpp>
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
@@ -207,7 +206,7 @@ private:
     std::unique_ptr<VolumeMaterial> _volumeMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    std::vector<unique_ptr<mc::TriangleConsumer<mc::util::VertexP3C4N3>>> _triangleConsumers;
+    std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangleConsumers;
     mc::util::LineSegmentBuffer _octreeAABBLineSegmentStorage;
     mc::util::LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
     mc::util::LineSegmentBuffer _axes;
@@ -475,9 +474,9 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
 
-        std::vector<unowned_ptr<mc::TriangleConsumer<mc::util::VertexP3C4N3>>> unownedTriangleConsumers;
+        std::vector<unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
         for (auto i = 0u; i < nThreads; i++) {
-            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer<mc::util::VertexP3C4N3>>());
+            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer<mc::Vertex>>());
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 

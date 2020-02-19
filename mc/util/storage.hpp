@@ -37,25 +37,6 @@ namespace util {
         static void bindVertexAttributes();
     };
 
-    struct VertexP3C4N3 {
-        glm::vec3 pos;
-        glm::vec4 color { 1 };
-        glm::vec3 normal { 0, 1, 0 };
-
-        enum class AttributeLayout : GLuint {
-            Pos = 0,
-            Color = 1,
-            Normal = 2
-        };
-
-        bool operator==(const VertexP3C4N3& other) const
-        {
-            return pos == other.pos && color == other.color && normal == other.normal;
-        }
-
-        static void bindVertexAttributes();
-    };
-
     /**
      * GPU storage templated on vertex type. Expects vertex to have static method
      * static void VertexType::bindVertexAttributes(); which sets/enables the right

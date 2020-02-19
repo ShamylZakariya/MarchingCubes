@@ -388,7 +388,7 @@ constexpr int triTable[256][16] = {
     of totally below the isolevel.
 */
 
-int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction normalSampler, Triangle<util::VertexP3C4N3>* triangles)
+int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction normalSampler, Triangle<Vertex>* triangles)
 {
     /*
         Determine the index into the edge table which
@@ -551,7 +551,14 @@ bool GetGridCell(int x, int y, int z, IsoSurfaceValueFunction valueFunction, Gri
     cell.val[6] = valueFunction(cell.v[6]);
     cell.val[7] = valueFunction(cell.v[7]);
 
-    cell.occupied = (cell.val[0] > 0 || cell.val[1] > 0 || cell.val[2] > 0 || cell.val[3] > 0 || cell.val[4] > 0 || cell.val[5] > 0 || cell.val[6] > 0 || cell.val[7] > 0);
+    cell.occupied = (cell.val[0] > 0
+        || cell.val[1] > 0
+        || cell.val[2] > 0
+        || cell.val[3] > 0
+        || cell.val[4] > 0
+        || cell.val[5] > 0
+        || cell.val[6] > 0
+        || cell.val[7] > 0);
 
     if (cell.occupied) {
         // now compute the location of vertices in world space

@@ -41,35 +41,5 @@ namespace util {
         glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Color));
     }
 
-    void VertexP3C4N3::bindVertexAttributes()
-    {
-        glVertexAttribPointer(
-            static_cast<GLuint>(AttributeLayout::Pos),
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            sizeof(VertexP3C4N3),
-            (const GLvoid*)offsetof(VertexP3C4N3, pos));
-        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Pos));
-
-        glVertexAttribPointer(
-            static_cast<GLuint>(AttributeLayout::Color),
-            4,
-            GL_FLOAT,
-            GL_FALSE,
-            sizeof(VertexP3C4N3),
-            (const GLvoid*)offsetof(VertexP3C4N3, color));
-        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Color));
-
-        glVertexAttribPointer(
-            static_cast<GLuint>(VertexP3C4N3::AttributeLayout::Normal),
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            sizeof(VertexP3C4N3),
-            (const GLvoid*)offsetof(VertexP3C4N3, normal));
-        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Normal));
-    }
-
 }
 } // namespace mc::util

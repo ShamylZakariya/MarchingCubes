@@ -7,7 +7,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/norm.hpp>
 
-#include <mc/triangle_soup.hpp>
+#include <mc/triangle_consumer.hpp>
 
 #include "cubemap_blur.hpp"
 
