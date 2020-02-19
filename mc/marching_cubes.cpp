@@ -55,7 +55,6 @@ void Vertex::bindVertexAttributes()
         sizeof(Vertex),
         (const GLvoid*)offsetof(Vertex, triangleNormal));
     glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::TriangleNormal));
-
 }
 
 void march(iAABB region,

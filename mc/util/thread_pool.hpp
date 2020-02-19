@@ -26,7 +26,6 @@ namespace util {
 
     class ThreadPool {
     public:
-
         /**
          * Work function definition. Receives the stable index of the thread
          * executing the job. This will be a value from [0, size())

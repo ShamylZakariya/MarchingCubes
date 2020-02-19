@@ -95,12 +95,12 @@ namespace util {
 #endif
     }
 
-    void CheckGlError(const std::string &ctx) {
+    void CheckGlError(const std::string& ctx)
+    {
 #ifndef NDEBUG
         CheckGlError(ctx.c_str());
 #endif
     }
-
 
     GLuint CreateShader(GLenum shader_type, const char* src, const char* filename)
     {

@@ -83,7 +83,7 @@ namespace util {
     Checks for GL error, throwing if there is one
     */
     void CheckGlError(const char* ctx);
-    void CheckGlError(const std::string &ctx);
+    void CheckGlError(const std::string& ctx);
 
     /**
     Creates a shader of specified type from provided source
