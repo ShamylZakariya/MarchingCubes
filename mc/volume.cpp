@@ -53,7 +53,7 @@ void OctreeVolume::dispatchMarch(
 
     std::mutex popMutex;
     for (std::size_t i = 0, N = _marchThreads->size(); i < N; i++) {
-        _marchThreads->enqueue([&popMutex, this, i, N, &transform]() {
+        _marchThreads->enqueue([&popMutex, this, N, &transform](int threadIdx) {
             while (true) {
                 Node* node = nullptr;
                 {
@@ -66,7 +66,7 @@ void OctreeVolume::dispatchMarch(
                     _nodesToMarch.pop_back();
                 }
 
-                marchNode(node, *_triangleConsumers[i % N], transform);
+                marchNode(node, *_triangleConsumers[threadIdx % N], transform);
             }
         });
     }

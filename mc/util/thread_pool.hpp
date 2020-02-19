@@ -26,11 +26,19 @@ namespace util {
 
     class ThreadPool {
     public:
+
+        /**
+         * Work function definition. Receives the stable index of the thread
+         * executing the job. This will be a value from [0, size())
+         */
+        typedef std::function<void(int)> WorkFn;
+
+    public:
         ThreadPool(unsigned int n = std::thread::hardware_concurrency(), bool pinThreads = true)
         {
             for (unsigned int i = 0; i < n; ++i)
                 _workers.emplace_back([this, i, pinThreads]() {
-                    threadLoop(pinThreads ? i % std::thread::hardware_concurrency() : -1);
+                    threadLoop(i, pinThreads ? i % std::thread::hardware_concurrency() : -1);
                 });
         }
 
@@ -64,7 +72,7 @@ namespace util {
         auto size() const { return _workers.size(); }
 
     private:
-        void threadLoop(int pinnedCpuIdx)
+        void threadLoop(int threadIdx, int pinnedCpuIdx)
         {
             if (pinnedCpuIdx >= 0) {
 #ifndef __APPLE__
@@ -107,7 +115,7 @@ namespace util {
                     latch.unlock();
 
                     // run function outside context
-                    fn();
+                    fn(threadIdx);
 
                     latch.lock();
                     --_busy;
@@ -120,7 +128,7 @@ namespace util {
 
     private:
         std::vector<std::thread> _workers;
-        std::deque<std::function<void()>> _tasks;
+        std::deque<std::function<void(int)>> _tasks;
         std::mutex _queueMutex;
         std::condition_variable _cvTask;
         std::condition_variable _cvFinished;
