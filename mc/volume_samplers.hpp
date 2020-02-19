@@ -448,7 +448,7 @@ public:
     glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const override
     {
         using glm::dot;
-        using glm::max;
+        using glm::min;
         using glm::mix;
         fuzziness += 1e-5F;
 
@@ -469,12 +469,12 @@ public:
         const auto negZ = -posZDistance - _halfExtents.z;
 
         if (posX <= 0 && negX <= 0 && posY <= 0 && negY <= 0 && posZ <= 0 && negZ <= 0) {
-            auto posXAmt = 1 - max<float>(-posX / fuzziness, 1);
-            auto negXAmt = 1 - max<float>(-negX / fuzziness, 1);
-            auto posYAmt = 1 - max<float>(-posY / fuzziness, 1);
-            auto negYAmt = 1 - max<float>(-negY / fuzziness, 1);
-            auto posZAmt = 1 - max<float>(-posZ / fuzziness, 1);
-            auto negZAmt = 1 - max<float>(-negZ / fuzziness, 1);
+            auto posXAmt = 1 - min<float>(-posX / fuzziness, 1);
+            auto negXAmt = 1 - min<float>(-negX / fuzziness, 1);
+            auto posYAmt = 1 - min<float>(-posY / fuzziness, 1);
+            auto negYAmt = 1 - min<float>(-negY / fuzziness, 1);
+            auto posZAmt = 1 - min<float>(-posZ / fuzziness, 1);
+            auto negZAmt = 1 - min<float>(-negZ / fuzziness, 1);
 
             return normalize(
                 mix(glm::vec3 { 0 }, _posX, posXAmt)
