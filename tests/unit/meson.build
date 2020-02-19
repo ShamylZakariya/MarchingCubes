@@ -1,6 +1,6 @@
 unit_test_sources = [
-    ['TestSamplers', 'test_samplers.cpp'],
-    ['TestOctree', 'test_octree.cpp'],
+    ['test_samplers', 'test_samplers.cpp'],
+    ['test_octree', 'test_octree.cpp'],
 ]
 
 # build an exe per test source

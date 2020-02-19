@@ -32,7 +32,7 @@ include_dirs = [
 
 # build the mc_lib marching cubes library
 subdir('mc')
-subdir('demo')
+subdir('demos')
 
 ## build/register unit tests
 subdir('tests')
