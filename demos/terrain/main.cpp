@@ -11,6 +11,7 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -48,7 +49,6 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
 
-
 struct VolumeSegment {
 public:
     explicit VolumeSegment(int numThreadsToUse)
@@ -67,7 +67,8 @@ public:
     VolumeSegment(VolumeSegment&&) = delete;
     VolumeSegment& operator==(const VolumeSegment&) = delete;
 
-    int march() {
+    int march()
+    {
         occupiedAABBs.clear();
 
         volume->march([this](mc::OctreeVolume::Node* node) {
@@ -92,7 +93,6 @@ public:
     mc::util::LineSegmentBuffer occupiedAABBs;
 
 private:
-
     std::vector<vec4> _nodeColors;
 
     vec4 nodeColor(int atDepth)
@@ -120,7 +120,6 @@ private:
 
 class App {
 private:
-
     // app state
     GLFWwindow* _window;
     mc::util::FpsCalculator _fpsCalculator;
@@ -137,11 +136,37 @@ private:
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
+    std::set<int> _pressedkeyScancodes;
     vec2 _lastMousePosition { -1 };
 
-    // camera state
-    mat3 _cameraRotation { 1 };
-    vec3 _cameraPosition { 0, 0, -10 };
+    struct _CameraState {
+        float pitch = 0;
+        float yaw = 0;
+        vec3 position = vec3 { 0, 0, -100 };
+
+        mat4 view() const
+        {
+            vec3 dir = vec3 { 0, 0, 1 };
+            vec3 up = vec3 { 0, 1, 0 };
+            mat3 rot = rotation();
+
+            dir = rot * dir;
+            up = rot * up;
+            return lookAt(position, position + dir, up);
+        }
+
+        mat3 rotation() const
+        {
+            return rotate(rotate(mat4 { 1 }, yaw, vec3 { 0, 1, 0 }), pitch, vec3 { 1, 0, 0 });
+        }
+
+        void moveBy(vec3 deltaLocal)
+        {
+            vec3 deltaWorld = rotation() * deltaLocal;
+            position += deltaWorld;
+        }
+
+    } _cameraState;
 
 public:
     App()
@@ -228,9 +253,11 @@ private:
             auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
             switch (action) {
             case GLFW_PRESS:
+                app->_pressedkeyScancodes.insert(scancode);
                 app->onKeyPress(key, scancode, mods);
                 break;
             case GLFW_RELEASE:
+                app->_pressedkeyScancodes.erase(scancode);
                 app->onKeyRelease(key, scancode, mods);
                 break;
             }
@@ -350,7 +377,7 @@ private:
         //  Build terrain
         //
 
-        for (int i = 0; i < _volumeSegments.size(); i++) {
+        for (size_t i = 0; i < _volumeSegments.size(); i++) {
             buildTerrain(i);
         }
 
@@ -365,34 +392,9 @@ private:
 
     void onKeyPress(int key, int scancode, int mods)
     {
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE) || scancode == glfwGetKeyScancode(GLFW_KEY_Q)) {
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
             _running = false;
         }
-
-        // WASD
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_A)) {
-            moveCamera(vec3(-1,0,0));
-        }
-
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_D)) {
-            moveCamera(vec3(+1,0,0));
-        }
-
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_W)) {
-            moveCamera(vec3(0,0,-1));
-        }
-
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_S)) {
-            moveCamera(vec3(0,0,+1));
-        }
-
-        // if (scancode == glfwGetKeyScancode(GLFW_KEY_Q)) {
-        //     moveCamera(vec3(0,-1,0));
-        // }
-
-        // if (scancode == glfwGetKeyScancode(GLFW_KEY_E)) {
-        //     moveCamera(vec3(0,+1,0));
-        // }
     }
 
     void onKeyRelease(int key, int scancode, int mods)
@@ -404,9 +406,8 @@ private:
         if (_mouseButtonState[0]) {
             // simple x/y trackball
             float trackballSpeed = 0.004 * M_PI;
-            mat3 xRot = rotate(mat4(1), -1 * delta.y * trackballSpeed, vec3(1, 0, 0));
-            mat3 yRot = rotate(mat4(1), 1 * delta.x * trackballSpeed, vec3(0, 1, 0));
-            _cameraRotation = _cameraRotation * xRot * yRot;
+            _cameraState.pitch += delta.y * trackballSpeed;
+            _cameraState.yaw += -delta.x * trackballSpeed;
         }
     }
 
@@ -430,6 +431,31 @@ private:
 
     void step(float now, float deltaT)
     {
+        // WASD
+        const float movementSpeed = 20 * deltaT;
+        if (isKeyDown(GLFW_KEY_A)) {
+            _cameraState.moveBy(movementSpeed * vec3(+1, 0, 0));
+        }
+
+        if (isKeyDown(GLFW_KEY_D)) {
+            _cameraState.moveBy(movementSpeed * vec3(-1, 0, 0));
+        }
+
+        if (isKeyDown(GLFW_KEY_W)) {
+            _cameraState.moveBy(movementSpeed * vec3(0, 0, +1));
+        }
+
+        if (isKeyDown(GLFW_KEY_S)) {
+            _cameraState.moveBy(movementSpeed * vec3(0, 0, -1));
+        }
+
+        if (isKeyDown(GLFW_KEY_Q)) {
+            _cameraState.moveBy(movementSpeed * vec3(0, -1, 0));
+        }
+
+        if (isKeyDown(GLFW_KEY_E)) {
+            _cameraState.moveBy(movementSpeed * vec3(0, +1, 0));
+        }
     }
 
     void drawFrame()
@@ -437,15 +463,15 @@ private:
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        mat4 view = inverse(translate(mat4{1}, _cameraPosition) * mat4{_cameraRotation});
+        mat4 view = _cameraState.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
         // draw volumes
         glDepthMask(GL_TRUE);
         float segmentZ = 0;
         for (const auto& segment : _volumeSegments) {
-            mat4 model = translate(mat4{1}, vec3(0,0,segmentZ));
-            _volumeMaterial->bind(model, view, projection, _cameraPosition);
+            mat4 model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
+            _volumeMaterial->bind(model, view, projection, _cameraState.position);
             for (auto& tc : segment->triangles) {
                 tc->draw();
             }
@@ -463,7 +489,7 @@ private:
         segmentZ = 0;
         for (const auto& segment : _volumeSegments) {
             // TODO: Store model in segment
-            mat4 model = translate(mat4{1}, vec3(0,0,segmentZ));
+            mat4 model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
             _lineMaterial->bind(projection * view * model);
             segment->occupiedAABBs.draw();
             segmentZ += segment->volume->size().z;
@@ -487,28 +513,27 @@ private:
         std::cout << "Building segment " << which << std::endl;
 
         // for now make a box
-        const auto &segment = _volumeSegments[which];
-        const auto size = vec3{segment->volume->size()};
+        const auto& segment = _volumeSegments[which];
+        const auto size = vec3 { segment->volume->size() };
         const auto center = size / 2.0F;
         segment->volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
             vec3(center.x, 10, center.z),
-            vec3(size.x/2, 19, size.y/2),
-            mat3{1},
-            mc::IVolumeSampler::Mode::Additive
-        ));
+            vec3(size.x / 2, 19, size.y / 2),
+            mat3 { 1 },
+            mc::IVolumeSampler::Mode::Additive));
     }
 
     void marchSegments()
     {
         _triangleCount = 0;
-        for (const auto &s : _volumeSegments) {
+        for (const auto& s : _volumeSegments) {
             _triangleCount += s->march();
         }
     }
 
-    void moveCamera(vec3 deltaInLook) {
-        vec3 deltaWorld = _cameraRotation * deltaInLook;
-        _cameraPosition += deltaWorld;
+    bool isKeyDown(int scancode) const
+    {
+        return _pressedkeyScancodes.find(glfwGetKeyScancode(scancode)) != _pressedkeyScancodes.end();
     }
 };
 
