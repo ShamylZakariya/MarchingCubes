@@ -11,6 +11,6 @@ terrain_app_sources = [
 
 executable('terrain',
     sources: terrain_app_sources,
-    include_directories: ['../../include','../../', '../common'],
+    include_directories: ['../../include','../../'],
     link_with: mc_lib,
     dependencies: dependencies)

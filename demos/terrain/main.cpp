@@ -27,7 +27,8 @@
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
 
-#include "cubemap_blur.hpp"
+#include "../common/cubemap_blur.hpp"
+#include "materials.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -47,162 +48,72 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
 
-//
-// Materials
-//
 
-struct SkydomeMaterial {
-private:
-    GLuint _program = 0;
-    GLint _uProjectionInverse = -1;
-    GLint _uModelViewInverse = -1;
-    GLint _uSkyboxSampler = -1;
-    mc::util::TextureHandleRef _skyboxTex;
-
+struct VolumeSegment {
 public:
-    SkydomeMaterial(mc::util::TextureHandleRef skybox)
-        : _skyboxTex(skybox)
+    explicit VolumeSegment(int numThreadsToUse)
     {
-        using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/skydome_vert.glsl", "shaders/gl/skydome_frag.glsl");
-        _uProjectionInverse = glGetUniformLocation(_program, "uProjectionInverse");
-        _uModelViewInverse = glGetUniformLocation(_program, "uModelViewInverse");
-        _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
-    }
-
-    SkydomeMaterial(const SkydomeMaterial& other) = delete;
-    SkydomeMaterial(const SkydomeMaterial&& other) = delete;
-
-    ~SkydomeMaterial()
-    {
-        if (_program > 0) {
-            glDeleteProgram(_program);
+        std::vector<unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
+        for (auto i = 0; i < numThreadsToUse; i++) {
+            triangles.push_back(make_unique<mc::TriangleConsumer<mc::Vertex>>());
+            unownedTriangleConsumers.push_back(triangles.back().get());
         }
+
+        volume = make_unique<mc::OctreeVolume>(128, 0.5F, 4, unownedTriangleConsumers);
     }
 
-    void bind(const mat4& projection, const mat4& modelview)
-    {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _skyboxTex->id());
+    ~VolumeSegment() = default;
+    VolumeSegment(const VolumeSegment&) = delete;
+    VolumeSegment(VolumeSegment&&) = delete;
+    VolumeSegment& operator==(const VolumeSegment&) = delete;
 
-        glUseProgram(_program);
-        glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, value_ptr(inverse(projection)));
-        glUniformMatrix4fv(_uModelViewInverse, 1, GL_FALSE, value_ptr(inverse(modelview)));
-        glUniform1i(_uSkyboxSampler, 0);
+    int march() {
+        occupiedAABBs.clear();
+
+        volume->march([this](mc::OctreeVolume::Node* node) {
+            {
+                // update the occupied aabb display
+                auto bounds = node->bounds;
+                bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
+                occupiedAABBs.add(bounds, nodeColor(node->depth));
+            }
+        });
+
+        int triangleCount = 0;
+        for (const auto& tc : triangles) {
+            triangleCount += tc->numTriangles();
+        }
+
+        return triangleCount;
     }
-};
 
-struct VolumeMaterial {
+    unique_ptr<mc::OctreeVolume> volume;
+    std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
+    mc::util::LineSegmentBuffer occupiedAABBs;
+
 private:
-    GLuint _program = 0;
-    GLint _uMVP = -1;
-    GLint _uModel = -1;
-    GLint _uCameraPos = -1;
-    GLint _uLightprobeSampler = -1;
-    GLint _uAmbientLight;
-    GLint _uReflectionMapSampler = -1;
-    GLint _uReflectionMapMipLevels = -1;
-    GLint _uShininess = -1;
-    GLint _uDotCreaseThreshold = -1;
 
-    mc::util::TextureHandleRef _lightprobe;
-    vec3 _ambientLight;
-    mc::util::TextureHandleRef _reflectionMap;
-    float _shininess;
-    float _creaseThresholdRadians;
+    std::vector<vec4> _nodeColors;
 
-public:
-    VolumeMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
-        : _lightprobe(lightProbe)
-        , _ambientLight(ambientLight)
-        , _reflectionMap(reflectionMap)
-        , _shininess(clamp(shininess, 0.0F, 1.0F))
-        , _creaseThresholdRadians(radians<float>(15))
+    vec4 nodeColor(int atDepth)
     {
-        using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/volume_vert.glsl", "shaders/gl/volume_frag.glsl");
-        _uMVP = glGetUniformLocation(_program, "uMVP");
-        _uModel = glGetUniformLocation(_program, "uModel");
-        _uCameraPos = glGetUniformLocation(_program, "uCameraPosition");
-        _uLightprobeSampler = glGetUniformLocation(_program, "uLightprobeSampler");
-        _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
-        _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
-        _uReflectionMapMipLevels = glGetUniformLocation(_program, "uReflectionMapMipLevels");
-        _uShininess = glGetUniformLocation(_program, "uShininess");
-        _uDotCreaseThreshold = glGetUniformLocation(_program, "uDotCreaseThreshold");
-    }
+        using namespace mc::util::color;
 
-    VolumeMaterial(const VolumeMaterial& other) = delete;
-    VolumeMaterial(const VolumeMaterial&& other) = delete;
-
-    ~VolumeMaterial()
-    {
-        if (_program > 0) {
-            glDeleteProgram(_program);
+        auto depth = volume->depth();
+        if (_nodeColors.size() < depth) {
+            _nodeColors.clear();
+            const float hueStep = 360.0F / depth;
+            for (auto i = 0U; i <= depth; i++) {
+                const hsv hC { i * hueStep, 0.6F, 1.0F };
+                const auto rgbC = Hsv2Rgb(hC);
+                _nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, mix<float>(0.6, 0.25, static_cast<float>(i) / depth));
+            }
         }
+
+        return _nodeColors[atDepth];
     }
 
-    void setShininess(float s)
-    {
-        _shininess = clamp<float>(s, 0, 1);
-    }
 
-    float shininess() const { return _shininess; }
-
-    void setCreaseThreshold(float thresholdRadians)
-    {
-        _creaseThresholdRadians = std::max<float>(thresholdRadians, 0);
-    }
-
-    float creaseThreshold() const { return _creaseThresholdRadians; }
-
-    void bind(const mat4& mvp, const mat4& model, const vec3& cameraPosition)
-    {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _lightprobe->id());
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->id());
-
-        glUseProgram(_program);
-        glUniformMatrix4fv(_uMVP, 1, GL_FALSE, value_ptr(mvp));
-        glUniformMatrix4fv(_uModel, 1, GL_FALSE, value_ptr(model));
-        glUniform3fv(_uCameraPos, 1, value_ptr(cameraPosition));
-        glUniform1i(_uLightprobeSampler, 0);
-        glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
-        glUniform1i(_uReflectionMapSampler, 1);
-        glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
-        glUniform1f(_uShininess, _shininess);
-        glUniform1f(_uDotCreaseThreshold, cos(_creaseThresholdRadians));
-    }
-};
-
-struct LineMaterial {
-private:
-    GLuint _program = 0;
-    GLint _uMVP = -1;
-
-public:
-    LineMaterial()
-    {
-        using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/line_vert.glsl", "shaders/gl/line_frag.glsl");
-        _uMVP = glGetUniformLocation(_program, "uMVP");
-    }
-    LineMaterial(const LineMaterial& other) = delete;
-    LineMaterial(const LineMaterial&& other) = delete;
-
-    ~LineMaterial()
-    {
-        if (_program > 0) {
-            glDeleteProgram(_program);
-        }
-    }
-    void bind(const mat4& mvp)
-    {
-        glUseProgram(_program);
-        glUniformMatrix4fv(_uMVP, 1, GL_FALSE, value_ptr(mvp));
-    }
 };
 
 //
@@ -218,36 +129,17 @@ private:
     std::unique_ptr<VolumeMaterial> _volumeMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangleConsumers;
-    mc::util::LineSegmentBuffer _octreeOccupiedAABBsLineSegmentStorage;
+    std::vector<std::unique_ptr<VolumeSegment>> _volumeSegments;
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
-    mat4 _model { 1 };
     mat3 _trackballRotation { 1 };
     float _cameraDistance = 20;
-
-    // volume and samplers
-    unique_ptr<mc::OctreeVolume> _volume;
-
     bool _running = true;
-    struct _MarchStats {
-        int nodesMarched = 0;
-        std::vector<int> nodesMarchedByDepth;
-        int voxelsMarched = 0;
-        int triangleCount = 0;
-
-        void reset(int maxDepth)
-        {
-            nodesMarched = 0;
-            nodesMarchedByDepth = std::vector<int>(maxDepth, 0);
-            voxelsMarched = 0;
-            triangleCount = 0;
-        }
-    } _marchStats;
+    int _triangleCount = 0;
 
 public:
     App()
@@ -446,23 +338,21 @@ private:
         //
 
         auto nThreads = std::thread::hardware_concurrency();
-        std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
+        std::cout << "Using " << nThreads << " threads to march volumes" << std::endl;
 
-        std::vector<unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
-        for (auto i = 0u; i < nThreads; i++) {
-            _triangleConsumers.push_back(make_unique<mc::TriangleConsumer<mc::Vertex>>());
-            unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
+        for (int i = 0; i < 3; i++) {
+            _volumeSegments.emplace_back(std::make_unique<VolumeSegment>(nThreads));
         }
-
-        _volume = make_unique<mc::OctreeVolume>(128, 0.5F, 4, unownedTriangleConsumers);
-        _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
 
         //
         //  Build terrain
         //
 
-        buildTerrain(0);
-        marchVolume();
+        for (int i = 0; i < _volumeSegments.size(); i++) {
+            buildTerrain(i);
+        }
+
+        marchSegments();
     }
 
     void onResize(int width, int height)
@@ -509,7 +399,7 @@ private:
 
     void onMouseWheel(const vec2& scrollOffset)
     {
-        _cameraDistance -= 0.5F * scrollOffset.y;
+        _cameraDistance -= 10 * scrollOffset.y;
         _cameraDistance = std::max<float>(_cameraDistance, 1.0F);
     }
 
@@ -519,28 +409,46 @@ private:
 
     void drawFrame()
     {
-        vec3 cameraPosition;
-        mat4 model, view, projection;
-        auto mvp = MVP(cameraPosition, model, view, projection);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // draw marching cubes output
+        // extract trackball Z and Y for building view matrix via lookAt
+        auto trackballY = glm::vec3 { _trackballRotation[0][1], _trackballRotation[1][1], _trackballRotation[2][1] };
+        auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
+
+        vec3 target{0};
+        vec3 cameraPosition = target + (_cameraDistance * -trackballZ);
+        mat4 view = lookAt(cameraPosition, target, trackballY);
+        mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
+
+        // draw volumes
         glDepthMask(GL_TRUE);
-        _volumeMaterial->bind(mvp, _model, cameraPosition);
-        for (auto& tc : _triangleConsumers) {
-            tc->draw();
+        float segmentZ = 0;
+        for (const auto& segment : _volumeSegments) {
+            mat4 model = translate(mat4{1}, vec3(0,0,segmentZ));
+            _volumeMaterial->bind(model, view, projection, cameraPosition);
+            for (auto& tc : segment->triangles) {
+                tc->draw();
+            }
+
+            segmentZ += segment->volume->size().z;
         }
 
         // draw skydome (after volume, it's depth is 1 in clip space)
         glDepthMask(GL_FALSE);
-        _skydomeMaterial->bind(projection, (view * model));
+        _skydomeMaterial->bind(projection, view);
         _skydomeQuad.draw();
 
         // draw lines
         glDepthMask(GL_FALSE);
-        _lineMaterial->bind(mvp);
-        _octreeOccupiedAABBsLineSegmentStorage.draw();
+        segmentZ = 0;
+        for (const auto& segment : _volumeSegments) {
+            // TODO: Store model in segment
+            mat4 model = translate(mat4{1}, vec3(0,0,segmentZ));
+            _lineMaterial->bind(projection * view * model);
+            segment->occupiedAABBs.draw();
+            segmentZ += segment->volume->size().z;
+        }
 
         glDepthMask(GL_TRUE);
     }
@@ -550,7 +458,7 @@ private:
         ImGui::Begin("Demo window");
 
         ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
-        ImGui::LabelText("triangles", "%d", _marchStats.triangleCount);
+        ImGui::LabelText("triangles", "%d", _triangleCount);
 
         ImGui::Text("Reset Trackball Rotation");
         if (ImGui::Button("-X")) {
@@ -585,75 +493,25 @@ private:
     void buildTerrain(int which)
     {
         std::cout << "Building segment " << which << std::endl;
-        _volume->clear();
 
-        // it's a mystery
-
-        marchVolume();
+        // for now make a box
+        const auto &segment = _volumeSegments[which];
+        const auto size = vec3{segment->volume->size()};
+        const auto center = size / 2.0F;
+        segment->volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
+            vec3(center.x, 10, center.z),
+            vec3(size.x/2, 19, size.y/2),
+            mat3{1},
+            mc::IVolumeSampler::Mode::Additive
+        ));
     }
 
-    void aabbDisplayChanged()
+    void marchSegments()
     {
-        marchVolume();
-    }
-
-    void marchVolume()
-    {
-        _marchStats.reset(_volume->depth());
-        _octreeOccupiedAABBsLineSegmentStorage.clear();
-
-        _volume->march([this](mc::OctreeVolume::Node* node) {
-            {
-                // update the occupied aabb display
-                auto bounds = node->bounds;
-                bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
-                _octreeOccupiedAABBsLineSegmentStorage.add(bounds, nodeColor(node->depth));
-            }
-
-            // update march stats
-            _marchStats.nodesMarched++;
-            _marchStats.voxelsMarched += iAABB(node->bounds).volume();
-            _marchStats.nodesMarchedByDepth[node->depth]++;
-        });
-
-        for (const auto& tc : _triangleConsumers) {
-            _marchStats.triangleCount += tc->numTriangles();
+        _triangleCount = 0;
+        for (const auto &s : _volumeSegments) {
+            _triangleCount += s->march();
         }
-    }
-
-    const vec4 nodeColor(int atDepth) const
-    {
-        using namespace mc::util::color;
-        static std::vector<vec4> nodeColors;
-
-        auto depth = _volume->depth();
-        if (nodeColors.size() != depth) {
-            nodeColors.clear();
-            const float hueStep = 360.0F / depth;
-            for (auto i = 0U; i <= depth; i++) {
-                const hsv hC { i * hueStep, 0.6F, 1.0F };
-                const auto rgbC = Hsv2Rgb(hC);
-                nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, mix<float>(0.6, 0.25, static_cast<float>(i) / depth));
-            }
-        }
-
-        return nodeColors[atDepth];
-    }
-
-    mat4 MVP(vec3& cameraPosition, mat4& model, mat4& view, mat4& projection) const
-    {
-        model = _model;
-
-        // extract trackball Z and Y for building view matrix via lookAt
-        auto trackballY = glm::vec3 { _trackballRotation[0][1], _trackballRotation[1][1], _trackballRotation[2][1] };
-        auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
-
-        cameraPosition = -_cameraDistance * trackballZ;
-        view = lookAt(cameraPosition, vec3(0), trackballY);
-
-        projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
-
-        return projection * view * model;
     }
 };
 
