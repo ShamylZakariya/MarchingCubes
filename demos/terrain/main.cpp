@@ -91,6 +91,7 @@ public:
     unique_ptr<mc::OctreeVolume> volume;
     std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
     mc::util::LineSegmentBuffer occupiedAABBs;
+    mat4 model;
 
 private:
     std::vector<vec4> _nodeColors;
@@ -470,8 +471,8 @@ private:
         glDepthMask(GL_TRUE);
         float segmentZ = 0;
         for (const auto& segment : _volumeSegments) {
-            mat4 model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
-            _volumeMaterial->bind(model, view, projection, _cameraState.position);
+            segment->model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
+            _volumeMaterial->bind(segment->model, view, projection, _cameraState.position);
             for (auto& tc : segment->triangles) {
                 tc->draw();
             }
@@ -486,13 +487,9 @@ private:
 
         // draw lines
         glDepthMask(GL_FALSE);
-        segmentZ = 0;
         for (const auto& segment : _volumeSegments) {
-            // TODO: Store model in segment
-            mat4 model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
-            _lineMaterial->bind(projection * view * model);
+            _lineMaterial->bind(projection * view * segment->model);
             segment->occupiedAABBs.draw();
-            segmentZ += segment->volume->size().z;
         }
 
         glDepthMask(GL_TRUE);
