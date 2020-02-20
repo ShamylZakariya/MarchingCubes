@@ -72,6 +72,9 @@
         "locale": "cpp",
         "queue": "cpp",
         "stack": "cpp",
-        "cstdbool": "cpp"
+        "cstdbool": "cpp",
+        "complex": "cpp",
+        "list": "cpp",
+        "valarray": "cpp"
     }
 }

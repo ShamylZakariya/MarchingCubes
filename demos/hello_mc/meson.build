@@ -11,6 +11,6 @@ hello_app_sources = [
 
 executable('hello_mc',
     sources: hello_app_sources,
-    include_directories: ['../../include','../../', '../common'],
+    include_directories: ['../../include','../../'],
     link_with: mc_lib,
     dependencies: dependencies)

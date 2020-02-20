@@ -27,7 +27,7 @@
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
 
-#include "cubemap_blur.hpp"
+#include "../common/cubemap_blur.hpp"
 #include "demos.hpp"
 
 using namespace glm;
