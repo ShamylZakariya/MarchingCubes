@@ -112,8 +112,6 @@ private:
 
         return _nodeColors[atDepth];
     }
-
-
 };
 
 //
@@ -122,8 +120,12 @@ private:
 
 class App {
 private:
+
+    // app state
     GLFWwindow* _window;
     mc::util::FpsCalculator _fpsCalculator;
+    bool _running = true;
+    int _triangleCount = 0;
 
     // render state
     std::unique_ptr<VolumeMaterial> _volumeMaterial;
@@ -136,10 +138,10 @@ private:
     // input state
     bool _mouseButtonState[3] = { false, false, false };
     vec2 _lastMousePosition { -1 };
-    mat3 _trackballRotation { 1 };
-    float _cameraDistance = 20;
-    bool _running = true;
-    int _triangleCount = 0;
+
+    // camera state
+    mat3 _cameraRotation { 1 };
+    vec3 _cameraPosition { 0, 0, -10 };
 
 public:
     App()
@@ -366,6 +368,31 @@ private:
         if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE) || scancode == glfwGetKeyScancode(GLFW_KEY_Q)) {
             _running = false;
         }
+
+        // WASD
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_A)) {
+            moveCamera(vec3(-1,0,0));
+        }
+
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_D)) {
+            moveCamera(vec3(+1,0,0));
+        }
+
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_W)) {
+            moveCamera(vec3(0,0,-1));
+        }
+
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_S)) {
+            moveCamera(vec3(0,0,+1));
+        }
+
+        // if (scancode == glfwGetKeyScancode(GLFW_KEY_Q)) {
+        //     moveCamera(vec3(0,-1,0));
+        // }
+
+        // if (scancode == glfwGetKeyScancode(GLFW_KEY_E)) {
+        //     moveCamera(vec3(0,+1,0));
+        // }
     }
 
     void onKeyRelease(int key, int scancode, int mods)
@@ -379,7 +406,7 @@ private:
             float trackballSpeed = 0.004 * M_PI;
             mat3 xRot = rotate(mat4(1), -1 * delta.y * trackballSpeed, vec3(1, 0, 0));
             mat3 yRot = rotate(mat4(1), 1 * delta.x * trackballSpeed, vec3(0, 1, 0));
-            _trackballRotation = xRot * yRot * _trackballRotation;
+            _cameraRotation = _cameraRotation * xRot * yRot;
         }
     }
 
@@ -399,8 +426,6 @@ private:
 
     void onMouseWheel(const vec2& scrollOffset)
     {
-        _cameraDistance -= 10 * scrollOffset.y;
-        _cameraDistance = std::max<float>(_cameraDistance, 1.0F);
     }
 
     void step(float now, float deltaT)
@@ -412,13 +437,7 @@ private:
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // extract trackball Z and Y for building view matrix via lookAt
-        auto trackballY = glm::vec3 { _trackballRotation[0][1], _trackballRotation[1][1], _trackballRotation[2][1] };
-        auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
-
-        vec3 target{0};
-        vec3 cameraPosition = target + (_cameraDistance * -trackballZ);
-        mat4 view = lookAt(cameraPosition, target, trackballY);
+        mat4 view = inverse(translate(mat4{1}, _cameraPosition) * mat4{_cameraRotation});
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
         // draw volumes
@@ -426,7 +445,7 @@ private:
         float segmentZ = 0;
         for (const auto& segment : _volumeSegments) {
             mat4 model = translate(mat4{1}, vec3(0,0,segmentZ));
-            _volumeMaterial->bind(model, view, projection, cameraPosition);
+            _volumeMaterial->bind(model, view, projection, _cameraPosition);
             for (auto& tc : segment->triangles) {
                 tc->draw();
             }
@@ -460,33 +479,6 @@ private:
         ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
         ImGui::LabelText("triangles", "%d", _triangleCount);
 
-        ImGui::Text("Reset Trackball Rotation");
-        if (ImGui::Button("-X")) {
-            _trackballRotation = rotate(mat4 { 1 }, +half_pi<float>(), vec3(0, 1, 0));
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("+X")) {
-            _trackballRotation = rotate(mat4 { 1 }, -half_pi<float>(), vec3(0, 1, 0));
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("-Y")) {
-            _trackballRotation = rotate(mat4 { 1 }, -half_pi<float>(), vec3(1, 0, 0)) * rotate(mat4 { 1 }, half_pi<float>(), vec3(0, 1, 0));
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("+Y")) {
-            _trackballRotation = rotate(mat4 { 1 }, half_pi<float>(), vec3(1, 0, 0)) * rotate(mat4 { 1 }, half_pi<float>(), vec3(0, 1, 0));
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("-Z")) {
-            _trackballRotation = rotate(mat4 { 1 }, pi<float>(), vec3(0, 1, 0));
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("+Z")) {
-            _trackballRotation = mat3 { 1 };
-        }
-
-        ImGui::Separator();
-
         ImGui::End();
     }
 
@@ -512,6 +504,11 @@ private:
         for (const auto &s : _volumeSegments) {
             _triangleCount += s->march();
         }
+    }
+
+    void moveCamera(vec3 deltaInLook) {
+        vec3 deltaWorld = _cameraRotation * deltaInLook;
+        _cameraPosition += deltaWorld;
     }
 };
 
