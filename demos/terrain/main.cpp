@@ -18,6 +18,7 @@
 #include <vector>
 
 #include <epoxy/gl.h>
+#include <glm/gtc/noise.hpp>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -31,7 +32,6 @@
 #include "../common/cubemap_blur.hpp"
 #include "materials.hpp"
 #include "terrain_samplers.hpp"
-#include "perlin_noise.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -137,6 +137,7 @@ private:
     std::vector<std::unique_ptr<VolumeSegment>> _volumeSegments;
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
+    bool _drawOctreeAABBs = false;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -173,8 +174,10 @@ private:
     } _cameraState;
 
     // demo state (noise, etc)
-    siv::PerlinNoise _noise{ 12345 };
-
+    GroundSampler::NoiseConfig _noise {
+        PerlinNoise { 12345 },
+        4,1,1
+    };
 
 public:
     App()
@@ -325,13 +328,14 @@ private:
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
+        auto backgroundTex = BlurCubemap(skyboxTexture, radians<float>(30), 64);
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
         _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, volumeShininess);
         _volumeMaterial->setCreaseThreshold(radians<float>(0));
 
         _lineMaterial = std::make_unique<LineMaterial>();
-        _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
+        _skydomeMaterial = std::make_unique<SkydomeMaterial>(std::move(backgroundTex));
 
         //
         // some constant GL state
@@ -379,13 +383,16 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march volumes" << std::endl;
 
-
         // TODO: Decide how many sections we will create
         constexpr auto COUNT = 3;
 
         for (int i = 0; i < COUNT; i++) {
             _volumeSegments.emplace_back(std::make_unique<VolumeSegment>(nThreads));
         }
+
+        float freq = 8;
+        _noise.fx = _volumeSegments.front()->volume->size().x / freq;
+        _noise.fy = _volumeSegments.front()->volume->size().z / freq;
 
         //
         //  Build terrain
@@ -408,6 +415,9 @@ private:
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
             _running = false;
+        }
+        if (scancode == glfwGetKeyScancode(GLFW_KEY_M)) {
+            marchSegments();
         }
     }
 
@@ -502,13 +512,14 @@ private:
         _skydomeMaterial->bind(projection, view);
         _skydomeQuad.draw();
 
-        // draw lines
-        glDepthMask(GL_FALSE);
-        for (const auto& segment : _volumeSegments) {
-            _lineMaterial->bind(projection * view * segment->model);
-            segment->occupiedAABBs.draw();
+        if (_drawOctreeAABBs) {
+            // draw lines
+            glDepthMask(GL_FALSE);
+            for (const auto& segment : _volumeSegments) {
+                _lineMaterial->bind(projection * view * segment->model);
+                segment->occupiedAABBs.draw();
+            }
         }
-
         glDepthMask(GL_TRUE);
     }
 
@@ -518,6 +529,9 @@ private:
 
         ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
         ImGui::LabelText("triangles", "%d", _triangleCount);
+
+        ImGui::Separator();
+        ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
 
         ImGui::End();
     }
@@ -529,28 +543,22 @@ private:
         const auto& segment = _volumeSegments[which];
         const float maxHeight = 16.0F;
 
-        const double frequency = 8;
-        const int octaves = 8;
-        const double fx = segment->volume->size().x / frequency;
-        const double fy = segment->volume->size().z / frequency;
-
-        auto noiseFunction = [=](float a, float b) {
-            return _noise.octaveNoise0_1(a / fx, b / fy, 0, octaves);
-        };
-
         // for now make a box
-        segment->groundSampler = segment->volume->add(
-            std::make_unique<GroundSampler>(noiseFunction, maxHeight));
+        segment->groundSampler
+            = segment->volume->add(std::make_unique<GroundSampler>(_noise, maxHeight));
 
         // offset samples by the cumulative z to enable continuous perlin sampling
-        segment->groundSampler->setSampleOffset(vec3{0,0,which * segment->volume->size().z});
+        segment->groundSampler->setSampleOffset(vec3 { 0, 0, which * segment->volume->size().z });
     }
 
     void marchSegments()
     {
         _triangleCount = 0;
         for (const auto& s : _volumeSegments) {
+            auto start = glfwGetTime();
             _triangleCount += s->march();
+            auto elapsed = glfwGetTime() - start;
+            std::cout << "March took " << elapsed << " seconds" << std::endl;
         }
     }
 

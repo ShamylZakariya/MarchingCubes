@@ -9,30 +9,43 @@
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
 
+#include "perlin_noise.hpp"
 
 using namespace glm;
 using mc::util::AABB;
 using mc::util::iAABB;
 
-typedef std::function<float(float, float)> NoiseFunction;
-
 class GroundSampler : public mc::IVolumeSampler {
 public:
+    struct NoiseConfig {
+        const PerlinNoise& noise;
+        int octaves = 4;
+        double fx = 1;
+        double fy = 1;
 
-    GroundSampler(NoiseFunction noise, float height)
-        :IVolumeSampler(IVolumeSampler::Mode::Additive)
-        ,_noise(noise)
-        ,_height(height)
+        inline float sample(float a, float b) const
+        {
+            return noise.octaveNoise0_1(a / fx, b / fx, octaves);
+        }
+    };
+
+public:
+    GroundSampler(NoiseConfig& noise, float height)
+        : IVolumeSampler(IVolumeSampler::Mode::Additive)
+        , _noise(noise)
+        , _height(height)
     {
     }
 
     ~GroundSampler() = default;
 
-    void setSampleOffset(vec3 offset) {
+    void setSampleOffset(vec3 offset)
+    {
         _sampleOffset = offset;
     }
 
-    vec3 sampleOffset() const {
+    vec3 sampleOffset() const
+    {
         return _sampleOffset;
     }
 
@@ -72,32 +85,41 @@ public:
     vec3 normalAt(const vec3& p, float fuzziness) const override
     {
         // return a wildly wrong normal and shader will use triangle normals
-        // return vec3{0,-1,0};
+        return vec3 { 0, -1, 0 };
 
-        // TODO: this doesn't work, we need to compute a real normal anyway
-        const float d = 1.0f;
-        vec3 x0(p + vec3(d, 0, 0));
-        vec3 x1(p + vec3(-d, 0, 0));
-        vec3 z0(p + vec3(0, 0, d));
-        vec3 z1(p + vec3(0, 0, -d));
-        x0.y = _sample(x0);
-        x1.y = _sample(x1);
-        z0.y = _sample(z0);
-        z1.y = _sample(z1);
+        // This computes correct vertex normals but it ain't cheap
+        // const float d = 1.0f;
+        // vec3 x0(p + vec3(d, 0, 0));
+        // vec3 x1(p + vec3(-d, 0, 0));
+        // vec3 z0(p + vec3(0, 0, d));
+        // vec3 z1(p + vec3(0, 0, -d));
+        // x0.y = _sample(x0);
+        // x1.y = _sample(x1);
+        // z0.y = _sample(z0);
+        // z1.y = _sample(z1);
 
-        return -normalize(cross(x1 - x0, z1 - z0));
+        // return -normalize(cross(x1 - x0, z1 - z0));
     }
 
 private:
+    inline float _sample(const vec3& p) const
+    {
+        float n = _noise.sample((p.x + _sampleOffset.x), (p.z + _sampleOffset.z));
 
-    float _sample(const vec3 &p) const {
-        return _noise(p.x + _sampleOffset.x, p.z + _sampleOffset.z) * _height;
+        // stairstep & flatten while retaining peaks
+        float m = (int)(n * 8) / 8.0F;
+        m = m * m * m * m * m;
+        float mesa = m * _height;
+
+        float f = n * n * n;
+        float floor = f * 0.1F * _height;
+
+        return floor + mesa;
     }
 
-    NoiseFunction _noise;
-    float _height{0};
-    vec3 _sampleOffset{0};
-
+    const NoiseConfig& _noise;
+    float _height { 0 };
+    vec3 _sampleOffset { 0 };
 };
 
 #endif
