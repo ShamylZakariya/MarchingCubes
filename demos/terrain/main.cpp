@@ -174,9 +174,11 @@ private:
     } _cameraState;
 
     // demo state (noise, etc)
+
+    // volume segments use a ground sampler which has to share
+    // a noise source for continuous terrain generation
     GroundSampler::NoiseConfig _noise {
-        PerlinNoise { 12345 },
-        4,1,1
+        PerlinNoise { 12345 }
     };
 
 public:
@@ -390,10 +392,6 @@ private:
             _volumeSegments.emplace_back(std::make_unique<VolumeSegment>(nThreads));
         }
 
-        float freq = 8;
-        _noise.fx = _volumeSegments.front()->volume->size().x / freq;
-        _noise.fy = _volumeSegments.front()->volume->size().z / freq;
-
         //
         //  Build terrain
         //
@@ -541,7 +539,10 @@ private:
         std::cout << "Building segment " << which << std::endl;
 
         const auto& segment = _volumeSegments[which];
-        const float maxHeight = 16.0F;
+        const float maxHeight = 8.0F;
+
+        _noise.frequency = vec3(_volumeSegments.front()->volume->size()) * 2.0F;
+        _noise.octaves = 3;
 
         // for now make a box
         segment->groundSampler

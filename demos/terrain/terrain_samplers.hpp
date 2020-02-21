@@ -20,12 +20,11 @@ public:
     struct NoiseConfig {
         const PerlinNoise& noise;
         int octaves = 4;
-        double fx = 1;
-        double fy = 1;
+        vec3 frequency{1};
 
-        inline float sample(float a, float b) const
+        inline float sample(float a, float b, float c) const
         {
-            return noise.octaveNoise0_1(a / fx, b / fx, octaves);
+            return noise.octaveNoise0_1(a / frequency.x, b / frequency.y, c / frequency.z, octaves);
         }
     };
 
@@ -104,17 +103,22 @@ public:
 private:
     inline float _sample(const vec3& p) const
     {
-        float n = _noise.sample((p.x + _sampleOffset.x), (p.z + _sampleOffset.z));
+        float n = _noise.sample(
+            p.x + _sampleOffset.x,
+            p.y + _sampleOffset.y,
+            p.z + _sampleOffset.z
+            );
 
-        // stairstep & flatten while retaining peaks
-        float m = (int)(n * 8) / 8.0F;
-        m = m * m * m * m * m;
-        float mesa = m * _height;
+        // sand-dune like structure
+        float dune = n * 5;
+        dune = dune - floor(dune);
+        dune = dune * dune * _height;
 
+        // floor
         float f = n * n * n;
-        float floor = f * 0.1F * _height;
+        float floor = f * _height;
 
-        return floor + mesa;
+        return floor + dune;
     }
 
     const NoiseConfig& _noise;
