@@ -17,22 +17,18 @@ using mc::util::iAABB;
 
 class GroundSampler : public mc::IVolumeSampler {
 public:
-    struct NoiseConfig {
-        const PerlinNoise& noise;
-        int octaves = 4;
-        vec3 frequency{1};
-
-        inline float sample(float a, float b, float c) const
-        {
-            return noise.octaveNoise0_1(a / frequency.x, b / frequency.y, c / frequency.z, octaves);
-        }
-    };
+    typedef std::function<float(vec3)> NoiseSampler;
 
 public:
-    GroundSampler(NoiseConfig& noise, float height)
+    GroundSampler() = delete;
+    GroundSampler(const GroundSampler&) = delete;
+    GroundSampler(GroundSampler&&) = delete;
+
+    GroundSampler(NoiseSampler noise, float height, bool smooth)
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _noise(noise)
         , _height(height)
+        , _smooth(smooth)
     {
     }
 
@@ -47,6 +43,9 @@ public:
     {
         return _sampleOffset;
     }
+
+    void setSmooth(bool smooth) { _smooth = smooth; }
+    bool smooth() const { return _smooth; }
 
     bool intersects(AABB bounds) const override
     {
@@ -83,31 +82,22 @@ public:
 
     vec3 normalAt(const vec3& p, float fuzziness) const override
     {
-        // return a wildly wrong normal and shader will use triangle normals
+        if (_smooth) {
+            const float d = 0.75f;
+            vec3 grad(
+                _sample(p + vec3(d, 0, 0)) - _sample(p + vec3(-d, 0, 0)),
+                _sample(p + vec3(0, d, 0)) - _sample(p + vec3(0, -d, 0)),
+                _sample(p + vec3(0, 0, d)) - _sample(p + vec3(0, 0, -d)));
+
+            return -normalize(grad);
+        }
         return vec3 { 0, -1, 0 };
-
-        // This computes correct vertex normals but it ain't cheap
-        // const float d = 1.0f;
-        // vec3 x0(p + vec3(d, 0, 0));
-        // vec3 x1(p + vec3(-d, 0, 0));
-        // vec3 z0(p + vec3(0, 0, d));
-        // vec3 z1(p + vec3(0, 0, -d));
-        // x0.y = _sample(x0);
-        // x1.y = _sample(x1);
-        // z0.y = _sample(z0);
-        // z1.y = _sample(z1);
-
-        // return -normalize(cross(x1 - x0, z1 - z0));
     }
 
 private:
     inline float _sample(const vec3& p) const
     {
-        float n = _noise.sample(
-            p.x + _sampleOffset.x,
-            p.y + _sampleOffset.y,
-            p.z + _sampleOffset.z
-            );
+        float n = _noise(p + _sampleOffset);
 
         // sand-dune like structure
         float dune = n * 5;
@@ -121,9 +111,10 @@ private:
         return floor + dune;
     }
 
-    const NoiseConfig& _noise;
+    NoiseSampler _noise;
     float _height { 0 };
     vec3 _sampleOffset { 0 };
+    bool _smooth = true;
 };
 
 #endif

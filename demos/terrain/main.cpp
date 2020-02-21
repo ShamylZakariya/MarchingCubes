@@ -175,11 +175,7 @@ private:
 
     // demo state (noise, etc)
 
-    // volume segments use a ground sampler which has to share
-    // a noise source for continuous terrain generation
-    GroundSampler::NoiseConfig _noise {
-        PerlinNoise { 12345 }
-    };
+    PerlinNoise _noise { 12345 };
 
 public:
     App()
@@ -334,7 +330,7 @@ private:
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
         _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, volumeShininess);
-        _volumeMaterial->setCreaseThreshold(radians<float>(0));
+        _volumeMaterial->setCreaseThreshold(radians<float>(30));
 
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(std::move(backgroundTex));
@@ -531,6 +527,14 @@ private:
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
 
+        bool smoothGround = _volumeSegments.front()->groundSampler->smooth();
+        if (ImGui::Checkbox("Smooth Ground", &smoothGround)) {
+            for (auto& seg : _volumeSegments) {
+                seg->groundSampler->setSmooth(smoothGround);
+            }
+            marchSegments();
+        }
+
         ImGui::End();
     }
 
@@ -540,13 +544,16 @@ private:
 
         const auto& segment = _volumeSegments[which];
         const float maxHeight = 8.0F;
+        const auto octaves = 3;
+        const auto frequency = vec3(_volumeSegments.front()->volume->size()) * 2.0F;
 
-        _noise.frequency = vec3(_volumeSegments.front()->volume->size()) * 2.0F;
-        _noise.octaves = 3;
+        auto noiseFunction = [=](vec3 p) {
+            return _noise.octaveNoise0_1(p.x / frequency.x, p.y / frequency.y, p.z / frequency.z, octaves);
+        };
 
         // for now make a box
         segment->groundSampler
-            = segment->volume->add(std::make_unique<GroundSampler>(_noise, maxHeight));
+            = segment->volume->add(std::make_unique<GroundSampler>(noiseFunction, maxHeight, false));
 
         // offset samples by the cumulative z to enable continuous perlin sampling
         segment->groundSampler->setSampleOffset(vec3 { 0, 0, which * segment->volume->size().z });
