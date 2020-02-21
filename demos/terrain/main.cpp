@@ -30,6 +30,8 @@
 
 #include "../common/cubemap_blur.hpp"
 #include "materials.hpp"
+#include "terrain_samplers.hpp"
+#include "perlin_noise.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -169,6 +171,10 @@ private:
 
     } _cameraState;
 
+    // demo state (noise, etc)
+    siv::PerlinNoise _noise{ 12345 };
+
+
 public:
     App()
     {
@@ -239,7 +245,7 @@ private:
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        _window = glfwCreateWindow(WIDTH, HEIGHT, "Marching Cubes", nullptr, nullptr);
+        _window = glfwCreateWindow(WIDTH, HEIGHT, "Terrain", nullptr, nullptr);
         glfwSetWindowUserPointer(_window, this);
         glfwSetFramebufferSizeCallback(_window, [](GLFWwindow* window, int width, int height) {
             auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
@@ -321,6 +327,8 @@ private:
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
         _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, volumeShininess);
+        _volumeMaterial->setCreaseThreshold(radians<float>(0));
+
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
 
@@ -370,7 +378,11 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march volumes" << std::endl;
 
-        for (int i = 0; i < 3; i++) {
+
+        // TODO: Decide how many sections we will create
+        constexpr auto COUNT = 3;
+
+        for (int i = 0; i < COUNT; i++) {
             _volumeSegments.emplace_back(std::make_unique<VolumeSegment>(nThreads));
         }
 
@@ -433,7 +445,11 @@ private:
     void step(float now, float deltaT)
     {
         // WASD
-        const float movementSpeed = 20 * deltaT;
+        float movementSpeed = 20 * deltaT;
+        if (isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
+            movementSpeed *= 5;
+        }
+
         if (isKeyDown(GLFW_KEY_A)) {
             _cameraState.moveBy(movementSpeed * vec3(+1, 0, 0));
         }
@@ -509,15 +525,21 @@ private:
     {
         std::cout << "Building segment " << which << std::endl;
 
-        // for now make a box
         const auto& segment = _volumeSegments[which];
-        const auto size = vec3 { segment->volume->size() };
-        const auto center = size / 2.0F;
-        segment->volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            vec3(center.x, 10, center.z),
-            vec3(size.x / 2, 19, size.y / 2),
-            mat3 { 1 },
-            mc::IVolumeSampler::Mode::Additive));
+        const float maxHeight = 16.0F;
+
+        const double frequency = 8;
+        const int octaves = 8;
+        const double fx = segment->volume->size().x / frequency;
+        const double fy = segment->volume->size().z / frequency;
+
+        auto noiseFunction = [=](float a, float b) {
+            return _noise.octaveNoise0_1(a / fx, b / fy, 0, octaves);
+        };
+
+        // for now make a box
+        segment->volume->add(
+            std::make_unique<GroundSampler>(noiseFunction, maxHeight));
     }
 
     void marchSegments()
