@@ -28,6 +28,14 @@ public:
 
     ~GroundSampler() = default;
 
+    void setSampleOffset(vec3 offset) {
+        _sampleOffset = offset;
+    }
+
+    vec3 sampleOffset() const {
+        return _sampleOffset;
+    }
+
     bool intersects(AABB bounds) const override
     {
         // We know that the geometry will span [x,y] and be no taller than
@@ -50,7 +58,7 @@ public:
 
     float valueAt(const vec3& p, float fuzziness) const override
     {
-        auto y = _noise(p.x, p.z) * _height;
+        auto y = _sample(p);
         auto innerY = y - fuzziness;
         if (p.y > y) {
             return 0;
@@ -72,22 +80,23 @@ public:
         vec3 x1(p + vec3(-d, 0, 0));
         vec3 z0(p + vec3(0, 0, d));
         vec3 z1(p + vec3(0, 0, -d));
-        x0.y = valueAt(x0);
-        x1.y = valueAt(x1);
-        z0.y = valueAt(z0);
-        z1.y = valueAt(z1);
+        x0.y = _sample(x0);
+        x1.y = _sample(x1);
+        z0.y = _sample(z0);
+        z1.y = _sample(z1);
 
         return -normalize(cross(x1 - x0, z1 - z0));
     }
 
 private:
 
-    float valueAt(const vec3 &p) const {
-        return _noise(p.x, p.z) * _height;
+    float _sample(const vec3 &p) const {
+        return _noise(p.x + _sampleOffset.x, p.z + _sampleOffset.z) * _height;
     }
 
     NoiseFunction _noise;
-    float _height;
+    float _height{0};
+    vec3 _sampleOffset{0};
 
 };
 

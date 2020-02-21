@@ -91,6 +91,7 @@ public:
     }
 
     unique_ptr<mc::OctreeVolume> volume;
+    unowned_ptr<GroundSampler> groundSampler;
     std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
     mc::util::LineSegmentBuffer occupiedAABBs;
     mat4 model;
@@ -538,8 +539,11 @@ private:
         };
 
         // for now make a box
-        segment->volume->add(
+        segment->groundSampler = segment->volume->add(
             std::make_unique<GroundSampler>(noiseFunction, maxHeight));
+
+        // offset samples by the cumulative z to enable continuous perlin sampling
+        segment->groundSampler->setSampleOffset(vec3{0,0,which * segment->volume->size().z});
     }
 
     void marchSegments()
