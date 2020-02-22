@@ -552,8 +552,13 @@ private:
         };
 
         // for now make a box
-        segment->groundSampler
-            = segment->volume->add(std::make_unique<GroundSampler>(noiseFunction, maxHeight, false));
+        segment->groundSampler = segment->volume->add(
+            std::make_unique<GroundSampler>(noiseFunction, maxHeight, false));
+
+        vec3 center = vec3(segment->volume->size()) / 2.0F;
+        segment->volume->add(
+            std::make_unique<Ring>(vec3(center.x, 0, center.z), vec3(0,0,1), 5, 45, 50)
+        );
 
         // offset samples by the cumulative z to enable continuous perlin sampling
         segment->groundSampler->setSampleOffset(vec3 { 0, 0, which * segment->volume->size().z });

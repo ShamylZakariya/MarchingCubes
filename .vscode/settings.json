@@ -75,6 +75,7 @@
         "cstdbool": "cpp",
         "complex": "cpp",
         "list": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "*.ipp": "cpp"
     }
 }
