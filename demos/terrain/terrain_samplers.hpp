@@ -137,18 +137,26 @@ public:
             return false;
         }
 
-        // find the point on surface of bounds closest to _position
-        const auto closestPoint = glm::vec3 {
-            max(bounds.min.x, min(_axisOrigin.x, bounds.max.x)),
-            max(bounds.min.y, min(_axisOrigin.y, bounds.max.y)),
-            max(bounds.min.z, min(_axisOrigin.z, bounds.max.z))
-        };
+        // find the closest and farthest vertices on the bounds to our
+        // axis and discard if the closest is beyond the cylinder outer
+        // radius, or if the farthest is inside the inner radius
+        float closestDist2 = std::numeric_limits<float>::max();
+        float farthestDist2 = 0;
 
-        if (distance2(closestPoint, _axisOrigin) > _outerRadius2) {
+        for (const auto &c : bounds.corners()) {
+            float d2 = _distanceToAxis2(c);
+            closestDist2 = min(d2, closestDist2);
+            farthestDist2 = max(d2, farthestDist2);
+        }
+
+        if (closestDist2 > _outerRadius2) {
             return false;
         }
 
-        // TODO: Implement radial bounds testing
+        if (farthestDist2 < _innerRadius2) {
+            return false;
+        }
+
         return true;
     }
 
