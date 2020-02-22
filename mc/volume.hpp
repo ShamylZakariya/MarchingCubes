@@ -207,15 +207,15 @@ public:
     /**
      * March the represented volume into the triangle consumers provided in the constructor
     */
-    void march(glm::mat4 transform,
+    void march(bool smoothNormals, glm::mat4 transform,
         std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
     {
-        dispatchMarch(util::unowned_ptr<glm::mat4>(&transform), marchedNodeObserver);
+        dispatchMarch(smoothNormals, util::unowned_ptr<glm::mat4>(&transform), marchedNodeObserver);
     }
 
-    void march(std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
+    void march(bool smoothNormals, std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
     {
-        dispatchMarch(nullptr, marchedNodeObserver);
+        dispatchMarch(smoothNormals, nullptr, marchedNodeObserver);
     }
 
     /**
@@ -235,10 +235,10 @@ public:
     }
 
 protected:
-    void dispatchMarch(util::unowned_ptr<glm::mat4> transform,
+    void dispatchMarch(bool smoothNormals, util::unowned_ptr<glm::mat4> transform,
         std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
 
-    void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, util::unowned_ptr<glm::mat4> transform);
+    void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, bool smoothNormals, util::unowned_ptr<glm::mat4> transform);
 
     /**
      * Mark the nodes which should be marched.

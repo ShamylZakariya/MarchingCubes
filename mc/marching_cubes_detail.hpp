@@ -488,19 +488,26 @@ int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction no
     //
 
     int numTriangles = 0;
+    bool computeVertexNormals = normalSampler != nullptr;
     for (int i = 0; triTable[cubeIndex][i] != -1; i += 3) {
         triangles[numTriangles].a.pos = vertList[triTable[cubeIndex][i]];
         triangles[numTriangles].b.pos = vertList[triTable[cubeIndex][i + 1]];
         triangles[numTriangles].c.pos = vertList[triTable[cubeIndex][i + 2]];
 
-        triangles[numTriangles].a.vertexNormal = normalSampler(sourceList[triTable[cubeIndex][i]]);
-        triangles[numTriangles].b.vertexNormal = normalSampler(sourceList[triTable[cubeIndex][i + 1]]);
-        triangles[numTriangles].c.vertexNormal = normalSampler(sourceList[triTable[cubeIndex][i + 2]]);
-
         glm::vec3 n = normalize(cross(triangles[numTriangles].b.pos - triangles[numTriangles].a.pos, triangles[numTriangles].c.pos - triangles[numTriangles].a.pos));
         triangles[numTriangles].a.triangleNormal = n;
         triangles[numTriangles].b.triangleNormal = n;
         triangles[numTriangles].c.triangleNormal = n;
+
+        if (computeVertexNormals) {
+            triangles[numTriangles].a.vertexNormal = normalSampler(sourceList[triTable[cubeIndex][i]]);
+            triangles[numTriangles].b.vertexNormal = normalSampler(sourceList[triTable[cubeIndex][i + 1]]);
+            triangles[numTriangles].c.vertexNormal = normalSampler(sourceList[triTable[cubeIndex][i + 2]]);
+        } else {
+            triangles[numTriangles].a.vertexNormal = n;
+            triangles[numTriangles].b.vertexNormal = n;
+            triangles[numTriangles].c.vertexNormal = n;
+        }
 
         numTriangles++;
     }

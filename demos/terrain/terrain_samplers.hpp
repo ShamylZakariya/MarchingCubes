@@ -28,7 +28,6 @@ public:
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _noise(noise)
         , _height(height)
-        , _smooth(smooth)
     {
     }
 
@@ -43,9 +42,6 @@ public:
     {
         return _sampleOffset;
     }
-
-    void setSmooth(bool smooth) { _smooth = smooth; }
-    bool smooth() const { return _smooth; }
 
     bool intersects(AABB bounds) const override
     {
@@ -76,16 +72,13 @@ public:
 
     vec3 normalAt(const vec3& p, float fuzziness) const override
     {
-        if (_smooth) {
-            const float d = 0.75f;
-            vec3 grad(
-                _sample(p + vec3(d, 0, 0)) - _sample(p + vec3(-d, 0, 0)),
-                _sample(p + vec3(0, d, 0)) - _sample(p + vec3(0, -d, 0)),
-                _sample(p + vec3(0, 0, d)) - _sample(p + vec3(0, 0, -d)));
+        const float d = 0.75f;
+        vec3 grad(
+            _sample(p + vec3(d, 0, 0)) - _sample(p + vec3(-d, 0, 0)),
+            _sample(p + vec3(0, d, 0)) - _sample(p + vec3(0, -d, 0)),
+            _sample(p + vec3(0, 0, d)) - _sample(p + vec3(0, 0, -d)));
 
-            return -normalize(grad);
-        }
-        return vec3 { 0, -1, 0 };
+        return -normalize(grad);
     }
 
 private:
@@ -108,74 +101,87 @@ private:
     NoiseSampler _noise;
     float _height { 0 };
     vec3 _sampleOffset { 0 };
-    bool _smooth = true;
 };
 
 class Tube : public mc::IVolumeSampler {
 private:
 
-    vec3 _tubeAxisOrigin;
-    vec3 _tubeAxisDir;
-    float _innerRadius;
-    float _outerRadius;
-    float _innerRadius2;
-    float _outerRadius2;
+    vec3 _tubeAxisOrigin{0};
+    vec3 _tubeAxisDir{0,0,1};
+    vec3 _tubeAxisPerp{0,1,0};
+    vec3 _innerRadiusOffset{0};
+    float _innerRadius{0};
+    float _outerRadius{0};
+    float _innerRadius2{0};
+    float _outerRadius2{0};
 
-    vec3 _frontFaceNormal;
-    vec3 _frontFaceOrigin;
-    vec3 _backFaceNormal;
-    vec3 _backFaceOrigin;
+    vec3 _frontFaceNormal{0,0,1};
+    vec3 _frontFaceOrigin{0};
+    vec3 _backFaceNormal{0,0,-1};
+    vec3 _backFaceOrigin{0,0,0};
+
+    float _cutAngleRadians{0};
+    float _cosCutAngle{0};
+    bool _hasInnerCylinderOffset = false;
 
 
 public:
+
+    struct Config {
+        // origin of the cylinder representing the outer radius of the tube
+        vec3 axisOrigin{0};
+        // major axis of the cylinder making the outer radius of the tube
+        vec3 axisDir{0,0,1};
+
+        // perpendicular to the axisDir, used for computing the cut angle
+        vec3 axisPerp{0,1,0};
+
+        // offset of the cylinder making up the inner radius from axisOrigin
+        // if 0, both cylinders are coaxial, but an offset can produce interesting
+        // non-symmetries
+        vec3 innerRadiusAxisOffset{0};
+
+        // inner radius of tube
+        float innerRadius = 0;
+
+        // outer radius of tube
+        float outerRadius = 0;
+
+        // length of tube (end to end)
+        float length = 1;
+
+        // [0,2*pi] cuts a notch our of the tube lengthwise with center of
+        // notch aligned via axisPerp
+        float cutAngleRadians = 0;
+
+        // normal of the front capping plane of the tube
+        vec3 frontFaceNormal{0,0,1};
+
+        // normal of the back capping plane of the tube
+        vec3 backFaceNormal{0,0,-1};
+    };
+
+
     Tube() = delete;
 
-    /**
-     * Create a tube with perpendicular end caps
-     * tubeAxisOrigin: center of cylinder
-     * tubeAxisDir: +dir of the cylinder axis
-     * innerRadius: inside radius of tube
-     * outerRadius: outside radius of tube
-     * length: length of tube
-     */
-    Tube(vec3 tubeAxisOrigin, vec3 tubeAxisDir, float innerRadius, float outerRadius, float length)
-        : IVolumeSampler(Mode::Additive)
-        , _tubeAxisOrigin(tubeAxisOrigin)
-        , _tubeAxisDir(normalize(tubeAxisDir))
-        , _innerRadius(innerRadius)
-        , _outerRadius(outerRadius)
-        , _innerRadius2(innerRadius*innerRadius)
-        , _outerRadius2(outerRadius*outerRadius)
-        , _frontFaceNormal(_tubeAxisDir)
-        , _frontFaceOrigin(_tubeAxisOrigin + _tubeAxisDir * (length / 2))
-        , _backFaceNormal(_tubeAxisDir)
-        , _backFaceOrigin(_tubeAxisOrigin - _tubeAxisDir * (length / 2))
+    Tube(Config c)
+        :IVolumeSampler(Mode::Additive)
+        , _tubeAxisOrigin(c.axisOrigin)
+        , _tubeAxisDir(normalize(c.axisDir))
+        , _tubeAxisPerp(normalize(c.axisPerp))
+        , _innerRadiusOffset(c.innerRadiusAxisOffset)
+        , _innerRadius(c.innerRadius)
+        , _outerRadius(c.outerRadius)
+        , _innerRadius2(c.innerRadius*c.innerRadius)
+        , _outerRadius2(c.outerRadius*c.outerRadius)
+        , _frontFaceNormal(c.frontFaceNormal)
+        , _frontFaceOrigin(_tubeAxisOrigin + _tubeAxisDir * (c.length / 2))
+        , _backFaceNormal(c.backFaceNormal)
+        , _backFaceOrigin(_tubeAxisOrigin - _tubeAxisDir * (c.length / 2))
+        , _cutAngleRadians(clamp<float>(c.cutAngleRadians, 0, 2*pi<float>()))
     {
-    }
-
-    /**
-     * Create a tube with angled caps
-     * tubeAxisOrigin: center of cylinder
-     * tubeAxisDir: +dir of the cylinder axis
-     * innerRadius: inside radius of tube
-     * outerRadius: outside radius of tube
-     * length: length of tube
-     * frontFaceNormal: normal of the +dir end cap
-     * backFaceNormal: normal of the -dir end cap
-     */
-    Tube(vec3 tubeAxisOrigin, vec3 tubeAxisDir, float innerRadius, float outerRadius, float length, vec3 frontFaceNormal, vec3 backFaceNormal)
-        : IVolumeSampler(Mode::Additive)
-        , _tubeAxisOrigin(tubeAxisOrigin)
-        , _tubeAxisDir(normalize(tubeAxisDir))
-        , _innerRadius(innerRadius)
-        , _outerRadius(outerRadius)
-        , _innerRadius2(innerRadius*innerRadius)
-        , _outerRadius2(outerRadius*outerRadius)
-        , _frontFaceNormal(frontFaceNormal)
-        , _frontFaceOrigin(_tubeAxisOrigin + _tubeAxisDir * (length / 2))
-        , _backFaceNormal(backFaceNormal)
-        , _backFaceOrigin(_tubeAxisOrigin - _tubeAxisDir * (length / 2))
-    {
+        _cosCutAngle = cos(_cutAngleRadians);
+        _hasInnerCylinderOffset = length2(_innerRadiusOffset) > 0;
     }
 
     Tube(const Tube&) = delete;
@@ -201,8 +207,12 @@ public:
         float farthestDist2 = 0;
 
         for (const auto& c : corners) {
-            float d2 = _distanceToAxis2(c);
+            float d2 = _distanceToOuterCylinderAxis2(c);
             closestDist2 = min(d2, closestDist2);
+
+            if (_hasInnerCylinderOffset) {
+                d2 = _distanceToInnerCylinderAxis2(c);
+            }
             farthestDist2 = max(d2, farthestDist2);
         }
 
@@ -228,16 +238,24 @@ public:
         // A point is inside the ring volume if:
         // - On negative side front and back planes
         // - Between inner and outer radius from axis
-        float radialDist2 = _distanceToAxis2(p);
 
-        if (radialDist2 > _outerRadius2 || radialDist2 < _innerRadius2) {
-            return 0;
-        }
 
         float frontFaceDist = dot(_frontFaceNormal, p - _frontFaceOrigin);
         float backFaceDist = dot(_backFaceNormal, p - _backFaceOrigin);
 
+        // early exit
         if (frontFaceDist > 0 || backFaceDist > 0) {
+            return 0;
+        }
+
+        vec3 closestPointOnAxis;
+        float distanceToOuterCylinderAxis2 = _distanceToOuterCylinderAxis2(p, closestPointOnAxis);
+        float distanceToInnerCylinderAxis2 = _hasInnerCylinderOffset
+            ? _distanceToInnerCylinderAxis2(p)
+            : distanceToOuterCylinderAxis2;
+
+        // early exit
+        if (distanceToOuterCylinderAxis2 > _outerRadius2 || distanceToInnerCylinderAxis2 < _innerRadius2) {
             return 0;
         }
 
@@ -251,17 +269,27 @@ public:
         float outerRadiusInner2 = outerRadiusInner * outerRadiusInner;
         float innerRadiusInner2 = innerRadiusInner * innerRadiusInner;
 
-        if (radialDist2 < innerRadiusInner2) {
+        if (distanceToInnerCylinderAxis2 < innerRadiusInner2) {
             // gradient on inner
-            float radialDist = sqrt(radialDist2);
+            float radialDist = sqrt(distanceToInnerCylinderAxis2);
             tubeContribution = (radialDist - _innerRadius) / fuzziness;
-        } else if (radialDist2 > outerRadiusInner2) {
+        } else if (distanceToOuterCylinderAxis2 > outerRadiusInner2) {
             // gradient on outer
-            float radialDist = sqrt(radialDist2);
+            float radialDist = sqrt(distanceToOuterCylinderAxis2);
             tubeContribution = 1 - ((radialDist - outerRadiusInner) / fuzziness);
         }
 
-        return planeBoundsContribution * tubeContribution;
+        float totalContribution = planeBoundsContribution * tubeContribution;
+
+        if (_cutAngleRadians > 0) {
+            vec3 dir = normalize(p - closestPointOnAxis);
+            auto d = dot(_tubeAxisPerp, dir);
+            if (d > _cosCutAngle) {
+                totalContribution = 0;
+            }
+        }
+
+        return totalContribution;
     }
 
     vec3 normalAt(const vec3& p, float fuzziness) const override
@@ -278,7 +306,7 @@ public:
         float frontFaceDist = dot(_frontFaceNormal, p - _frontFaceOrigin);
         float backFaceDist = dot(_backFaceNormal, p - _backFaceOrigin);
         vec3 pointOnAxis;
-        float radialDist2 = _distanceToAxis2(p, pointOnAxis);
+        float radialDist2 = _distanceToOuterCylinderAxis2(p, pointOnAxis);
 
         // early exit
         if (radialDist2 > _outerRadius2 || radialDist2 < _innerRadius2
@@ -313,31 +341,40 @@ public:
 
 private:
     //http://mathworld.wolfram.com/Point-LineDistance3-Dimensional.html
-    // vec3 a = _cylinderAxisOrigin;
-    // vec3 b = _cylinderAxisOrigin + _cylinderAxisDirection;
+    // vec3 a = _tubeAxisOrigin;
+    // vec3 b = _tubeAxisOrigin + _tubeAxisDir;
     // float d = dot((a - p), (b - a));
     // float t = -d / length2(b - a);
     // vec3 tp = mix(a,b,t);
     // return distance(tp, p);
 
-    inline float _distanceToAxis(vec3 p) const
-    {
-        float t = -dot(_tubeAxisOrigin - p, _tubeAxisDir);
-        auto tp = _tubeAxisOrigin + t * _tubeAxisDir;
-        return distance(tp, p);
-    }
-
-    inline float _distanceToAxis2(vec3 p) const
+    inline float _distanceToOuterCylinderAxis2(vec3 p) const
     {
         float t = -dot(_tubeAxisOrigin - p, _tubeAxisDir);
         auto tp = _tubeAxisOrigin + t * _tubeAxisDir;
         return distance2(tp, p);
     }
 
-    inline float _distanceToAxis2(vec3 p, vec3& pointOnAxis) const
+    inline float _distanceToOuterCylinderAxis2(vec3 p, vec3& pointOnAxis) const
     {
         float t = -dot(_tubeAxisOrigin - p, _tubeAxisDir);
         pointOnAxis = _tubeAxisOrigin + t * _tubeAxisDir;
+        return distance2(pointOnAxis, p);
+    }
+
+    inline float _distanceToInnerCylinderAxis2(vec3 p) const
+    {
+        const vec3 origin = _tubeAxisOrigin + _innerRadiusOffset;
+        float t = -dot(origin - p, _tubeAxisDir);
+        auto tp = origin + t * _tubeAxisDir;
+        return distance2(tp, p);
+    }
+
+    inline float _distanceToInnerCylinderAxis2(vec3 p, vec3& pointOnAxis) const
+    {
+        const vec3 origin = _tubeAxisOrigin + _innerRadiusOffset;
+        float t = -dot(origin - p, _tubeAxisDir);
+        pointOnAxis = origin + t * _tubeAxisDir;
         return distance2(pointOnAxis, p);
     }
 };

@@ -15,6 +15,7 @@ using namespace glm;
 namespace mc {
 
 void OctreeVolume::dispatchMarch(
+    bool smoothNormals,
     util::unowned_ptr<glm::mat4> transform,
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
@@ -53,7 +54,7 @@ void OctreeVolume::dispatchMarch(
 
     std::mutex popMutex;
     for (std::size_t i = 0, N = _marchThreads->size(); i < N; i++) {
-        _marchThreads->enqueue([&popMutex, this, N, &transform](int threadIdx) {
+        _marchThreads->enqueue([&popMutex, this, N, smoothNormals, &transform](int threadIdx) {
             while (true) {
                 Node* node = nullptr;
                 {
@@ -66,7 +67,7 @@ void OctreeVolume::dispatchMarch(
                     _nodesToMarch.pop_back();
                 }
 
-                marchNode(node, *_triangleConsumers[threadIdx % N], transform);
+                marchNode(node, *_triangleConsumers[threadIdx % N], smoothNormals, transform);
             }
         });
     }
@@ -78,7 +79,7 @@ void OctreeVolume::dispatchMarch(
     }
 }
 
-void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, util::unowned_ptr<glm::mat4> transform)
+void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, bool smoothNormals, util::unowned_ptr<glm::mat4> transform)
 {
     auto fuzziness = this->_fuzziness;
     auto valueSampler = [fuzziness, node](const vec3& p) {
@@ -94,33 +95,37 @@ void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>&
         return value;
     };
 
-    auto normalSampler = [fuzziness, node](const vec3& p) {
-        constexpr float thresh2 = 0.01F * 0.01F;
-        bool haveSubtractiveNormals = false;
-        vec3 subtractiveNormal{0};
-        for (auto subtractiveSampler : node->_subtractiveSamplersVec) {
-            auto sn = subtractiveSampler->normalAt(p, fuzziness);
-            if (length2(sn) >= thresh2) {
-                subtractiveNormal -= sn;
-                haveSubtractiveNormals = true;
+    if (smoothNormals) {
+        auto normalSampler = [fuzziness, node](const vec3& p) {
+            constexpr float thresh2 = 0.01F * 0.01F;
+            bool haveSubtractiveNormals = false;
+            vec3 subtractiveNormal{0};
+            for (auto subtractiveSampler : node->_subtractiveSamplersVec) {
+                auto sn = subtractiveSampler->normalAt(p, fuzziness);
+                if (length2(sn) >= thresh2) {
+                    subtractiveNormal -= sn;
+                    haveSubtractiveNormals = true;
+                }
             }
-        }
 
-        if (haveSubtractiveNormals) {
-            subtractiveNormal = normalize(subtractiveNormal);
-            return subtractiveNormal;
-        }
+            if (haveSubtractiveNormals) {
+                subtractiveNormal = normalize(subtractiveNormal);
+                return subtractiveNormal;
+            }
 
-        vec3 additiveNormal { 0 };
-        for (auto additiveSampler : node->_additiveSamplersVec) {
-            additiveNormal += additiveSampler->normalAt(p, fuzziness);
-        }
-        additiveNormal = normalize(additiveNormal);
+            vec3 additiveNormal { 0 };
+            for (auto additiveSampler : node->_additiveSamplersVec) {
+                additiveNormal += additiveSampler->normalAt(p, fuzziness);
+            }
+            additiveNormal = normalize(additiveNormal);
 
-        return additiveNormal;
-    };
+            return additiveNormal;
+        };
 
-    mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform);
+        mc::march(util::iAABB(node->bounds), valueSampler, normalSampler, tc, transform);
+    } else {
+        mc::march(util::iAABB(node->bounds), valueSampler, nullptr, tc, transform);
+    }
 }
 
 } // namespace mc

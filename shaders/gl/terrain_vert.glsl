@@ -28,11 +28,9 @@ void main()
     // and want to use the triangle normal to make a hard edge. note,
     // since we're using the dot product of the crease threshold the
     // comparison appears inverted.
-    // float crease = dot(inTriangleNormal, inVertexNormal);
-    // float s = step(uDotCreaseThreshold, crease);
-    // vs_out.worldNormal = mat3(uModel) * mix(inTriangleNormal, inVertexNormal, s);
-
-    vs_out.worldNormal = mat3(uModel) * inTriangleNormal;
+    float crease = dot(inTriangleNormal, inVertexNormal);
+    float s = step(uDotCreaseThreshold, crease);
+    vs_out.worldNormal = mat3(uModel) * mix(inTriangleNormal, inVertexNormal, s);
 
     vs_out.worldPosition = vec3(uModel * vec4(inPosition, 1.0));
 }

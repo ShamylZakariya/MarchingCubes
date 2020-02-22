@@ -69,11 +69,11 @@ public:
     VolumeSegment(VolumeSegment&&) = delete;
     VolumeSegment& operator==(const VolumeSegment&) = delete;
 
-    int march()
+    int march(bool smoothNormals)
     {
         occupiedAABBs.clear();
 
-        volume->march([this](mc::OctreeVolume::Node* node) {
+        volume->march(smoothNormals, [this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
@@ -131,13 +131,14 @@ private:
     int _triangleCount = 0;
 
     // render state
-    std::unique_ptr<TerrainMaterial> _volumeMaterial;
+    std::unique_ptr<TerrainMaterial> _terrainMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
     std::vector<std::unique_ptr<VolumeSegment>> _volumeSegments;
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
     bool _drawOctreeAABBs = false;
+    bool _smoothNormals = false;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -329,8 +330,8 @@ private:
         auto backgroundTex = BlurCubemap(skyboxTexture, radians<float>(30), 64);
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
-        _volumeMaterial = std::make_unique<TerrainMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, shininess);
-        _volumeMaterial->setCreaseThreshold(radians<float>(0));
+        _terrainMaterial = std::make_unique<TerrainMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, shininess);
+        _terrainMaterial->setCreaseThreshold(radians<float>(45));
 
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(std::move(backgroundTex));
@@ -507,7 +508,7 @@ private:
         float segmentZ = 0;
         for (const auto& segment : _volumeSegments) {
             segment->model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
-            _volumeMaterial->bind(segment->model, view, projection, _cameraState.position);
+            _terrainMaterial->bind(segment->model, view, projection, _cameraState.position);
             for (auto& tc : segment->triangles) {
                 tc->draw();
             }
@@ -541,11 +542,7 @@ private:
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
 
-        bool smoothGround = _volumeSegments.front()->groundSampler->smooth();
-        if (ImGui::Checkbox("Smooth Ground", &smoothGround)) {
-            for (auto& seg : _volumeSegments) {
-                seg->groundSampler->setSmooth(smoothGround);
-            }
+        if (ImGui::Checkbox("Smooth Ground", &_smoothNormals)) {
             marchSegments();
         }
 
@@ -571,18 +568,20 @@ private:
 
         vec3 center = vec3(segment->volume->size()) / 2.0F;
 
-        vec3 ringOrigin = vec3(center.x, 0, center.z);
-        vec3 ringAxis = vec3(0,0,1);
-        float ringLength = 10;
-        float innerRadius = 40;
-        float outerRadius = 50;
-        float ringClip = 0;
-        vec3 frontCapNormal = normalize(ringAxis + ringClip*vec3(0,0.15,0));
-        vec3 backCapNormal = normalize(-ringAxis + ringClip*vec3(0,0.15,0));
+        Tube::Config tube;
+        tube.axisOrigin = vec3(center.x, 0, center.z);
+        tube.innerRadiusAxisOffset = vec3(0,8,0);
+        tube.axisDir = vec3(0, 0, 1);
+        tube.axisPerp = vec3(0, 1, 0);
+        tube.length = 10;
+        tube.innerRadius = 40;
+        tube.outerRadius = 50;
+        float faceClipAmt = 0.06F;
+        tube.frontFaceNormal = normalize(tube.axisDir + faceClipAmt * vec3(0, 1, 0));
+        tube.backFaceNormal = normalize(-tube.axisDir + faceClipAmt * vec3(0, 1, 0));
+        tube.cutAngleRadians = radians<float>(20);
 
-        segment->volume->add(
-            std::make_unique<Tube>(ringOrigin, ringAxis, innerRadius, outerRadius, ringLength, frontCapNormal, backCapNormal)
-        );
+        segment->volume->add(std::make_unique<Tube>(tube));
 
         // offset samples by the cumulative z to enable continuous perlin sampling
         segment->groundSampler->setSampleOffset(vec3 { 0, 0, which * segment->volume->size().z });
@@ -593,7 +592,7 @@ private:
         _triangleCount = 0;
         for (const auto& s : _volumeSegments) {
             auto start = glfwGetTime();
-            _triangleCount += s->march();
+            _triangleCount += s->march(_smoothNormals);
             auto elapsed = glfwGetTime() - start;
             std::cout << "March took " << elapsed << " seconds" << std::endl;
         }
