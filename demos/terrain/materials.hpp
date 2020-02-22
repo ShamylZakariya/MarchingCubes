@@ -47,7 +47,7 @@ public:
     }
 };
 
-struct VolumeMaterial {
+struct TerrainMaterial {
 private:
     GLuint _program = 0;
     GLint _uMVP = -1;
@@ -67,7 +67,7 @@ private:
     float _creaseThresholdRadians;
 
 public:
-    VolumeMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
+    TerrainMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
         : _lightprobe(lightProbe)
         , _ambientLight(ambientLight)
         , _reflectionMap(reflectionMap)
@@ -75,7 +75,7 @@ public:
         , _creaseThresholdRadians(radians<float>(15))
     {
         using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/volume_vert.glsl", "shaders/gl/volume_frag.glsl");
+        _program = CreateProgramFromFiles("shaders/gl/terrain_vert.glsl", "shaders/gl/terrain_frag.glsl");
         _uMVP = glGetUniformLocation(_program, "uMVP");
         _uModel = glGetUniformLocation(_program, "uModel");
         _uCameraPos = glGetUniformLocation(_program, "uCameraPosition");
@@ -87,10 +87,10 @@ public:
         _uDotCreaseThreshold = glGetUniformLocation(_program, "uDotCreaseThreshold");
     }
 
-    VolumeMaterial(const VolumeMaterial& other) = delete;
-    VolumeMaterial(const VolumeMaterial&& other) = delete;
+    TerrainMaterial(const TerrainMaterial& other) = delete;
+    TerrainMaterial(const TerrainMaterial&& other) = delete;
 
-    ~VolumeMaterial()
+    ~TerrainMaterial()
     {
         if (_program > 0) {
             glDeleteProgram(_program);

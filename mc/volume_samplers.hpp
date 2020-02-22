@@ -14,7 +14,7 @@
 
 namespace mc {
 
-namespace volume_samplers_detail {
+namespace volume_samplers_helpers {
 
     /*
     Test for intersection type of the volume defined by vertices and the planar volume defined
@@ -39,6 +39,52 @@ namespace volume_samplers_detail {
             if (signedDistance > halfExtent) {
                 onPositiveSide++;
             } else if (signedDistance < -halfExtent) {
+                onNegativeSide++;
+            } else {
+                inside++;
+            }
+
+            // if we have vertices on both sides of the plane
+            // we have an intersection (but not containment)
+            if (onPositiveSide && onNegativeSide) {
+                return IVolumeSampler::AABBIntersection::IntersectsAABB;
+            }
+        }
+
+        switch (inside) {
+        case 0:
+            return IVolumeSampler::AABBIntersection::None;
+        case 8:
+            return IVolumeSampler::AABBIntersection::ContainsAABB;
+        default:
+            return IVolumeSampler::AABBIntersection::IntersectsAABB;
+        }
+    }
+
+    /*
+    return the intersection of a rectangular prism-like volume with a region of space
+    defined by the negative side of two planes. This is like boundedPlaneIntersection
+    but allows for two planes with different normals
+    */
+    IVolumeSampler::AABBIntersection
+    boundedSpaceIntersection(
+        glm::vec3 frontFaceOrigin,
+        glm::vec3 frontFaceNormal,
+        glm::vec3 backFaceOrigin,
+        glm::vec3 backFaceNormal,
+        const std::array<glm::vec3, 8>& vertices)
+    {
+        // we need to see if the bounds actually intersects
+        int onPositiveSide = 0;
+        int onNegativeSide = 0;
+        int inside = 0;
+        for (const auto& v : vertices) {
+            float frontFaceDist = dot(frontFaceNormal, v - frontFaceOrigin);
+            float backFaceDist = dot(backFaceNormal, v - backFaceOrigin);
+
+            if (frontFaceDist > 0) {
+                onPositiveSide++;
+            } else if (backFaceDist > 0) {
                 onNegativeSide++;
             } else {
                 inside++;
@@ -288,12 +334,12 @@ public:
 
     bool intersects(util::AABB bounds) const override
     {
-        return volume_samplers_detail::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds) != AABBIntersection::None;
+        return volume_samplers_helpers::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds) != AABBIntersection::None;
     }
 
     AABBIntersection intersection(util::AABB bounds) const override
     {
-        return volume_samplers_detail::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds);
+        return volume_samplers_helpers::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds);
     }
 
     float valueAt(const glm::vec3& p, float fuzziness) const override
@@ -359,7 +405,7 @@ public:
 
     bool intersects(util::AABB bounds) const override
     {
-        using volume_samplers_detail::boundedPlaneIntersection;
+        using volume_samplers_helpers::boundedPlaneIntersection;
 
         // coarse AABB check
         if (bounds.intersect(_bounds) == util::AABB::Intersection::Outside) {
@@ -388,7 +434,7 @@ public:
 
     AABBIntersection intersection(util::AABB bounds) const override
     {
-        using volume_samplers_detail::boundedPlaneIntersection;
+        using volume_samplers_helpers::boundedPlaneIntersection;
 
         // coarse AABB check
         if (bounds.intersect(_bounds) == util::AABB::Intersection::Outside) {

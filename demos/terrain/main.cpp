@@ -48,7 +48,7 @@ constexpr int WIDTH = 1440;
 constexpr int HEIGHT = 900;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
-constexpr float FOV_DEGREES = 50.0F;
+constexpr float FOV_DEGREES = 80.0F;
 constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
 
 struct VolumeSegment {
@@ -131,7 +131,7 @@ private:
     int _triangleCount = 0;
 
     // render state
-    std::unique_ptr<VolumeMaterial> _volumeMaterial;
+    std::unique_ptr<TerrainMaterial> _volumeMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
     std::vector<std::unique_ptr<VolumeSegment>> _volumeSegments;
@@ -322,15 +322,15 @@ private:
         // load materials
         //
 
-        float volumeShininess = 0.0f;
+        float shininess = 0.0f;
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
         auto backgroundTex = BlurCubemap(skyboxTexture, radians<float>(30), 64);
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
-        _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, volumeShininess);
-        _volumeMaterial->setCreaseThreshold(radians<float>(30));
+        _volumeMaterial = std::make_unique<TerrainMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, shininess);
+        _volumeMaterial->setCreaseThreshold(radians<float>(0));
 
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(std::move(backgroundTex));
@@ -450,10 +450,8 @@ private:
     void step(float now, float deltaT)
     {
         // WASD
-        float movementSpeed = 20 * deltaT;
-        if (isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
-            movementSpeed *= 5;
-        }
+        const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
+        const float lookSpeed = radians<float>(90) * deltaT;
 
         if (isKeyDown(GLFW_KEY_A)) {
             _cameraState.moveBy(movementSpeed * vec3(+1, 0, 0));
@@ -477,6 +475,22 @@ private:
 
         if (isKeyDown(GLFW_KEY_E)) {
             _cameraState.moveBy(movementSpeed * vec3(0, +1, 0));
+        }
+
+        if (isKeyDown(GLFW_KEY_UP)) {
+            _cameraState.pitch -= lookSpeed;
+        }
+
+        if (isKeyDown(GLFW_KEY_DOWN)) {
+            _cameraState.pitch += lookSpeed;
+        }
+
+        if (isKeyDown(GLFW_KEY_LEFT)) {
+            _cameraState.yaw += lookSpeed;
+        }
+
+        if (isKeyDown(GLFW_KEY_RIGHT)) {
+            _cameraState.yaw -= lookSpeed;
         }
     }
 
@@ -556,8 +570,18 @@ private:
             std::make_unique<GroundSampler>(noiseFunction, maxHeight, false));
 
         vec3 center = vec3(segment->volume->size()) / 2.0F;
+
+        vec3 ringOrigin = vec3(center.x, 0, center.z);
+        vec3 ringAxis = vec3(0,0,1);
+        float ringLength = 10;
+        float innerRadius = 40;
+        float outerRadius = 50;
+        float ringClip = 0;
+        vec3 frontCapNormal = normalize(ringAxis + ringClip*vec3(0,0.15,0));
+        vec3 backCapNormal = normalize(-ringAxis + ringClip*vec3(0,0.15,0));
+
         segment->volume->add(
-            std::make_unique<Ring>(vec3(center.x, 0, center.z), vec3(0,0,1), 5, 45, 50)
+            std::make_unique<Tube>(ringOrigin, ringAxis, innerRadius, outerRadius, ringLength, frontCapNormal, backCapNormal)
         );
 
         // offset samples by the cumulative z to enable continuous perlin sampling
