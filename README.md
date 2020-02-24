@@ -18,7 +18,7 @@ brew install libepoxy glm glfw
 
 The VSCode project depends on meson building into `build`
 ```bash
-meson setup build
+meson setup --layout flat build
 ```
 
 Then you can open the project in VSCode
