@@ -72,13 +72,6 @@ public:
      */
     virtual float valueAt(const glm::vec3& p, float fuzziness) const = 0;
 
-    /*
-    Return the normal of the gradient of the volume at
-    a particular point in space; the magnitude of the
-    normal goes to 0 as the distanbce of point p from the isosurface
-    */
-    virtual glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const = 0;
-
 private:
     Mode _mode;
 };
@@ -207,15 +200,15 @@ public:
     /**
      * March the represented volume into the triangle consumers provided in the constructor
     */
-    void march(bool smoothNormals, glm::mat4 transform,
+    void march(bool vertexNormals, glm::mat4 transform,
         std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
     {
-        dispatchMarch(smoothNormals, util::unowned_ptr<glm::mat4>(&transform), marchedNodeObserver);
+        dispatchMarch(vertexNormals, util::unowned_ptr<glm::mat4>(&transform), marchedNodeObserver);
     }
 
-    void march(bool smoothNormals, std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
+    void march(bool vertexNormals, std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
     {
-        dispatchMarch(smoothNormals, nullptr, marchedNodeObserver);
+        dispatchMarch(vertexNormals, nullptr, marchedNodeObserver);
     }
 
     /**
@@ -235,10 +228,10 @@ public:
     }
 
 protected:
-    void dispatchMarch(bool smoothNormals, util::unowned_ptr<glm::mat4> transform,
+    void dispatchMarch(bool vertexNormals, util::unowned_ptr<glm::mat4> transform,
         std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
 
-    void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, bool smoothNormals, util::unowned_ptr<glm::mat4> transform);
+    void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, bool vertexNormals, util::unowned_ptr<glm::mat4> transform);
 
     /**
      * Mark the nodes which should be marched.

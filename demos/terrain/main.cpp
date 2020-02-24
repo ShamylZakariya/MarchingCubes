@@ -69,11 +69,11 @@ public:
     VolumeSegment(VolumeSegment&&) = delete;
     VolumeSegment& operator==(const VolumeSegment&) = delete;
 
-    int march(bool smoothNormals)
+    int march(bool computeVertexNormals)
     {
         occupiedAABBs.clear();
 
-        volume->march(smoothNormals, [this](mc::OctreeVolume::Node* node) {
+        volume->march(computeVertexNormals, [this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
@@ -138,7 +138,7 @@ private:
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
     bool _drawOctreeAABBs = false;
-    bool _smoothNormals = false;
+    bool _computeVertexNormals = true;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -318,12 +318,11 @@ private:
 
     void initApp()
     {
-
         //
         // load materials
         //
 
-        float shininess = 0.0f;
+        float shininess = 1.0f;
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
@@ -542,7 +541,7 @@ private:
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
 
-        if (ImGui::Checkbox("Smooth Ground", &_smoothNormals)) {
+        if (ImGui::Checkbox("Compute Vertex Normals", &_computeVertexNormals)) {
             marchSegments();
         }
 
@@ -570,7 +569,7 @@ private:
 
         Tube::Config tube;
         tube.axisOrigin = vec3(center.x, 0, center.z);
-        tube.innerRadiusAxisOffset = vec3(0,8,0);
+        tube.innerRadiusAxisOffset = vec3(0, 8, 0);
         tube.axisDir = vec3(0, 0, 1);
         tube.axisPerp = vec3(0, 1, 0);
         tube.length = 10;
@@ -592,7 +591,7 @@ private:
         _triangleCount = 0;
         for (const auto& s : _volumeSegments) {
             auto start = glfwGetTime();
-            _triangleCount += s->march(_smoothNormals);
+            _triangleCount += s->march(_computeVertexNormals);
             auto elapsed = glfwGetTime() - start;
             std::cout << "March took " << elapsed << " seconds" << std::endl;
         }

@@ -70,17 +70,6 @@ public:
         return 1 - ((p.y - innerY) / fuzziness);
     }
 
-    vec3 normalAt(const vec3& p, float fuzziness) const override
-    {
-        const float d = 0.75f;
-        vec3 grad(
-            _sample(p + vec3(d, 0, 0)) - _sample(p + vec3(-d, 0, 0)),
-            _sample(p + vec3(0, d, 0)) - _sample(p + vec3(0, -d, 0)),
-            _sample(p + vec3(0, 0, d)) - _sample(p + vec3(0, 0, -d)));
-
-        return -normalize(grad);
-    }
-
 private:
     inline float _sample(const vec3& p) const
     {
@@ -174,9 +163,9 @@ public:
         , _outerRadius(c.outerRadius)
         , _innerRadius2(c.innerRadius*c.innerRadius)
         , _outerRadius2(c.outerRadius*c.outerRadius)
-        , _frontFaceNormal(c.frontFaceNormal)
+        , _frontFaceNormal(normalize(c.frontFaceNormal))
         , _frontFaceOrigin(_tubeAxisOrigin + _tubeAxisDir * (c.length / 2))
-        , _backFaceNormal(c.backFaceNormal)
+        , _backFaceNormal(normalize(c.backFaceNormal))
         , _backFaceOrigin(_tubeAxisOrigin - _tubeAxisDir * (c.length / 2))
         , _cutAngleRadians(clamp<float>(c.cutAngleRadians, 0, 2*pi<float>()))
     {
@@ -239,7 +228,6 @@ public:
         // - On negative side front and back planes
         // - Between inner and outer radius from axis
 
-
         float frontFaceDist = dot(_frontFaceNormal, p - _frontFaceOrigin);
         float backFaceDist = dot(_backFaceNormal, p - _backFaceOrigin);
 
@@ -290,53 +278,6 @@ public:
         }
 
         return totalContribution;
-    }
-
-    vec3 normalAt(const vec3& p, float fuzziness) const override
-    {
-        // compute four normals for this point:
-        // - negative face normal
-        // - positive face normal
-        // - outer cylinder normal
-        // - inner cylinder normal
-        // and the respective distances from each surface / fuzziness
-        // then scale each normal accordingly, and return the
-        // normalization of the sum
-
-        float frontFaceDist = dot(_frontFaceNormal, p - _frontFaceOrigin);
-        float backFaceDist = dot(_backFaceNormal, p - _backFaceOrigin);
-        vec3 pointOnAxis;
-        float radialDist2 = _distanceToOuterCylinderAxis2(p, pointOnAxis);
-
-        // early exit
-        if (radialDist2 > _outerRadius2 || radialDist2 < _innerRadius2
-            || frontFaceDist > 0 || backFaceDist > 0) {
-            return vec3 { 0 };
-        }
-
-        return _tubeAxisDir;
-
-        // TODO: Implement meaningful normal, because this isn't working
-        // // distance of this point from the surface of pos and neg planes
-        // const auto posPlaneDist = abs(axisDist - _halfWidth);
-        // const auto negPlaneDist = abs(-axisDist - _halfWidth);
-        // const auto posPlaneContribution = 1 - min<float>(posPlaneDist / fuzziness, 1);
-        // const auto negPlaneContribution = 1 - min<float>(negPlaneDist / fuzziness, 1);
-
-        // const auto radialDist = sqrt(radialDist2);
-        // const auto outerRingDist = max(radialDist - _outerRadius, 0.0F);
-        // const auto innerRingDist = max(_innerRadius - radialDist, 0.0F);
-        // const auto outerRingContribution = 1 - min<float>(outerRingDist / fuzziness, 1);
-        // const auto innerRingContribution = 1 - min<float>(innerRingDist / fuzziness, 1);
-
-        // const vec3 outerRingNormal = normalize(p - pointOnAxis);
-
-        // return normalize(
-        //     (_cylinderAxisDirection * posPlaneContribution)
-        //     + (-_cylinderAxisDirection * negPlaneContribution)
-        //     + (outerRingNormal * outerRingContribution)
-        //     + (-outerRingNormal * innerRingContribution)
-        // );
     }
 
 private:

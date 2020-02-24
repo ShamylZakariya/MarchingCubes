@@ -191,24 +191,6 @@ public:
         return 1 - (d / fuzziness);
     }
 
-    glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const override
-    {
-        float d2 = distance2(p, _position);
-        float innerRadius = _radius - fuzziness;
-        float outerRadius = _radius + fuzziness;
-
-        if (d2 < (innerRadius * innerRadius)) {
-            return glm::vec3 { 0 };
-        } else if (d2 > (outerRadius * outerRadius)) {
-            return glm::vec3 { 0 };
-        } else {
-            float len = sqrt(d2);
-            glm::vec3 normal = (p - _position) / len;
-            float scale = 1.0F - ((sqrt(d2) - _radius) / fuzziness);
-            return normal * scale;
-        }
-    }
-
     void setPosition(const glm::vec3& center)
     {
         _position = center;
@@ -286,26 +268,6 @@ public:
         return -signedDist / fuzziness;
     }
 
-    glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const override
-    {
-        float signedDist = dot(_normal, p - _origin);
-
-        // if (signedDist > 0) {
-        //     return glm::vec3{0};
-        // } else {
-        //     return _normal;
-        // }
-
-        if (signedDist >= 0) {
-            return glm::vec3{0};
-        } else if (signedDist < -fuzziness) {
-            return _normal;
-        } else {
-            // signedDist (-fuzziness -> 0)
-            return _normal * (-signedDist / fuzziness);
-        }
-    }
-
     void setPlaneOrigin(const glm::vec3 planeOrigin) { _origin = planeOrigin; }
     glm::vec3 planeOrigin() const { return _origin; }
 
@@ -356,25 +318,6 @@ public:
         }
 
         return 1 - ((dist - innerDist) / fuzziness);
-    }
-
-    glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const override
-    {
-        float signedDist = glm::dot(_normal, p - _origin);
-        float outerDist = _thickness * 0.5F;
-        float innerDist = outerDist - fuzziness;
-
-        if (signedDist < -outerDist || signedDist > outerDist) {
-            return glm::vec3 { 0 };
-        } else if (signedDist < 0) {
-            // we're on negative side
-            float scale = 1.0F - glm::max<float>(-signedDist - innerDist, 0);
-            return scale * -_normal;
-        } else {
-            // we're on positive side
-            float scale = 1.0F - glm::max<float>(signedDist - innerDist, 0);
-            return scale * _normal;
-        }
     }
 
     void setPlaneOrigin(const glm::vec3 planeOrigin) { _origin = planeOrigin; }
@@ -496,48 +439,6 @@ public:
             return min(min(posXAmt, min(negXAmt, min(posYAmt, min(negYAmt, min(posZAmt, negZAmt))))), 1.0F);
         }
         return 0;
-    }
-
-    glm::vec3 normalAt(const glm::vec3& p, float fuzziness) const override
-    {
-        using glm::dot;
-        using glm::min;
-        using glm::mix;
-        fuzziness += 1e-5F;
-
-        // postivie values denote that the point is on the positive
-        // side of the plane, or, outside the cube. if all values
-        // are negative, the point is *inside* the cube.
-
-        const auto dir = p - _origin;
-        const auto posXDistance = dot(_posX, dir);
-        const auto posYDistance = dot(_posY, dir);
-        const auto posZDistance = dot(_posZ, dir);
-
-        const auto posX = posXDistance - _halfExtents.x;
-        const auto negX = -posXDistance - _halfExtents.x;
-        const auto posY = posYDistance - _halfExtents.y;
-        const auto negY = -posYDistance - _halfExtents.y;
-        const auto posZ = posZDistance - _halfExtents.z;
-        const auto negZ = -posZDistance - _halfExtents.z;
-
-        if (posX <= 0 && negX <= 0 && posY <= 0 && negY <= 0 && posZ <= 0 && negZ <= 0) {
-            auto posXAmt = 1 - min<float>(-posX / fuzziness, 1);
-            auto negXAmt = 1 - min<float>(-negX / fuzziness, 1);
-            auto posYAmt = 1 - min<float>(-posY / fuzziness, 1);
-            auto negYAmt = 1 - min<float>(-negY / fuzziness, 1);
-            auto posZAmt = 1 - min<float>(-posZ / fuzziness, 1);
-            auto negZAmt = 1 - min<float>(-negZ / fuzziness, 1);
-
-            return normalize(
-                (_posX * posXAmt)
-                + (-_posX * negXAmt)
-                + (_posY * posYAmt)
-                + (-_posY * negYAmt)
-                + (_posZ * posZAmt)
-                + (-_posZ * negZAmt));
-        }
-        return glm::vec3 { 0 };
     }
 
     void setPosition(const glm::vec3& position)
