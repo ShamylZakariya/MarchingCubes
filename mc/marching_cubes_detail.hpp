@@ -422,65 +422,90 @@ int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction no
         Find the vertices where the surface intersects the cube
     */
     glm::vec3 vertList[12], sourceList[12];
+    bool computeVertexNormals = normalSampler != nullptr;
 
     if (edgeTable[cubeIndex] & 1) {
         vertList[0] = VertexInterp(isolevel, grid.p[0], grid.p[1], grid.val[0], grid.val[1]);
-        sourceList[0] = VertexInterp(isolevel, grid.v[0], grid.v[1], grid.val[0], grid.val[1]);
+        if (computeVertexNormals) {
+            sourceList[0] = VertexInterp(isolevel, grid.v[0], grid.v[1], grid.val[0], grid.val[1]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 2) {
         vertList[1] = VertexInterp(isolevel, grid.p[1], grid.p[2], grid.val[1], grid.val[2]);
-        sourceList[1] = VertexInterp(isolevel, grid.v[1], grid.v[2], grid.val[1], grid.val[2]);
+        if (computeVertexNormals) {
+            sourceList[1] = VertexInterp(isolevel, grid.v[1], grid.v[2], grid.val[1], grid.val[2]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 4) {
         vertList[2] = VertexInterp(isolevel, grid.p[2], grid.p[3], grid.val[2], grid.val[3]);
-        sourceList[2] = VertexInterp(isolevel, grid.v[2], grid.v[3], grid.val[2], grid.val[3]);
+        if (computeVertexNormals) {
+            sourceList[2] = VertexInterp(isolevel, grid.v[2], grid.v[3], grid.val[2], grid.val[3]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 8) {
         vertList[3] = VertexInterp(isolevel, grid.p[3], grid.p[0], grid.val[3], grid.val[0]);
-        sourceList[3] = VertexInterp(isolevel, grid.v[3], grid.v[0], grid.val[3], grid.val[0]);
+        if (computeVertexNormals) {
+            sourceList[3] = VertexInterp(isolevel, grid.v[3], grid.v[0], grid.val[3], grid.val[0]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 16) {
         vertList[4] = VertexInterp(isolevel, grid.p[4], grid.p[5], grid.val[4], grid.val[5]);
-        sourceList[4] = VertexInterp(isolevel, grid.v[4], grid.v[5], grid.val[4], grid.val[5]);
+        if (computeVertexNormals) {
+            sourceList[4] = VertexInterp(isolevel, grid.v[4], grid.v[5], grid.val[4], grid.val[5]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 32) {
         vertList[5] = VertexInterp(isolevel, grid.p[5], grid.p[6], grid.val[5], grid.val[6]);
-        sourceList[5] = VertexInterp(isolevel, grid.v[5], grid.v[6], grid.val[5], grid.val[6]);
+        if (computeVertexNormals) {
+            sourceList[5] = VertexInterp(isolevel, grid.v[5], grid.v[6], grid.val[5], grid.val[6]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 64) {
         vertList[6] = VertexInterp(isolevel, grid.p[6], grid.p[7], grid.val[6], grid.val[7]);
-        sourceList[6] = VertexInterp(isolevel, grid.v[6], grid.v[7], grid.val[6], grid.val[7]);
+        if (computeVertexNormals) {
+            sourceList[6] = VertexInterp(isolevel, grid.v[6], grid.v[7], grid.val[6], grid.val[7]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 128) {
         vertList[7] = VertexInterp(isolevel, grid.p[7], grid.p[4], grid.val[7], grid.val[4]);
-        sourceList[7] = VertexInterp(isolevel, grid.v[7], grid.v[4], grid.val[7], grid.val[4]);
+        if (computeVertexNormals) {
+            sourceList[7] = VertexInterp(isolevel, grid.v[7], grid.v[4], grid.val[7], grid.val[4]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 256) {
         vertList[8] = VertexInterp(isolevel, grid.p[0], grid.p[4], grid.val[0], grid.val[4]);
-        sourceList[8] = VertexInterp(isolevel, grid.v[0], grid.v[4], grid.val[0], grid.val[4]);
+        if (computeVertexNormals) {
+            sourceList[8] = VertexInterp(isolevel, grid.v[0], grid.v[4], grid.val[0], grid.val[4]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 512) {
         vertList[9] = VertexInterp(isolevel, grid.p[1], grid.p[5], grid.val[1], grid.val[5]);
-        sourceList[9] = VertexInterp(isolevel, grid.v[1], grid.v[5], grid.val[1], grid.val[5]);
+        if (computeVertexNormals) {
+            sourceList[9] = VertexInterp(isolevel, grid.v[1], grid.v[5], grid.val[1], grid.val[5]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 1024) {
         vertList[10] = VertexInterp(isolevel, grid.p[2], grid.p[6], grid.val[2], grid.val[6]);
-        sourceList[10] = VertexInterp(isolevel, grid.v[2], grid.v[6], grid.val[2], grid.val[6]);
+        if (computeVertexNormals) {
+            sourceList[10] = VertexInterp(isolevel, grid.v[2], grid.v[6], grid.val[2], grid.val[6]);
+        }
     }
 
     if (edgeTable[cubeIndex] & 2048) {
         vertList[11] = VertexInterp(isolevel, grid.p[3], grid.p[7], grid.val[3], grid.val[7]);
-        sourceList[11] = VertexInterp(isolevel, grid.v[3], grid.v[7], grid.val[3], grid.val[7]);
+        if (computeVertexNormals) {
+            sourceList[11] = VertexInterp(isolevel, grid.v[3], grid.v[7], grid.val[3], grid.val[7]);
+        }
     }
 
     //
@@ -488,7 +513,6 @@ int Polygonise(const GridCell& grid, float isolevel, IsoSurfaceNormalFunction no
     //
 
     int numTriangles = 0;
-    bool computeVertexNormals = normalSampler != nullptr;
     for (int i = 0; triTable[cubeIndex][i] != -1; i += 3) {
         triangles[numTriangles].a.pos = vertList[triTable[cubeIndex][i]];
         triangles[numTriangles].b.pos = vertList[triTable[cubeIndex][i + 1]];

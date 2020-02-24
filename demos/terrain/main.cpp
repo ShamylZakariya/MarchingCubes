@@ -138,7 +138,7 @@ private:
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
     bool _drawOctreeAABBs = false;
-    bool _computeVertexNormals = true;
+    bool _computeVertexNormals = false;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -322,7 +322,7 @@ private:
         // load materials
         //
 
-        float shininess = 1.0f;
+        float shininess = 0.5f;
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
