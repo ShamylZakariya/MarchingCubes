@@ -69,11 +69,11 @@ public:
     VolumeSegment(VolumeSegment&&) = delete;
     VolumeSegment& operator==(const VolumeSegment&) = delete;
 
-    int march(bool computeVertexNormals)
+    int march()
     {
         occupiedAABBs.clear();
 
-        volume->march(computeVertexNormals, [this](mc::OctreeVolume::Node* node) {
+        volume->march([this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
@@ -138,7 +138,6 @@ private:
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
     bool _drawOctreeAABBs = false;
-    bool _computeVertexNormals = false;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -330,8 +329,6 @@ private:
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, shininess);
-        _terrainMaterial->setCreaseThreshold(radians<float>(45));
-
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(std::move(backgroundTex));
 
@@ -541,10 +538,6 @@ private:
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
 
-        if (ImGui::Checkbox("Compute Vertex Normals", &_computeVertexNormals)) {
-            marchSegments();
-        }
-
         ImGui::End();
     }
 
@@ -591,7 +584,7 @@ private:
         _triangleCount = 0;
         for (const auto& s : _volumeSegments) {
             auto start = glfwGetTime();
-            _triangleCount += s->march(_computeVertexNormals);
+            _triangleCount += s->march();
             auto elapsed = glfwGetTime() - start;
             std::cout << "March took " << elapsed << " seconds" << std::endl;
         }

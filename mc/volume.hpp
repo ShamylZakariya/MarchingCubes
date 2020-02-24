@@ -200,16 +200,7 @@ public:
     /**
      * March the represented volume into the triangle consumers provided in the constructor
     */
-    void march(bool vertexNormals, glm::mat4 transform,
-        std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
-    {
-        dispatchMarch(vertexNormals, util::unowned_ptr<glm::mat4>(&transform), marchedNodeObserver);
-    }
-
-    void march(bool vertexNormals, std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr)
-    {
-        dispatchMarch(vertexNormals, nullptr, marchedNodeObserver);
-    }
+    void march(std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr);
 
     /**
      * Get the bounds of this volume - no geometry will exceed this region
@@ -228,10 +219,8 @@ public:
     }
 
 protected:
-    void dispatchMarch(bool vertexNormals, util::unowned_ptr<glm::mat4> transform,
-        std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
 
-    void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc, bool vertexNormals, util::unowned_ptr<glm::mat4> transform);
+    void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
 
     /**
      * Mark the nodes which should be marched.

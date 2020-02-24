@@ -58,13 +58,11 @@ private:
     GLint _uReflectionMapSampler = -1;
     GLint _uReflectionMapMipLevels = -1;
     GLint _uShininess = -1;
-    GLint _uDotCreaseThreshold = -1;
 
     mc::util::TextureHandleRef _lightprobe;
     vec3 _ambientLight;
     mc::util::TextureHandleRef _reflectionMap;
     float _shininess;
-    float _creaseThresholdRadians;
 
 public:
     TerrainMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
@@ -72,7 +70,6 @@ public:
         , _ambientLight(ambientLight)
         , _reflectionMap(reflectionMap)
         , _shininess(clamp(shininess, 0.0F, 1.0F))
-        , _creaseThresholdRadians(radians<float>(15))
     {
         using namespace mc::util;
         _program = CreateProgramFromFiles("shaders/gl/terrain_vert.glsl", "shaders/gl/terrain_frag.glsl");
@@ -84,7 +81,6 @@ public:
         _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
         _uReflectionMapMipLevels = glGetUniformLocation(_program, "uReflectionMapMipLevels");
         _uShininess = glGetUniformLocation(_program, "uShininess");
-        _uDotCreaseThreshold = glGetUniformLocation(_program, "uDotCreaseThreshold");
     }
 
     TerrainMaterial(const TerrainMaterial& other) = delete;
@@ -104,13 +100,6 @@ public:
 
     float shininess() const { return _shininess; }
 
-    void setCreaseThreshold(float thresholdRadians)
-    {
-        _creaseThresholdRadians = std::max<float>(thresholdRadians, 0);
-    }
-
-    float creaseThreshold() const { return _creaseThresholdRadians; }
-
     void bind(const mat4& model, const mat4& view, const mat4& projection, const vec3& cameraPosition)
     {
         glActiveTexture(GL_TEXTURE0);
@@ -128,7 +117,6 @@ public:
         glUniform1i(_uReflectionMapSampler, 1);
         glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
         glUniform1f(_uShininess, _shininess);
-        glUniform1f(_uDotCreaseThreshold, cos(_creaseThresholdRadians));
     }
 };
 
