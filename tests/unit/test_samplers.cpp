@@ -32,23 +32,24 @@ TEST_CASE("SphereSampler", "[samplers]")
     auto radius = 100.0F;
     auto fuzz = 1.0F;
     auto sampler = SphereVolumeSampler(pos, radius, IVolumeSampler::Mode::Additive);
+    auto material = mc::MaterialState {};
 
     SECTION("valueAt")
     {
         // Point inside sphere is inside
-        REQUIRE(sampler.valueAt(vec3(radius / 2, 0, 0), fuzz) == 1_a);
+        REQUIRE(sampler.valueAt(vec3(radius / 2, 0, 0), fuzz, material) == 1_a);
 
         // Point outside sphere is outside
-        REQUIRE(sampler.valueAt(vec3(radius * 2, 0, 0), fuzz) == 0_a);
+        REQUIRE(sampler.valueAt(vec3(radius * 2, 0, 0), fuzz, material) == 0_a);
 
         // Point on boundary is outside
-        REQUIRE(sampler.valueAt(vec3(radius, 0, 0), fuzz) == 0.0_a);
+        REQUIRE(sampler.valueAt(vec3(radius, 0, 0), fuzz, material) == 0.0_a);
 
         // Point on inner fuzz boundary is inside
-        REQUIRE(sampler.valueAt(vec3(radius - fuzz, 0, 0), fuzz) == 1_a);
+        REQUIRE(sampler.valueAt(vec3(radius - fuzz, 0, 0), fuzz, material) == 1_a);
 
         // Point halfway across fuzz boundary is half in/half out
-        REQUIRE(sampler.valueAt(vec3(radius - fuzz / 2, 0, 0), fuzz) == 0.5_a);
+        REQUIRE(sampler.valueAt(vec3(radius - fuzz / 2, 0, 0), fuzz, material) == 0.5_a);
     }
 
     SECTION("aabb")
@@ -90,29 +91,30 @@ TEST_CASE("PlaneSampler", "[samplers]")
     auto thickness = 1.0F;
     auto fuzz = 0.5F;
     auto sampler = BoundedPlaneVolumeSampler(origin, normal, thickness, IVolumeSampler::Mode::Additive);
+    auto material = mc::MaterialState {};
 
     SECTION("valueAt")
     {
         //Point at origin of bounded plane is inside
-        REQUIRE(sampler.valueAt(vec3(0, 0, 0), fuzz) == 1.0_a);
+        REQUIRE(sampler.valueAt(vec3(0, 0, 0), fuzz, material) == 1.0_a);
 
         //Point at halfway across fuzziness boundary is half-inside
-        REQUIRE(sampler.valueAt(vec3(0, 0.25F, 0), fuzz) == 0.5_a);
+        REQUIRE(sampler.valueAt(vec3(0, 0.25F, 0), fuzz, material) == 0.5_a);
 
         //Point at halfway across fuzziness boundary is half-inside
-        REQUIRE(sampler.valueAt(vec3(0, -0.25F, 0), fuzz) == 0.5_a);
+        REQUIRE(sampler.valueAt(vec3(0, -0.25F, 0), fuzz, material) == 0.5_a);
 
         //Point at fuzziness edge of bounded plane is outside
-        REQUIRE(sampler.valueAt(vec3(0, 0.5F, 0), fuzz) == 0.0_a);
+        REQUIRE(sampler.valueAt(vec3(0, 0.5F, 0), fuzz, material) == 0.0_a);
 
         //Point at fuzziness edge of bounded plane is outside
-        REQUIRE(sampler.valueAt(vec3(0, -0.5F, 0), fuzz) == 0.0_a);
+        REQUIRE(sampler.valueAt(vec3(0, -0.5F, 0), fuzz, material) == 0.0_a);
 
         //Point beyond fuzziness edge of bounded plane is outside
-        REQUIRE(sampler.valueAt(vec3(0, 10.0F, 0), fuzz) == 0.0_a);
+        REQUIRE(sampler.valueAt(vec3(0, 10.0F, 0), fuzz, material) == 0.0_a);
 
         //Point beyond fuzziness edge of bounded plane is outside
-        REQUIRE(sampler.valueAt(vec3(0, -10.0F, 0), fuzz) == 0.0_a);
+        REQUIRE(sampler.valueAt(vec3(0, -10.0F, 0), fuzz, material) == 0.0_a);
     }
 
     SECTION("aabb")
@@ -172,18 +174,19 @@ TEST_CASE("CubeSampler", "[samplers]")
         // cube from -1 -> +1 on each axis, centered at origin
         auto fuzz = 0;
         auto cube = RectangularPrismVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
+        auto material = mc::MaterialState {};
 
         // test axes
         for (float x = 0; x <= 2; x += 0.25F) {
-            auto v = cube.valueAt(vec3(x, 0, 0), fuzz);
+            auto v = cube.valueAt(vec3(x, 0, 0), fuzz, material);
             REQUIRE(v == (x < 1 ? 1.0_a : 0.0_a));
         }
         for (float y = 0; y <= 2; y += 0.25F) {
-            auto v = cube.valueAt(vec3(0, y, 0), fuzz);
+            auto v = cube.valueAt(vec3(0, y, 0), fuzz, material);
             REQUIRE(v == (y < 1 ? 1.0_a : 0.0_a));
         }
         for (float z = 0; z <= 2; z += 0.25F) {
-            auto v = cube.valueAt(vec3(0, 0, z), fuzz);
+            auto v = cube.valueAt(vec3(0, 0, z), fuzz, material);
             REQUIRE(v == (z < 1 ? 1.0_a : 0.0_a));
         }
     }
@@ -195,7 +198,8 @@ TEST_CASE("CubeSampler", "[samplers]")
         auto cube = RectangularPrismVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
 
         auto eval = [&cube, &fuzz](vec3 p) {
-            return cube.valueAt(p, fuzz);
+            auto material = mc::MaterialState {};
+            return cube.valueAt(p, fuzz, material);
         };
 
         REQUIRE(eval(vec3(0, 0, 0)) == approx(1.0F));
@@ -245,7 +249,8 @@ TEST_CASE("CubeSampler", "[samplers]")
         auto cube = RectangularPrismVolumeSampler(vec3(0), vec3(1), mat3 { 1 }, IVolumeSampler::Mode::Additive);
 
         auto eval = [&cube, &fuzz](vec3 p) {
-            return cube.valueAt(p, fuzz);
+            auto material = mc::MaterialState {};
+            return cube.valueAt(p, fuzz, material);
         };
 
         auto test = [&eval, &cube](vec3 cubeOrigin) {

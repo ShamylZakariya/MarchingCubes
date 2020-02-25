@@ -57,19 +57,16 @@ private:
     GLint _uAmbientLight;
     GLint _uReflectionMapSampler = -1;
     GLint _uReflectionMapMipLevels = -1;
-    GLint _uShininess = -1;
 
     mc::util::TextureHandleRef _lightprobe;
     vec3 _ambientLight;
     mc::util::TextureHandleRef _reflectionMap;
-    float _shininess;
 
 public:
-    TerrainMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
+    TerrainMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap)
         : _lightprobe(lightProbe)
         , _ambientLight(ambientLight)
         , _reflectionMap(reflectionMap)
-        , _shininess(clamp(shininess, 0.0F, 1.0F))
     {
         using namespace mc::util;
         _program = CreateProgramFromFiles("shaders/gl/terrain_vert.glsl", "shaders/gl/terrain_frag.glsl");
@@ -80,7 +77,6 @@ public:
         _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
         _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
         _uReflectionMapMipLevels = glGetUniformLocation(_program, "uReflectionMapMipLevels");
-        _uShininess = glGetUniformLocation(_program, "uShininess");
     }
 
     TerrainMaterial(const TerrainMaterial& other) = delete;
@@ -92,13 +88,6 @@ public:
             glDeleteProgram(_program);
         }
     }
-
-    void setShininess(float s)
-    {
-        _shininess = clamp<float>(s, 0, 1);
-    }
-
-    float shininess() const { return _shininess; }
 
     void bind(const mat4& model, const mat4& view, const mat4& projection, const vec3& cameraPosition)
     {
@@ -116,7 +105,6 @@ public:
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
         glUniform1i(_uReflectionMapSampler, 1);
         glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
-        glUniform1f(_uShininess, _shininess);
     }
 };
 

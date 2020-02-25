@@ -57,8 +57,11 @@ public:
         throw std::runtime_error("intersection only meanignful for subtractive volumes");
     }
 
-    float valueAt(const vec3& p, float fuzziness) const override
+    float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
     {
+        material.color = vec4(0.2, 0.2, 0.2, 1);
+        material.shininess = 0;
+
         auto y = _sample(p);
         auto innerY = y - fuzziness;
         if (p.y > y) {
@@ -222,8 +225,11 @@ public:
         throw std::runtime_error("intersection only meanignful for subtractive volumes");
     }
 
-    float valueAt(const vec3& p, float fuzziness) const override
+    float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
     {
+        material.color = vec4(1, 0, 1, 1);
+        material.shininess = 1;
+
         // A point is inside the ring volume if:
         // - On negative side front and back planes
         // - Between inner and outer radius from axis

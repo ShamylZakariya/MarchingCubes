@@ -23,6 +23,16 @@ struct MaterialState {
     float texture1 { 0 };
 };
 
+inline MaterialState mix(const MaterialState& a, const MaterialState& b, float t)
+{
+    return MaterialState {
+        glm::mix(a.color, b.color, t),
+        glm::mix(a.shininess, b.shininess, t),
+        glm::mix(a.texture0, b.texture0, t),
+        glm::mix(a.texture1, b.texture1, t)
+    };
+}
+
 typedef std::function<float(const glm::vec3& p, MaterialState&)> IsoSurfaceValueFunction;
 
 /**
@@ -32,9 +42,9 @@ struct Vertex {
     glm::vec3 pos;
     glm::vec4 color { 1 };
     glm::vec3 triangleNormal { 0, 1, 0 };
-    float shininess {0};
-    float texture0{0};
-    float texture1{0};
+    float shininess { 0 };
+    float texture0 { 0 };
+    float texture1 { 0 };
 
     enum class AttributeLayout : GLuint {
         Pos = 0,

@@ -173,7 +173,7 @@ public:
         }
     }
 
-    float valueAt(const glm::vec3& p, float fuzziness) const override
+    float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const override
     {
         float d2 = distance2(p, _position);
         float innerRadius = _radius - fuzziness;
@@ -257,7 +257,7 @@ public:
         }
     }
 
-    float valueAt(const glm::vec3& p, float fuzziness) const override
+    float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const override
     {
         float signedDist = dot(_normal, p - _origin);
         if (signedDist < -fuzziness) {
@@ -304,7 +304,7 @@ public:
         return volume_samplers_helpers::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds);
     }
 
-    float valueAt(const glm::vec3& p, float fuzziness) const override
+    float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const override
     {
         // distance of p from plane
         float dist = abs(glm::dot(_normal, p - _origin));
@@ -407,7 +407,7 @@ public:
         return AABBIntersection::ContainsAABB;
     }
 
-    float valueAt(const glm::vec3& p, float fuzziness) const override
+    float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const override
     {
         using glm::min;
 

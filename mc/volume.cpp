@@ -80,16 +80,29 @@ void OctreeVolume::march(
 void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc)
 {
     auto fuzziness = this->_fuzziness;
-    auto valueSampler = [fuzziness, node](const vec3& p, mc::MaterialState &material) {
+    auto valueSampler = [fuzziness, node](const vec3& p, mc::MaterialState& material) {
+        // run additive samplers, interpolating
+        // material state
         float value = 0;
         for (auto additiveSampler : node->_additiveSamplersVec) {
-            value += additiveSampler->valueAt(p, fuzziness);
+            MaterialState m;
+            auto v = additiveSampler->valueAt(p, fuzziness, m);
+            if (value == 0) {
+                material = m;
+            } else {
+                material = mix(material, m, v);
+            }
+            value += v;
         }
+
+        // run subtractions (these don't affect material state)
         value = min<float>(value, 1.0F);
         for (auto subtractiveSampler : node->_subtractiveSamplersVec) {
-            value -= subtractiveSampler->valueAt(p, fuzziness);
+            MaterialState _;
+            value -= subtractiveSampler->valueAt(p, fuzziness, _);
         }
         value = max<float>(value, 0.0F);
+
         return value;
     };
     mc::march(util::iAABB(node->bounds), valueSampler, tc);

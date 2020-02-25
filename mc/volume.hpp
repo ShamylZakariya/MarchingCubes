@@ -69,8 +69,9 @@ public:
      example, in the case of a circle or radius r, a point distance <= r - fuziness
      returns a value of 1, and a distance >= r returns 0,
      and values in between return a linear transition.
+     Write the material properties of the volume into `material
      */
-    virtual float valueAt(const glm::vec3& p, float fuzziness) const = 0;
+    virtual float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const = 0;
 
 private:
     Mode _mode;
@@ -219,7 +220,6 @@ public:
     }
 
 protected:
-
     void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
 
     /**

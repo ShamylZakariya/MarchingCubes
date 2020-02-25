@@ -321,14 +321,12 @@ private:
         // load materials
         //
 
-        float shininess = 0.5f;
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
-
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
         auto backgroundTex = BlurCubemap(skyboxTexture, radians<float>(30), 64);
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
-        _terrainMaterial = std::make_unique<TerrainMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, shininess);
+        _terrainMaterial = std::make_unique<TerrainMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture);
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(std::move(backgroundTex));
 
