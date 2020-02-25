@@ -54,19 +54,32 @@ private:
     GLint _uModel = -1;
     GLint _uCameraPos = -1;
     GLint _uLightprobeSampler = -1;
+    GLint _uTexture0Sampler = -1;
+    GLuint _uTexture0Scale = -1;
+    GLint _uTexture1Sampler = -1;
+    GLuint _uTexture1Scale = -1;
     GLint _uAmbientLight;
     GLint _uReflectionMapSampler = -1;
     GLint _uReflectionMapMipLevels = -1;
 
     mc::util::TextureHandleRef _lightprobe;
     vec3 _ambientLight;
-    mc::util::TextureHandleRef _reflectionMap;
+    mc::util::TextureHandleRef _reflectionMap, _texture0, _texture1;
+    float _texture0Scale = 1;
+    float _texture1Scale = 1;
 
 public:
-    TerrainMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap)
+    TerrainMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight,
+        mc::util::TextureHandleRef reflectionMap,
+        mc::util::TextureHandleRef texture0, float tex0Scale,
+        mc::util::TextureHandleRef texture1, float tex1Scale)
         : _lightprobe(lightProbe)
         , _ambientLight(ambientLight)
         , _reflectionMap(reflectionMap)
+        , _texture0(texture0)
+        , _texture1(texture1)
+        , _texture0Scale(tex0Scale)
+        , _texture1Scale(tex1Scale)
     {
         using namespace mc::util;
         _program = CreateProgramFromFiles("shaders/gl/terrain_vert.glsl", "shaders/gl/terrain_frag.glsl");
@@ -77,6 +90,10 @@ public:
         _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
         _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
         _uReflectionMapMipLevels = glGetUniformLocation(_program, "uReflectionMapMipLevels");
+        _uTexture0Sampler = glGetUniformLocation(_program, "uTexture0Sampler");
+        _uTexture0Scale = glGetUniformLocation(_program, "uTexture0Scale");
+        _uTexture1Sampler = glGetUniformLocation(_program, "uTexture1Sampler");
+        _uTexture1Scale = glGetUniformLocation(_program, "uTexture1Scale");
     }
 
     TerrainMaterial(const TerrainMaterial& other) = delete;
@@ -97,6 +114,12 @@ public:
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->id());
 
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, _texture0->id());
+
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, _texture1->id());
+
         glUseProgram(_program);
         glUniformMatrix4fv(_uMVP, 1, GL_FALSE, value_ptr(projection * view * model));
         glUniformMatrix4fv(_uModel, 1, GL_FALSE, value_ptr(model));
@@ -105,6 +128,10 @@ public:
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
         glUniform1i(_uReflectionMapSampler, 1);
         glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
+        glUniform1i(_uTexture0Sampler, 2);
+        glUniform1i(_uTexture1Sampler, 3);
+        glUniform1f(_uTexture0Scale, _texture0Scale);
+        glUniform1f(_uTexture1Scale, _texture1Scale);
     }
 };
 

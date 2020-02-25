@@ -59,8 +59,10 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
     {
-        material.color = vec4(0.2, 0.2, 0.2, 1);
+        material.color = vec4(0.4, 0.4, 0.45, 1);
         material.shininess = 0;
+        material.texture0 = 1;
+        material.texture1 = 0;
 
         auto y = _sample(p);
         auto innerY = y - fuzziness;
@@ -229,6 +231,8 @@ public:
     {
         material.color = vec4(1, 0, 1, 1);
         material.shininess = 1;
+        material.texture0 = 0;
+        material.texture1 = 1;
 
         // A point is inside the ring volume if:
         // - On negative side front and back planes
