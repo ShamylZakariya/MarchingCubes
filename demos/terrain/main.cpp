@@ -325,8 +325,8 @@ private:
         auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
         auto backgroundTex = BlurCubemap(skyboxTexture, radians<float>(30), 64);
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
-        auto terrainTexture0 = mc::util::LoadTexture2D("textures/axes.png");
-        auto terrainTexture1 = mc::util::LoadTexture2D("textures/axes-2.png");
+        auto terrainTexture0 = mc::util::LoadTexture2D("textures/Metal_Hammered_001_basecolor.jpg");
+        auto terrainTexture1 = mc::util::LoadTexture2D("textures/Metal_006_Base_Color.png");
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
             std::move(lightprobeTex), ambientLight, skyboxTexture,

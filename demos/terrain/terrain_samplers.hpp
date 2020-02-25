@@ -59,7 +59,7 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
     {
-        material.color = vec4(0.4, 0.4, 0.45, 1);
+        material.color = vec4(1, 1, 1, 1);
         material.shininess = 0;
         material.texture0 = 1;
         material.texture1 = 0;
@@ -229,8 +229,8 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
     {
-        material.color = vec4(1, 0, 1, 1);
-        material.shininess = 1;
+        material.color = vec4(1, 1, 1, 1);
+        material.shininess = 0.3;
         material.texture0 = 0;
         material.texture1 = 1;
 
