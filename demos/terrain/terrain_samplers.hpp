@@ -36,16 +36,6 @@ public:
 
     ~GroundSampler() = default;
 
-    void setSampleOffset(vec3 offset)
-    {
-        _sampleOffset = offset;
-    }
-
-    vec3 sampleOffset() const
-    {
-        return _sampleOffset;
-    }
-
     bool intersects(AABB bounds) const override
     {
         // We know that the geometry will span [x,y] and be no taller than
@@ -80,7 +70,7 @@ public:
 private:
     inline float _sample(const vec3& p) const
     {
-        float n = _noise(p + _sampleOffset);
+        float n = _noise(p);
 
         // sand-dune like structure
         float dune = n * 5;
@@ -96,7 +86,6 @@ private:
 
     NoiseSampler _noise;
     float _height { 0 };
-    vec3 _sampleOffset { 0 };
 
     mc::MaterialState _lowMaterial, _highMaterial;
 

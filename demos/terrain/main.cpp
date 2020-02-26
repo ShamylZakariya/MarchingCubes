@@ -32,6 +32,7 @@
 #include "../common/cubemap_blur.hpp"
 #include "materials.hpp"
 #include "terrain_samplers.hpp"
+#include "xorshift.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -61,7 +62,7 @@ public:
             unownedTriangleConsumers.push_back(triangles.back().get());
         }
 
-        volume = make_unique<mc::OctreeVolume>(128, 0.5F, 4, unownedTriangleConsumers);
+        volume = make_unique<mc::OctreeVolume>(256, 1, 4, unownedTriangleConsumers);
     }
 
     ~VolumeSegment() = default;
@@ -134,7 +135,7 @@ private:
     std::unique_ptr<TerrainMaterial> _terrainMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    std::vector<std::unique_ptr<VolumeSegment>> _volumeSegments;
+    std::vector<std::unique_ptr<VolumeSegment>> _segments;
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
     bool _drawOctreeAABBs = false;
@@ -385,15 +386,15 @@ private:
         constexpr auto COUNT = 3;
 
         for (int i = 0; i < COUNT; i++) {
-            _volumeSegments.emplace_back(std::make_unique<VolumeSegment>(nThreads));
+            _segments.emplace_back(std::make_unique<VolumeSegment>(nThreads));
         }
 
         //
         //  Build terrain
         //
 
-        for (size_t i = 0; i < _volumeSegments.size(); i++) {
-            buildTerrain(i);
+        for (size_t i = 0; i < _segments.size(); i++) {
+            buildTerrainSection(i);
         }
 
         marchSegments();
@@ -505,7 +506,7 @@ private:
         // draw volumes
         glDepthMask(GL_TRUE);
         float segmentZ = 0;
-        for (const auto& segment : _volumeSegments) {
+        for (const auto& segment : _segments) {
             segment->model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
             _terrainMaterial->bind(segment->model, view, projection, _cameraState.position);
             for (auto& tc : segment->triangles) {
@@ -523,7 +524,7 @@ private:
         if (_drawOctreeAABBs) {
             // draw lines
             glDepthMask(GL_FALSE);
-            for (const auto& segment : _volumeSegments) {
+            for (const auto& segment : _segments) {
                 _lineMaterial->bind(projection * view * segment->model);
                 segment->occupiedAABBs.draw();
             }
@@ -544,14 +545,22 @@ private:
         ImGui::End();
     }
 
-    void buildTerrain(int which)
+    void buildTerrainSection(int which)
     {
         std::cout << "Building segment " << which << std::endl;
 
-        const auto& segment = _volumeSegments[which];
+        const auto& segment = _segments[which];
+
+        // remove existing samplers - it's OK, making new ones is cheap
+        segment->volume->clear();
+
+        //
+        // build terrain sampler
+        //
+
         const float maxHeight = 8.0F;
         const auto octaves = 3;
-        const auto frequency = vec3(_volumeSegments.front()->volume->size()) * 2.0F;
+        const auto frequency = vec3(_segments.front()->volume->size()) * 2.0F;
 
         const mc::MaterialState lowGround {
             vec4(1),
@@ -574,15 +583,21 @@ private:
             1
         };
 
-        auto noiseFunction = [=](vec3 p) {
-            return _noise.octaveNoise0_1(p.x / frequency.x, p.y / frequency.y, p.z / frequency.z, octaves);
+        const auto zOffset = which * segment->volume->size().z;
+        const auto groundSampler = [=](vec3 p) {
+            return _noise.octaveNoise0_1(p.x / frequency.x, p.y / frequency.y, (p.z + zOffset) / frequency.z, octaves);
         };
 
-        // for now make a box
         segment->groundSampler = segment->volume->add(
-            std::make_unique<GroundSampler>(noiseFunction, maxHeight, lowGround, highGround));
+            std::make_unique<GroundSampler>(groundSampler, maxHeight, lowGround, highGround));
 
-        vec3 center = vec3(segment->volume->size()) / 2.0F;
+
+        //
+        // build a broken arch
+        //
+
+
+        const auto center = vec3(segment->volume->size()) / 2.0F;
 
         Tube::Config arch;
         arch.axisOrigin = vec3(center.x, 0, center.z);
@@ -599,15 +614,12 @@ private:
         arch.material = archMaterial;
 
         segment->volume->add(std::make_unique<Tube>(arch));
-
-        // offset samples by the cumulative z to enable continuous perlin sampling
-        segment->groundSampler->setSampleOffset(vec3 { 0, 0, which * segment->volume->size().z });
     }
 
     void marchSegments()
     {
         _triangleCount = 0;
-        for (const auto& s : _volumeSegments) {
+        for (const auto& s : _segments) {
             auto start = glfwGetTime();
             _triangleCount += s->march();
             auto elapsed = glfwGetTime() - start;
