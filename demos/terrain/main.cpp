@@ -553,30 +553,52 @@ private:
         const auto octaves = 3;
         const auto frequency = vec3(_volumeSegments.front()->volume->size()) * 2.0F;
 
+        const mc::MaterialState lowGround {
+            vec4(1),
+            0.5F,
+            1,
+            0
+        };
+
+        const mc::MaterialState highGround {
+            vec4(0.3,0.3,0.375,1),
+            0,
+            0,
+            1
+        };
+
+        const mc::MaterialState archMaterial {
+            vec4(0.6,0.6,0.6,1),
+            0.5,
+            0,
+            1
+        };
+
         auto noiseFunction = [=](vec3 p) {
             return _noise.octaveNoise0_1(p.x / frequency.x, p.y / frequency.y, p.z / frequency.z, octaves);
         };
 
         // for now make a box
         segment->groundSampler = segment->volume->add(
-            std::make_unique<GroundSampler>(noiseFunction, maxHeight, false));
+            std::make_unique<GroundSampler>(noiseFunction, maxHeight, lowGround, highGround));
 
         vec3 center = vec3(segment->volume->size()) / 2.0F;
 
-        Tube::Config tube;
-        tube.axisOrigin = vec3(center.x, 0, center.z);
-        tube.innerRadiusAxisOffset = vec3(0, 8, 0);
-        tube.axisDir = vec3(0, 0, 1);
-        tube.axisPerp = vec3(0, 1, 0);
-        tube.length = 10;
-        tube.innerRadius = 40;
-        tube.outerRadius = 50;
+        Tube::Config arch;
+        arch.axisOrigin = vec3(center.x, 0, center.z);
+        arch.innerRadiusAxisOffset = vec3(0, 8, 0);
+        arch.axisDir = vec3(0, 0, 1);
+        arch.axisPerp = vec3(0, 1, 0);
+        arch.length = 10;
+        arch.innerRadius = 40;
+        arch.outerRadius = 50;
         float faceClipAmt = 0.06F;
-        tube.frontFaceNormal = normalize(tube.axisDir + faceClipAmt * vec3(0, 1, 0));
-        tube.backFaceNormal = normalize(-tube.axisDir + faceClipAmt * vec3(0, 1, 0));
-        tube.cutAngleRadians = radians<float>(20);
+        arch.frontFaceNormal = normalize(arch.axisDir + faceClipAmt * vec3(0, 1, 0));
+        arch.backFaceNormal = normalize(-arch.axisDir + faceClipAmt * vec3(0, 1, 0));
+        arch.cutAngleRadians = radians<float>(20);
+        arch.material = archMaterial;
 
-        segment->volume->add(std::make_unique<Tube>(tube));
+        segment->volume->add(std::make_unique<Tube>(arch));
 
         // offset samples by the cumulative z to enable continuous perlin sampling
         segment->groundSampler->setSampleOffset(vec3 { 0, 0, which * segment->volume->size().z });

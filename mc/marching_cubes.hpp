@@ -17,9 +17,16 @@
 namespace mc {
 
 struct MaterialState {
+    // color of fragment
     glm::vec4 color { 1 };
+
+    // shininess [0,1]
     float shininess { 0 };
+
+    // amount [0,1] that texture0 will contribute
     float texture0 { 0 };
+
+    // amount [0,1] that texture1 will contribute
     float texture1 { 0 };
 };
 

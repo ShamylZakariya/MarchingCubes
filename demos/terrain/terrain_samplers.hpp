@@ -24,10 +24,13 @@ public:
     GroundSampler(const GroundSampler&) = delete;
     GroundSampler(GroundSampler&&) = delete;
 
-    GroundSampler(NoiseSampler noise, float height, bool smooth)
+    GroundSampler(NoiseSampler noise, float height,
+        const mc::MaterialState &lowMaterial, const mc::MaterialState &highMaterial)
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _noise(noise)
         , _height(height)
+        , _lowMaterial(lowMaterial)
+        , _highMaterial(highMaterial)
     {
     }
 
@@ -59,10 +62,9 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
     {
-        material.color = vec4(1, 1, 1, 1);
-        material.shininess = 0;
-        material.texture0 = 1;
-        material.texture1 = 0;
+        float height = clamp(p.y / _height, 0.0F, 1.0F);
+        float t = (1 - height);
+        material = mix(_highMaterial, _lowMaterial, t * t * t);
 
         auto y = _sample(p);
         auto innerY = y - fuzziness;
@@ -95,6 +97,9 @@ private:
     NoiseSampler _noise;
     float _height { 0 };
     vec3 _sampleOffset { 0 };
+
+    mc::MaterialState _lowMaterial, _highMaterial;
+
 };
 
 class Tube : public mc::IVolumeSampler {
@@ -117,7 +122,7 @@ private:
     float _cutAngleRadians{0};
     float _cosCutAngle{0};
     bool _hasInnerCylinderOffset = false;
-
+    mc::MaterialState _material;
 
 public:
 
@@ -153,6 +158,9 @@ public:
 
         // normal of the back capping plane of the tube
         vec3 backFaceNormal{0,0,-1};
+
+        // material tubes will emit
+        mc::MaterialState material;
     };
 
 
@@ -173,6 +181,7 @@ public:
         , _backFaceNormal(normalize(c.backFaceNormal))
         , _backFaceOrigin(_tubeAxisOrigin - _tubeAxisDir * (c.length / 2))
         , _cutAngleRadians(clamp<float>(c.cutAngleRadians, 0, 2*pi<float>()))
+        , _material(c.material)
     {
         _cosCutAngle = cos(_cutAngleRadians);
         _hasInnerCylinderOffset = length2(_innerRadiusOffset) > 0;
@@ -229,10 +238,7 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
     {
-        material.color = vec4(1, 1, 1, 1);
-        material.shininess = 0.3;
-        material.texture0 = 0;
-        material.texture1 = 1;
+        material = _material;
 
         // A point is inside the ring volume if:
         // - On negative side front and back planes
