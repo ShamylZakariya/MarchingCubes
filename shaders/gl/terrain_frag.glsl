@@ -53,9 +53,10 @@ void main()
 
     vec3 lightProbeColor = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
 
-    vec4 diffuse0 = fs_in.color * TriPlanarTexture(uTexture0Sampler, uTexture0Scale);
-    vec4 diffuse1 = fs_in.color * TriPlanarTexture(uTexture1Sampler, uTexture1Scale);
-    vec3 diffuse = (diffuse0.rgb * fs_in.tex0Contribution + diffuse1.rgb * fs_in.tex1Contribution) / (fs_in.tex0Contribution + fs_in.tex1Contribution);
+    vec3 diffuse0 = mix(fs_in.color, fs_in.color * TriPlanarTexture(uTexture0Sampler, uTexture0Scale), fs_in.tex0Contribution).rgb;
+    vec3 diffuse1 = mix(fs_in.color, fs_in.color * TriPlanarTexture(uTexture1Sampler, uTexture1Scale), fs_in.tex1Contribution).rgb;
+    vec3 diffuse = 0.5 * (diffuse0 + diffuse1);
+
     vec3 color = diffuse * (uAmbientLight + mix(lightProbeColor, reflectionColor, fs_in.shininess));
 
     fragColor = vec4(color, fs_in.color.a);

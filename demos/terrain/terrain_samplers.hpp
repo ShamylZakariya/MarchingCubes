@@ -22,11 +22,15 @@ public:
     GroundSampler(const GroundSampler&) = delete;
     GroundSampler(GroundSampler&&) = delete;
 
-    GroundSampler(NoiseSampler noise, float height,
-        const mc::MaterialState &lowMaterial, const mc::MaterialState &highMaterial)
+    GroundSampler(NoiseSampler noise, float height, float floorThreshold,
+        const mc::MaterialState& floorMaterial,
+        const mc::MaterialState& lowMaterial,
+        const mc::MaterialState& highMaterial)
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _noise(noise)
         , _height(height)
+        , _floorPinion(floorThreshold / height)
+        , _floorMaterial(floorMaterial)
         , _lowMaterial(lowMaterial)
         , _highMaterial(highMaterial)
     {
@@ -48,11 +52,21 @@ public:
         throw std::runtime_error("intersection only meanignful for subtractive volumes");
     }
 
-    float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
+    float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
     {
-        float height = clamp(p.y / _height, 0.0F, 1.0F);
-        float t = (1 - height);
-        material = mix(_highMaterial, _lowMaterial, t * t * t);
+        float sampleHeight = clamp(p.y / _height, 0.0F, 1.0F);
+
+        if (sampleHeight < _floorPinion) {
+            material = _floorMaterial;
+        } else {
+            float t = (sampleHeight - _floorPinion) / (1 - _floorPinion);
+            t = (1 - sampleHeight);
+            material = mix(_highMaterial, _lowMaterial, t * t * t);
+        }
+
+        if (p.y < 1e-3) {
+            return 1;
+        }
 
         auto y = _sample(p);
         auto innerY = y - fuzziness;
@@ -84,48 +98,46 @@ private:
 
     NoiseSampler _noise;
     float _height { 0 };
+    float _floorPinion {0};
 
-    mc::MaterialState _lowMaterial, _highMaterial;
-
+    mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
 };
 
 class Tube : public mc::IVolumeSampler {
 private:
+    vec3 _tubeAxisOrigin { 0 };
+    vec3 _tubeAxisDir { 0, 0, 1 };
+    vec3 _tubeAxisPerp { 0, 1, 0 };
+    vec3 _innerRadiusOffset { 0 };
+    float _innerRadius { 0 };
+    float _outerRadius { 0 };
+    float _innerRadius2 { 0 };
+    float _outerRadius2 { 0 };
 
-    vec3 _tubeAxisOrigin{0};
-    vec3 _tubeAxisDir{0,0,1};
-    vec3 _tubeAxisPerp{0,1,0};
-    vec3 _innerRadiusOffset{0};
-    float _innerRadius{0};
-    float _outerRadius{0};
-    float _innerRadius2{0};
-    float _outerRadius2{0};
+    vec3 _frontFaceNormal { 0, 0, 1 };
+    vec3 _frontFaceOrigin { 0 };
+    vec3 _backFaceNormal { 0, 0, -1 };
+    vec3 _backFaceOrigin { 0, 0, 0 };
 
-    vec3 _frontFaceNormal{0,0,1};
-    vec3 _frontFaceOrigin{0};
-    vec3 _backFaceNormal{0,0,-1};
-    vec3 _backFaceOrigin{0,0,0};
-
-    float _cutAngleRadians{0};
-    float _cosCutAngle{0};
+    float _cutAngleRadians { 0 };
+    float _cosCutAngle { 0 };
     bool _hasInnerCylinderOffset = false;
     mc::MaterialState _material;
 
 public:
-
     struct Config {
         // origin of the cylinder representing the outer radius of the tube
-        vec3 axisOrigin{0};
+        vec3 axisOrigin { 0 };
         // major axis of the cylinder making the outer radius of the tube
-        vec3 axisDir{0,0,1};
+        vec3 axisDir { 0, 0, 1 };
 
         // perpendicular to the axisDir, used for computing the cut angle
-        vec3 axisPerp{0,1,0};
+        vec3 axisPerp { 0, 1, 0 };
 
         // offset of the cylinder making up the inner radius from axisOrigin
         // if 0, both cylinders are coaxial, but an offset can produce interesting
         // non-symmetries
-        vec3 innerRadiusAxisOffset{0};
+        vec3 innerRadiusAxisOffset { 0 };
 
         // inner radius of tube
         float innerRadius = 0;
@@ -141,33 +153,32 @@ public:
         float cutAngleRadians = 0;
 
         // normal of the front capping plane of the tube
-        vec3 frontFaceNormal{0,0,1};
+        vec3 frontFaceNormal { 0, 0, 1 };
 
         // normal of the back capping plane of the tube
-        vec3 backFaceNormal{0,0,-1};
+        vec3 backFaceNormal { 0, 0, -1 };
 
         // material tubes will emit
         mc::MaterialState material;
     };
 
-
     Tube() = delete;
 
     Tube(Config c)
-        :IVolumeSampler(Mode::Additive)
+        : IVolumeSampler(Mode::Additive)
         , _tubeAxisOrigin(c.axisOrigin)
         , _tubeAxisDir(normalize(c.axisDir))
         , _tubeAxisPerp(normalize(c.axisPerp))
         , _innerRadiusOffset(c.innerRadiusAxisOffset)
         , _innerRadius(c.innerRadius)
         , _outerRadius(c.outerRadius)
-        , _innerRadius2(c.innerRadius*c.innerRadius)
-        , _outerRadius2(c.outerRadius*c.outerRadius)
+        , _innerRadius2(c.innerRadius * c.innerRadius)
+        , _outerRadius2(c.outerRadius * c.outerRadius)
         , _frontFaceNormal(normalize(c.frontFaceNormal))
         , _frontFaceOrigin(_tubeAxisOrigin + _tubeAxisDir * (c.length / 2))
         , _backFaceNormal(normalize(c.backFaceNormal))
         , _backFaceOrigin(_tubeAxisOrigin - _tubeAxisDir * (c.length / 2))
-        , _cutAngleRadians(clamp<float>(c.cutAngleRadians, 0, 2*pi<float>()))
+        , _cutAngleRadians(clamp<float>(c.cutAngleRadians, 0, 2 * pi<float>()))
         , _material(c.material)
     {
         _cosCutAngle = cos(_cutAngleRadians);
@@ -223,7 +234,7 @@ public:
         throw std::runtime_error("intersection only meanignful for subtractive volumes");
     }
 
-    float valueAt(const vec3& p, float fuzziness, mc::MaterialState &material) const override
+    float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
     {
         material = _material;
 

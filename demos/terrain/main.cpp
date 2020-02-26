@@ -559,25 +559,33 @@ private:
         //
 
         const float maxHeight = 8.0F;
+        const float floorThreshold = 1.25F;
         const auto period = _segments.front()->volume->size().z * 1.0F;
 
-        const mc::MaterialState lowGround {
+        const mc::MaterialState floorTerrainMaterial {
             vec4(1),
-            0.5F,
+            1,
+            0,
+            0
+        };
+
+        const mc::MaterialState lowTerrainMaterial {
+            vec4(1),
+            0,
             1,
             0
         };
 
-        const mc::MaterialState highGround {
-            vec4(1, 1, 1, 1),
+        const mc::MaterialState highTerrainMaterial {
+            vec4(0.7,0.7,0.7,1),
             0,
-            0,
+            1,
             1
         };
 
         const mc::MaterialState archMaterial {
-            vec4(0.7, 0.7, 0.7, 1),
-            0.5,
+            vec4(0.5,0.5,0.5,1),
+            0.3,
             0,
             1
         };
@@ -592,7 +600,8 @@ private:
         };
 
         segment->groundSampler = segment->volume->add(
-            std::make_unique<GroundSampler>(groundSampler, maxHeight, lowGround, highGround));
+            std::make_unique<GroundSampler>(groundSampler, maxHeight, floorThreshold,
+                floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
 
         //
         //  Build an RNG seeded for this segment
