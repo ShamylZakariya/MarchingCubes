@@ -570,14 +570,14 @@ private:
         };
 
         const mc::MaterialState highGround {
-            vec4(0.3,0.3,0.375,1),
+            vec4(0.3, 0.3, 0.375, 1),
             0,
             0,
             1
         };
 
         const mc::MaterialState archMaterial {
-            vec4(0.6,0.6,0.6,1),
+            vec4(0.6, 0.6, 0.6, 1),
             0.5,
             0,
             1
@@ -591,29 +591,44 @@ private:
         segment->groundSampler = segment->volume->add(
             std::make_unique<GroundSampler>(groundSampler, maxHeight, lowGround, highGround));
 
+        //
+        //  Build an RNG seeded for this segment
+        //
+
+        auto rng = rng_xorshift64 { static_cast<uint64_t>(12345 * (which + 1)) };
 
         //
         // build a broken arch
         //
 
+        const auto size = vec3(segment->volume->size());
+        const auto center = size / 2.0F;
 
-        const auto center = vec3(segment->volume->size()) / 2.0F;
+        const int nArches = rng.nextInt(7);
+        std::cout << nArches << " arches" << std::endl;
+        for (int i = 0; i < nArches; i++) {
+            Tube::Config arch;
+            arch.axisOrigin = vec3{
+                center.x + rng.nextFloat(-size.x/10, size.x/10),
+                0,
+                center.z + rng.nextFloat(-size.z/3, size.z/3)};
 
-        Tube::Config arch;
-        arch.axisOrigin = vec3(center.x, 0, center.z);
-        arch.innerRadiusAxisOffset = vec3(0, 8, 0);
-        arch.axisDir = vec3(0, 0, 1);
-        arch.axisPerp = vec3(0, 1, 0);
-        arch.length = 10;
-        arch.innerRadius = 40;
-        arch.outerRadius = 50;
-        float faceClipAmt = 0.06F;
-        arch.frontFaceNormal = normalize(arch.axisDir + faceClipAmt * vec3(0, 1, 0));
-        arch.backFaceNormal = normalize(-arch.axisDir + faceClipAmt * vec3(0, 1, 0));
-        arch.cutAngleRadians = radians<float>(20);
-        arch.material = archMaterial;
+            arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(8,16), 0);
 
-        segment->volume->add(std::make_unique<Tube>(arch));
+            arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
+
+            arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2,0.2), 1, 0));
+            arch.length = rng.nextFloat(7,11);
+            arch.innerRadius = rng.nextFloat(35,43);
+            arch.outerRadius = rng.nextFloat(48,55);
+            arch.frontFaceNormal = arch.axisDir;
+            arch.backFaceNormal = -arch.axisDir;
+            arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
+            arch.material = archMaterial;
+
+            segment->volume->add(std::make_unique<Tube>(arch));
+        }
+
     }
 
     void marchSegments()
