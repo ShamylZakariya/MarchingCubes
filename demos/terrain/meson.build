@@ -1,6 +1,7 @@
 # build the main executable
 terrain_app_sources = [
     'main.cpp',
+    'FastNoise.cpp',
     '../common/cubemap_blur.cpp',
     '../../include/imgui/imgui.cpp',
     '../../include/imgui/imgui_draw.cpp',

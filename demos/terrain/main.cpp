@@ -33,6 +33,7 @@
 #include "materials.hpp"
 #include "terrain_samplers.hpp"
 #include "xorshift.hpp"
+#include "FastNoise.h"
 
 using namespace glm;
 using mc::util::AABB;
@@ -62,7 +63,7 @@ public:
             unownedTriangleConsumers.push_back(triangles.back().get());
         }
 
-        volume = make_unique<mc::OctreeVolume>(256, 1, 4, unownedTriangleConsumers);
+        volume = make_unique<mc::OctreeVolume>(256, 4, 4, unownedTriangleConsumers);
     }
 
     ~VolumeSegment() = default;
@@ -175,8 +176,7 @@ private:
     } _cameraState;
 
     // demo state (noise, etc)
-
-    PerlinNoise _noise { 12345 };
+    FastNoise _fastNoise;
 
 public:
     App()
@@ -559,8 +559,7 @@ private:
         //
 
         const float maxHeight = 8.0F;
-        const auto octaves = 3;
-        const auto frequency = vec3(_segments.front()->volume->size()) * 2.0F;
+        const auto period = _segments.front()->volume->size().z * 1.0F;
 
         const mc::MaterialState lowGround {
             vec4(1),
@@ -570,22 +569,26 @@ private:
         };
 
         const mc::MaterialState highGround {
-            vec4(0.3, 0.3, 0.375, 1),
+            vec4(1, 1, 1, 1),
             0,
             0,
             1
         };
 
         const mc::MaterialState archMaterial {
-            vec4(0.6, 0.6, 0.6, 1),
+            vec4(0.7, 0.7, 0.7, 1),
             0.5,
             0,
             1
         };
 
+        _fastNoise.SetNoiseType(FastNoise::Simplex);
+        _fastNoise.SetFrequency(1);
+
         const auto zOffset = which * segment->volume->size().z;
         const auto groundSampler = [=](vec3 p) {
-            return _noise.octaveNoise0_1(p.x / frequency.x, p.y / frequency.y, (p.z + zOffset) / frequency.z, octaves);
+            float v = _fastNoise.GetSimplex(p.x / period, p.y / period, (p.z + zOffset) / period);
+            return v * 0.5F + 0.5F;
         };
 
         segment->groundSampler = segment->volume->add(
@@ -608,19 +611,20 @@ private:
         std::cout << nArches << " arches" << std::endl;
         for (int i = 0; i < nArches; i++) {
             Tube::Config arch;
-            arch.axisOrigin = vec3{
-                center.x + rng.nextFloat(-size.x/10, size.x/10),
+            arch.axisOrigin = vec3 {
+                center.x + rng.nextFloat(-size.x / 10, size.x / 10),
                 0,
-                center.z + rng.nextFloat(-size.z/3, size.z/3)};
+                center.z + rng.nextFloat(-size.z / 3, size.z / 3)
+            };
 
-            arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(8,16), 0);
+            arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(8, 16), 0);
 
             arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
 
-            arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2,0.2), 1, 0));
-            arch.length = rng.nextFloat(7,11);
-            arch.innerRadius = rng.nextFloat(35,43);
-            arch.outerRadius = rng.nextFloat(48,55);
+            arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
+            arch.length = rng.nextFloat(7, 11);
+            arch.innerRadius = rng.nextFloat(35, 43);
+            arch.outerRadius = rng.nextFloat(48, 55);
             arch.frontFaceNormal = arch.axisDir;
             arch.backFaceNormal = -arch.axisDir;
             arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
@@ -628,7 +632,6 @@ private:
 
             segment->volume->add(std::make_unique<Tube>(arch));
         }
-
     }
 
     void marchSegments()

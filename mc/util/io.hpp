@@ -25,6 +25,29 @@ namespace util {
     */
     std::string ReadFile(const std::string& filename);
 
+    class Image {
+    private:
+        unsigned char* _bytes = nullptr;
+        int _width = 0;
+        int _height = 0;
+        int _channels = 0;
+
+    public:
+        Image() = delete;
+        explicit Image(const std::string &filename);
+        Image(const Image &) = delete;
+        Image(Image &&) = delete;
+        Image& operator=(const Image&) = delete;
+
+        ~Image();
+
+        const unsigned char* bytes() const { return _bytes; }
+        int width() const { return _width; }
+        int height() const { return _height; }
+        int channels() const { return _height; }
+    };
+
+
     class TextureHandle {
     private:
         GLuint _id;

@@ -19,13 +19,25 @@ namespace util {
         return buffer.str();
     }
 
+    Image::Image(const std::string &filename) {
+        _bytes = stbi_load(filename.c_str(), &_width, &_height, &_channels, STBI_rgb_alpha);
+        if (!_bytes) {
+            throw std::runtime_error("[Image::ctor] - Failed to load image \"" + filename + "\"");
+        }
+    }
+
+    Image::~Image() {
+        stbi_image_free(_bytes);
+    }
+
+
     TextureHandleRef LoadTexture2D(const std::string& filename)
     {
         int texWidth, texHeight, texChannels;
         stbi_uc* data = stbi_load(filename.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
         if (!data) {
-            throw std::runtime_error("failed to load texture image!");
+            throw std::runtime_error("[LoadTexture2d] - Failed to load image \"" + filename + "\"");
         }
 
         GLuint textureId;
@@ -36,6 +48,8 @@ namespace util {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glGenerateMipmap(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        stbi_image_free(data);
 
         return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_2D, texWidth, texHeight);
     }
@@ -54,7 +68,7 @@ namespace util {
                     0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
                 stbi_image_free(data);
             } else {
-                std::cout << "Unable to load cubemap face[" << i << "] path(" << faces[i] << ")" << std::endl;
+                std::cout << "[LoadTextureCube] - Unable to load cubemap face[" << i << "] path(" << faces[i] << ")" << std::endl;
                 stbi_image_free(data);
             }
         }

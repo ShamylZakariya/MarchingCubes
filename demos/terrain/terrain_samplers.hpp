@@ -9,8 +9,6 @@
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
 
-#include "perlin_noise.hpp"
-
 using namespace glm;
 using mc::util::AABB;
 using mc::util::iAABB;
