@@ -67,12 +67,109 @@ public:
         volume = make_unique<mc::OctreeVolume>(size, 4, 4, unownedTriangleConsumers);
     }
 
-    ~VolumeSegment() {
+    ~VolumeSegment()
+    {
         std::cout << "VolumeSegment::dtor idx " << idx << std::endl;
     }
     VolumeSegment(const VolumeSegment&) = delete;
     VolumeSegment(VolumeSegment&&) = delete;
     VolumeSegment& operator==(const VolumeSegment&) = delete;
+
+    void build(int idx, FastNoise &noise) {
+        std::cout << "[VolumeSegment::build] idx " << idx << std::endl;
+
+        this->idx = idx;
+        volume->clear();
+        triangleCount = 0;
+        for (auto& tc : triangles) {
+            tc->clear();
+        }
+
+        const float sizeZ = volume->size().z;
+        model = translate(mat4 { 1 }, vec3(0, 0, sizeZ * idx));
+
+        //
+        // build terrain sampler
+        //
+
+        const mc::MaterialState floorTerrainMaterial {
+            vec4(1),
+            1,
+            0,
+            0
+        };
+
+        const mc::MaterialState lowTerrainMaterial {
+            vec4(1),
+            0,
+            1,
+            0
+        };
+
+        const mc::MaterialState highTerrainMaterial {
+            vec4(0.7, 0.7, 0.7, 1),
+            0,
+            1,
+            1
+        };
+
+        const mc::MaterialState archMaterial {
+            vec4(0.5, 0.5, 0.5, 1),
+            0.3,
+            0,
+            1
+        };
+
+        const float maxHeight = 8.0F;
+        const float floorThreshold = 1.25F;
+        const auto zOffset = idx * sizeZ;
+        const auto groundSampler = [=](vec3 p) {
+            float v = noise.GetSimplex(p.x, p.y, p.z + zOffset);
+            return v * 0.5F + 0.5F;
+        };
+
+        volume->add(std::make_unique<GroundSampler>(groundSampler, maxHeight, floorThreshold,
+                floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
+
+        //
+        //  Build an RNG seeded for this segment
+        //
+
+        auto rng = rng_xorshift64 { static_cast<uint64_t>(12345 * (idx + 1)) };
+
+        //
+        // build a broken arch
+        //
+
+        const auto size = vec3(volume->size());
+        const auto center = size / 2.0F;
+
+        const int nArches = rng.nextInt(7);
+        std::cout << nArches << " arches" << std::endl;
+        for (int i = 0; i < nArches; i++) {
+            Tube::Config arch;
+            arch.axisOrigin = vec3 {
+                center.x + rng.nextFloat(-size.x / 10, size.x / 10),
+                0,
+                center.z + rng.nextFloat(-size.z / 3, size.z / 3)
+            };
+
+            arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(8, 16), 0);
+
+            arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
+
+            arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
+            arch.length = rng.nextFloat(7, 11);
+            arch.innerRadius = rng.nextFloat(35, 43);
+            arch.outerRadius = rng.nextFloat(48, 55);
+            arch.frontFaceNormal = arch.axisDir;
+            arch.backFaceNormal = -arch.axisDir;
+            arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
+            arch.material = archMaterial;
+
+            volume->add(std::make_unique<Tube>(arch));
+        }
+    }
 
     void march()
     {
@@ -96,7 +193,6 @@ public:
     int idx = 0;
     int triangleCount;
     unique_ptr<mc::OctreeVolume> volume;
-    unowned_ptr<GroundSampler> groundSampler;
     std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
     mc::util::LineSegmentBuffer occupiedAABBs;
     mat4 model;
@@ -132,6 +228,7 @@ private:
     // app state
     GLFWwindow* _window;
     mc::util::FpsCalculator _fpsCalculator;
+    double _elapsedFrameTime = 0;
     bool _running = true;
 
     // render state
@@ -226,6 +323,7 @@ public:
             lastTime = now;
             step(static_cast<float>(now), static_cast<float>(elapsed));
 
+            _elapsedFrameTime = (_elapsedFrameTime + elapsed) / 2;
             _fpsCalculator.update();
             drawFrame();
             drawGui();
@@ -383,16 +481,20 @@ private:
         // build a volume
         //
 
+        _segmentSizeZ = 256;
+        const auto frequency = 1.0F / _segmentSizeZ;
+        _fastNoise.SetNoiseType(FastNoise::Simplex);
+        _fastNoise.SetFrequency(frequency);
+
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march volumes" << std::endl;
 
         // TODO: Decide how many sections we will create
         constexpr auto COUNT = 3;
 
-        _segmentSizeZ = 256;
         for (int i = 0; i < COUNT; i++) {
             _segments.emplace_back(std::make_unique<VolumeSegment>(_segmentSizeZ, nThreads));
-            buildTerrainSection(_segments.back().get(), i);
+            _segments.back()->build(i, _fastNoise);
         }
 
         marchSegments();
@@ -451,7 +553,7 @@ private:
         // WASD
         const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
         const float lookSpeed = radians<float>(90) * deltaT;
-        const float travelSpeed = movementSpeed;
+        const float travelSpeed = 100 * deltaT;
 
         if (isKeyDown(GLFW_KEY_A)) {
             _cameraState.moveBy(movementSpeed * vec3(+1, 0, 0));
@@ -513,7 +615,7 @@ private:
 
         // draw volumes
         glDepthMask(GL_TRUE);
-        mat4 terrainOffset = translate(mat4{1}, vec3(0,0,-_distanceAlongZ));
+        mat4 terrainOffset = translate(mat4 { 1 }, vec3(0, 0, -_distanceAlongZ));
 
         for (const auto& segment : _segments) {
             _terrainMaterial->bind(segment->model * terrainOffset, view, projection, _cameraState.position);
@@ -542,7 +644,8 @@ private:
     {
         ImGui::Begin("Demo window");
 
-        ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
+        float fps = _elapsedFrameTime > 0 ? static_cast<float>(1 / _elapsedFrameTime) : 0;
+        ImGui::LabelText("FPS", "%03.0f", fps);
         ImGui::LabelText("triangles", "%d", triangleCount());
 
         ImGui::Separator();
@@ -551,10 +654,19 @@ private:
         ImGui::End();
     }
 
-    void updateTerrainSections() {
+    int _lastIdx = -999;
+
+    void updateTerrainSections()
+    {
         int currentIdx = _distanceAlongZ / _segmentSizeZ;
+        if (currentIdx != _lastIdx) {
+            std::cout << "CurrentIdx: " << currentIdx << " _lastIdx: " << _lastIdx << std::endl;
+            _lastIdx = currentIdx;
+        }
 
         if (currentIdx < _segments.front()->idx) {
+            std::cout << "CurrentIdx: " << currentIdx << " PrevIdx: " << _segments.front()->idx << std::endl;
+
             // we moved backwards and revealed a new segment.
             // pop last segment, rebuild it for currentIdx and
             // push it front
@@ -562,11 +674,14 @@ private:
             auto seg = std::move(_segments.back());
             _segments.pop_back();
 
-            buildTerrainSection(seg.get(), currentIdx);
+            //seg->build(currentIdx, _fastNoise);
+            seg->model = translate(mat4 { 1 }, vec3(0, 0, _segmentSizeZ * currentIdx));
 
             _segments.push_front(std::move(seg));
 
         } else if (currentIdx > _segments.front()->idx) {
+            std::cout << "CurrentIdx: " << currentIdx << " PrevIdx: " << _segments.front()->idx << std::endl;
+
             // we moved forward enough to hide first segment,
             // it can be repurposed. pop front segment, generate
             // a new end segment, and push it back
@@ -574,111 +689,10 @@ private:
             auto seg = std::move(_segments.front());
             _segments.pop_front();
 
-            buildTerrainSection(seg.get(), _segments.back()->idx + 1);
+            //seg->build(_segments.back()->idx + 1, _fastNoise);
+            seg->model = translate(mat4 { 1 }, vec3(0, 0, _segmentSizeZ * (_segments.back()->idx + 1)));
 
             _segments.push_back(std::move(seg));
-        }
-    }
-
-    void buildTerrainSection(VolumeSegment *segment, int which)
-    {
-        std::cout << "Building segment " << which << std::endl;
-
-        segment->idx = which;
-        segment->volume->clear();
-        segment->triangleCount = 0;
-        for (auto &tc : segment->triangles) {
-            tc->clear();
-        }
-
-        segment->model = translate(mat4{1}, vec3(0,0,_segmentSizeZ * which));
-
-        //
-        // build terrain sampler
-        //
-
-        const mc::MaterialState floorTerrainMaterial {
-            vec4(1),
-            1,
-            0,
-            0
-        };
-
-        const mc::MaterialState lowTerrainMaterial {
-            vec4(1),
-            0,
-            1,
-            0
-        };
-
-        const mc::MaterialState highTerrainMaterial {
-            vec4(0.7, 0.7, 0.7, 1),
-            0,
-            1,
-            1
-        };
-
-        const mc::MaterialState archMaterial {
-            vec4(0.5, 0.5, 0.5, 1),
-            0.3,
-            0,
-            1
-        };
-
-        const float maxHeight = 8.0F;
-        const float floorThreshold = 1.25F;
-        const auto frequency = 1.0F / _segmentSizeZ;
-        const auto zOffset = which * _segmentSizeZ;
-
-        _fastNoise.SetNoiseType(FastNoise::Simplex);
-        _fastNoise.SetFrequency(frequency);
-
-        const auto groundSampler = [=](vec3 p) {
-            float v = _fastNoise.GetSimplex(p.x, p.y, p.z + zOffset);
-            return v * 0.5F + 0.5F;
-        };
-
-        segment->groundSampler = segment->volume->add(
-            std::make_unique<GroundSampler>(groundSampler, maxHeight, floorThreshold,
-                floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
-
-        //
-        //  Build an RNG seeded for this segment
-        //
-
-        auto rng = rng_xorshift64 { static_cast<uint64_t>(12345 * (which + 1)) };
-
-        //
-        // build a broken arch
-        //
-
-        const auto size = vec3(segment->volume->size());
-        const auto center = size / 2.0F;
-
-        const int nArches = rng.nextInt(7);
-        std::cout << nArches << " arches" << std::endl;
-        for (int i = 0; i < nArches; i++) {
-            Tube::Config arch;
-            arch.axisOrigin = vec3 {
-                center.x + rng.nextFloat(-size.x / 10, size.x / 10),
-                0,
-                center.z + rng.nextFloat(-size.z / 3, size.z / 3)
-            };
-
-            arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(8, 16), 0);
-
-            arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
-
-            arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
-            arch.length = rng.nextFloat(7, 11);
-            arch.innerRadius = rng.nextFloat(35, 43);
-            arch.outerRadius = rng.nextFloat(48, 55);
-            arch.frontFaceNormal = arch.axisDir;
-            arch.backFaceNormal = -arch.axisDir;
-            arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
-            arch.material = archMaterial;
-
-            segment->volume->add(std::make_unique<Tube>(arch));
         }
     }
 
@@ -692,8 +706,9 @@ private:
         }
     }
 
-    int triangleCount() {
-        return std::accumulate(_segments.begin(), _segments.end(), 0, [](int acc, const auto &seg){
+    int triangleCount()
+    {
+        return std::accumulate(_segments.begin(), _segments.end(), 0, [](int acc, const auto& seg) {
             return acc + seg->triangleCount;
         });
     }
