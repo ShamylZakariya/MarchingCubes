@@ -19,17 +19,18 @@ namespace util {
         return buffer.str();
     }
 
-    Image::Image(const std::string &filename) {
+    Image::Image(const std::string& filename)
+    {
         _bytes = stbi_load(filename.c_str(), &_width, &_height, &_channels, STBI_rgb_alpha);
         if (!_bytes) {
             throw std::runtime_error("[Image::ctor] - Failed to load image \"" + filename + "\"");
         }
     }
 
-    Image::~Image() {
+    Image::~Image()
+    {
         stbi_image_free(_bytes);
     }
-
 
     TextureHandleRef LoadTexture2D(const std::string& filename)
     {

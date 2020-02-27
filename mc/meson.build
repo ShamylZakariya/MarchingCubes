@@ -3,6 +3,7 @@ mc_lib_sources = [
     'volume.cpp',
     'util/color.cpp',
     'util/io.cpp',
+    'util/op_queue.cpp',
     'util/storage.cpp'
 ]
 

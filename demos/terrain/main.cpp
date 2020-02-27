@@ -25,6 +25,7 @@
 #include <imgui/imgui_impl_opengl3.h>
 
 #include <mc/marching_cubes.hpp>
+#include <mc/util/op_queue.hpp>
 #include <mc/util/util.hpp>
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
@@ -75,7 +76,8 @@ public:
     VolumeSegment(VolumeSegment&&) = delete;
     VolumeSegment& operator==(const VolumeSegment&) = delete;
 
-    void build(int idx, FastNoise &noise) {
+    void build(int idx, FastNoise& noise)
+    {
         std::cout << "[VolumeSegment::build] idx " << idx << std::endl;
 
         this->idx = idx;
@@ -84,6 +86,8 @@ public:
         for (auto& tc : triangles) {
             tc->clear();
         }
+
+        waypoints.clear();
 
         const float sizeZ = volume->size().z;
         model = translate(mat4 { 1 }, vec3(0, 0, sizeZ * idx));
@@ -129,7 +133,7 @@ public:
         };
 
         volume->add(std::make_unique<GroundSampler>(groundSampler, maxHeight, floorThreshold,
-                floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
+            floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
 
         //
         //  Build an RNG seeded for this segment
@@ -171,22 +175,25 @@ public:
         }
     }
 
-    void march()
+    void march(bool synchronously)
     {
         occupiedAABBs.clear();
 
-        volume->march([this](mc::OctreeVolume::Node* node) {
-            {
-                // update the occupied aabb display
-                auto bounds = node->bounds;
-                bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
-                occupiedAABBs.add(bounds, nodeColor(node->depth));
-            }
-        });
+        if (synchronously) {
+            volume->march([this](mc::OctreeVolume::Node* node) {
+                {
+                    // update the occupied aabb display
+                    auto bounds = node->bounds;
+                    bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
+                    occupiedAABBs.add(bounds, nodeColor(node->depth));
+                }
+            });
 
-        triangleCount = 0;
-        for (const auto& tc : triangles) {
-            triangleCount += tc->numTriangles();
+            triangleCount = 0;
+            for (const auto& tc : triangles) {
+                triangleCount += tc->numTriangles();
+            }
+        } else {
         }
     }
 
@@ -195,6 +202,7 @@ public:
     unique_ptr<mc::OctreeVolume> volume;
     std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
     mc::util::LineSegmentBuffer occupiedAABBs;
+    std::vector<vec3> waypoints;
     mat4 model;
 
 private:
@@ -227,7 +235,6 @@ class App {
 private:
     // app state
     GLFWwindow* _window;
-    mc::util::FpsCalculator _fpsCalculator;
     double _elapsedFrameTime = 0;
     bool _running = true;
 
@@ -308,24 +315,28 @@ public:
         ImGui_ImplOpenGL3_Init();
 
         // enter run loop
-        _fpsCalculator.reset();
         double lastTime = glfwGetTime();
         while (_running && !glfwWindowShouldClose(_window)) {
             glfwPollEvents();
 
-            // Start the Dear ImGui frame
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
+            // execute any queued operations
+            mc::util::MainThreadQueue()->drain();
 
+            // compute time delta and step simulation
             double now = glfwGetTime();
             double elapsed = now - lastTime;
             lastTime = now;
             step(static_cast<float>(now), static_cast<float>(elapsed));
-
             _elapsedFrameTime = (_elapsedFrameTime + elapsed) / 2;
-            _fpsCalculator.update();
+
+            // draw scene
             drawFrame();
+
+            // draw imgui ui
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
             drawGui();
 
             ImGui::Render();
@@ -497,7 +508,7 @@ private:
             _segments.back()->build(i, _fastNoise);
         }
 
-        marchSegments();
+        marchAllSegmentsSynchronously();
     }
 
     void onResize(int width, int height)
@@ -512,7 +523,7 @@ private:
             _running = false;
         }
         if (scancode == glfwGetKeyScancode(GLFW_KEY_M)) {
-            marchSegments();
+            marchAllSegmentsSynchronously();
         }
     }
 
@@ -654,18 +665,15 @@ private:
         ImGui::End();
     }
 
-    int _lastIdx = -999;
-
     void updateTerrainSections()
     {
         int currentIdx = _distanceAlongZ / _segmentSizeZ;
-        if (currentIdx != _lastIdx) {
-            std::cout << "CurrentIdx: " << currentIdx << " _lastIdx: " << _lastIdx << std::endl;
-            _lastIdx = currentIdx;
+        if (currentIdx != _segments.front()->idx) {
+            std::cout << "currentIdx: " << currentIdx << " prevIdx: " << _segments.front()->idx << std::endl;
         }
 
         if (currentIdx < _segments.front()->idx) {
-            std::cout << "CurrentIdx: " << currentIdx << " PrevIdx: " << _segments.front()->idx << std::endl;
+            std::cout << "BACKWARDS - currentIdx: " << currentIdx << " PrevIdx: " << _segments.front()->idx << std::endl;
 
             // we moved backwards and revealed a new segment.
             // pop last segment, rebuild it for currentIdx and
@@ -674,13 +682,12 @@ private:
             auto seg = std::move(_segments.back());
             _segments.pop_back();
 
-            //seg->build(currentIdx, _fastNoise);
-            seg->model = translate(mat4 { 1 }, vec3(0, 0, _segmentSizeZ * currentIdx));
+            seg->build(currentIdx, _fastNoise);
 
             _segments.push_front(std::move(seg));
 
         } else if (currentIdx > _segments.front()->idx) {
-            std::cout << "CurrentIdx: " << currentIdx << " PrevIdx: " << _segments.front()->idx << std::endl;
+            std::cout << "FORWARDS - currentIdx: " << currentIdx << " prevIdx: " << _segments.front()->idx << std::endl;
 
             // we moved forward enough to hide first segment,
             // it can be repurposed. pop front segment, generate
@@ -689,21 +696,23 @@ private:
             auto seg = std::move(_segments.front());
             _segments.pop_front();
 
-            //seg->build(_segments.back()->idx + 1, _fastNoise);
-            seg->model = translate(mat4 { 1 }, vec3(0, 0, _segmentSizeZ * (_segments.back()->idx + 1)));
+            seg->build(_segments.back()->idx + 1, _fastNoise);
 
             _segments.push_back(std::move(seg));
         }
     }
 
-    void marchSegments()
+    // this is mainly for performance testiung
+    void marchAllSegmentsSynchronously()
     {
+        std::cout << "[App::marchAllSegmentsSynchronously] ";
         for (const auto& s : _segments) {
             auto start = glfwGetTime();
-            s->march();
+            s->march(true);
             auto elapsed = glfwGetTime() - start;
-            std::cout << "March took " << elapsed << " seconds" << std::endl;
+            std::cout << "(" << s->idx << " @ " << elapsed << "s)";
         }
+        std::cout << std::endl;
     }
 
     int triangleCount()

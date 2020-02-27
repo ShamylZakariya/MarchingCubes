@@ -204,6 +204,18 @@ public:
     void march(std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr);
 
     /**
+     * March the volume in a non-blocking fashion; calls onReady on the
+     * main thread when the work is done
+     * NOTE:
+     * onReady will be called on the main thread, which requires use of
+     *  mc::util::MainThreadQueue
+     * marchedNodeObserver will be called on the calling thread
+     */
+    void marchAsync(
+        std::function<void()> onReady,
+        std::function<void(OctreeVolume::Node*)> marchedNodeObserver = nullptr);
+
+    /**
      * Get the bounds of this volume - no geometry will exceed this region
      */
     util::AABB bounds() const
@@ -220,6 +232,7 @@ public:
     }
 
 protected:
+    void marchSetup(std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
     void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
 
     /**
@@ -348,7 +361,7 @@ private:
     size_t _treeDepth = 0;
     std::unique_ptr<Node> _root;
     std::vector<Node*> _nodesToMarch;
-    std::unique_ptr<util::ThreadPool> _marchThreads;
+    std::unique_ptr<util::ThreadPool> _marchPool, _waitPool;
     std::vector<util::unowned_ptr<TriangleConsumer<Vertex>>> _triangleConsumers;
 };
 

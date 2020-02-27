@@ -34,9 +34,9 @@ namespace util {
 
     public:
         Image() = delete;
-        explicit Image(const std::string &filename);
-        Image(const Image &) = delete;
-        Image(Image &&) = delete;
+        explicit Image(const std::string& filename);
+        Image(const Image&) = delete;
+        Image(Image&&) = delete;
         Image& operator=(const Image&) = delete;
 
         ~Image();
@@ -46,7 +46,6 @@ namespace util {
         int height() const { return _height; }
         int channels() const { return _height; }
     };
-
 
     class TextureHandle {
     private:

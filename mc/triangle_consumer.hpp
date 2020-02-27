@@ -85,8 +85,10 @@ public:
         _gpuStorage.draw();
     }
 
-    void clear() {
+    void clear()
+    {
         _vertices.clear();
+        _gpuStorage.update({});
         _numTriangles = 0;
     }
 
