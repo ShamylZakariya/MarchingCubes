@@ -172,12 +172,16 @@ public:
             arch.material = archMaterial;
 
             volume->add(std::make_unique<Tube>(arch));
+
+            vec3 waypoint = arch.axisOrigin + vec3(0, arch.innerRadius * 0.7F, 0);
+            waypoints.push_back(waypoint);
+            waypointLineBuffer.addAxis(translate(mat4{1}, waypoint), 4);
         }
     }
 
     void march(bool synchronously)
     {
-        occupiedAABBs.clear();
+        aabbLineBuffer.clear();
 
         if (synchronously) {
             volume->march([this](mc::OctreeVolume::Node* node) {
@@ -185,7 +189,7 @@ public:
                     // update the occupied aabb display
                     auto bounds = node->bounds;
                     bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
-                    occupiedAABBs.add(bounds, nodeColor(node->depth));
+                    aabbLineBuffer.add(bounds, nodeColor(node->depth));
                 }
             });
 
@@ -201,7 +205,8 @@ public:
     int triangleCount;
     unique_ptr<mc::OctreeVolume> volume;
     std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
-    mc::util::LineSegmentBuffer occupiedAABBs;
+    mc::util::LineSegmentBuffer aabbLineBuffer;
+    mc::util::LineSegmentBuffer waypointLineBuffer;
     std::vector<vec3> waypoints;
     mat4 model;
 
@@ -245,6 +250,7 @@ private:
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
     bool _drawOctreeAABBs = false;
+    bool _drawWaypoints = true;
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -640,11 +646,15 @@ private:
         _skydomeMaterial->bind(projection, view);
         _skydomeQuad.draw();
 
-        if (_drawOctreeAABBs) {
-            glDepthMask(GL_FALSE);
+        if (_drawOctreeAABBs || _drawWaypoints) {
             for (const auto& segment : _segments) {
                 _lineMaterial->bind(projection * view * segment->model * terrainOffset);
-                segment->occupiedAABBs.draw();
+                if (_drawOctreeAABBs) {
+                    segment->aabbLineBuffer.draw();
+                }
+                if (_drawWaypoints) {
+                    segment->waypointLineBuffer.draw();
+                }
             }
         }
 
@@ -661,6 +671,7 @@ private:
 
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
+        ImGui::Checkbox("Waypoints", &_drawWaypoints);
 
         ImGui::End();
     }

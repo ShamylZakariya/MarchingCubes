@@ -53,6 +53,20 @@ namespace util {
             add(vertex_type { corners[3], color }, vertex_type { corners[7], color });
         }
 
+        void addAxis(const glm::mat4& basis, float size)
+        {
+            const auto X = glm::vec3 { basis[0][0], basis[1][0], basis[2][0] };
+            const auto Y = glm::vec3 { basis[0][1], basis[1][1], basis[2][1] };
+            const auto Z = glm::vec3 { basis[0][2], basis[1][2], basis[2][2] };
+            const auto pos = glm::vec3 { basis[3][0], basis[3][1], basis[3][2] };
+            const auto red = glm::vec4 { 1, 0, 0, 1 };
+            const auto green = glm::vec4 { 0, 1, 0, 1 };
+            const auto blue = glm::vec4 { 0, 0, 1, 1 };
+            add(vertex_type { pos, red }, vertex_type { pos + X * size, red });
+            add(vertex_type { pos, green }, vertex_type { pos + Y * size, green });
+            add(vertex_type { pos, blue }, vertex_type { pos + Z * size, blue });
+        }
+
         void draw()
         {
             if (_dirty) {
