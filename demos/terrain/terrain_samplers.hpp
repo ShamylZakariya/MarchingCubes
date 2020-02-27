@@ -16,20 +16,18 @@ using mc::util::iAABB;
 class GroundSampler : public mc::IVolumeSampler {
 public:
     typedef std::function<float(vec3)> NoiseSampler3D;
-    typedef std::function<float(vec2)> NoiseSampler2D;
 
 public:
     GroundSampler() = delete;
     GroundSampler(const GroundSampler&) = delete;
     GroundSampler(GroundSampler&&) = delete;
 
-    GroundSampler(NoiseSampler3D noise3D, NoiseSampler2D noise2D, float height, float floorThreshold,
+    GroundSampler(NoiseSampler3D noise3D, float height, float floorThreshold,
         const mc::MaterialState& floorMaterial,
         const mc::MaterialState& lowMaterial,
         const mc::MaterialState& highMaterial)
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _noise3D(noise3D)
-        , _noise2D(noise2D)
         , _height(height)
         , _floorPinion(floorThreshold / height)
         , _floorMaterial(floorMaterial)
@@ -70,8 +68,6 @@ public:
             return 1;
         }
 
-
-#if 1
         auto v = _sample3d(p);
         // this is nonsensical, but reduces stairstepping on y
         auto innerV = v - fuzziness;
@@ -82,40 +78,9 @@ public:
         }
 
         return 1 - ((p.y - innerV) / fuzziness);
-#endif
-
-#if 0
-
-        auto height = _heightmap(p.x, p.z);
-        if (p.y > height) {
-            return 0;
-        }
-        auto lowerHeight = height - fuzziness;
-        if (p.y < lowerHeight) {
-            return 1;
-        }
-        return 1 - ((p.y - lowerHeight) / fuzziness);
-#endif
-
     }
 
 private:
-    inline float _heightmap(float x, float z) const
-    {
-        float n = _noise2D(vec2(x,z));
-
-        // sand-dune like structure
-        float dune = n * 5;
-        dune = dune - floor(dune);
-        dune = dune * dune * _height;
-
-        // floor
-        float f = n * n * n;
-        float floor = f * _height;
-
-        return floor + dune;
-    }
-
     inline float _sample3d(const vec3& p) const
     {
         float n = _noise3D(p);
@@ -133,7 +98,6 @@ private:
     }
 
     NoiseSampler3D _noise3D;
-    NoiseSampler2D _noise2D;
     float _height { 0 };
     float _floorPinion { 0 };
 

@@ -30,10 +30,10 @@
 #include <mc/volume_samplers.hpp>
 
 #include "../common/cubemap_blur.hpp"
+#include "FastNoise.h"
 #include "materials.hpp"
 #include "terrain_samplers.hpp"
 #include "xorshift.hpp"
-#include "FastNoise.h"
 
 using namespace glm;
 using mc::util::AABB;
@@ -55,23 +55,26 @@ constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
 
 struct VolumeSegment {
 public:
-    explicit VolumeSegment(int numThreadsToUse)
+    VolumeSegment(int size, int numThreadsToUse)
     {
+        std::cout << "VolumeSegment::ctor size: " << size << " numThreadsToUse: " << numThreadsToUse << std::endl;
         std::vector<unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
         for (auto i = 0; i < numThreadsToUse; i++) {
             triangles.push_back(make_unique<mc::TriangleConsumer<mc::Vertex>>());
             unownedTriangleConsumers.push_back(triangles.back().get());
         }
 
-        volume = make_unique<mc::OctreeVolume>(256, 4, 4, unownedTriangleConsumers);
+        volume = make_unique<mc::OctreeVolume>(size, 4, 4, unownedTriangleConsumers);
     }
 
-    ~VolumeSegment() = default;
+    ~VolumeSegment() {
+        std::cout << "VolumeSegment::dtor idx " << idx << std::endl;
+    }
     VolumeSegment(const VolumeSegment&) = delete;
     VolumeSegment(VolumeSegment&&) = delete;
     VolumeSegment& operator==(const VolumeSegment&) = delete;
 
-    int march()
+    void march()
     {
         occupiedAABBs.clear();
 
@@ -84,14 +87,14 @@ public:
             }
         });
 
-        int triangleCount = 0;
+        triangleCount = 0;
         for (const auto& tc : triangles) {
             triangleCount += tc->numTriangles();
         }
-
-        return triangleCount;
     }
 
+    int idx = 0;
+    int triangleCount;
     unique_ptr<mc::OctreeVolume> volume;
     unowned_ptr<GroundSampler> groundSampler;
     std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
@@ -130,13 +133,11 @@ private:
     GLFWwindow* _window;
     mc::util::FpsCalculator _fpsCalculator;
     bool _running = true;
-    int _triangleCount = 0;
 
     // render state
     std::unique_ptr<TerrainMaterial> _terrainMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    std::vector<std::unique_ptr<VolumeSegment>> _segments;
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     float _aspect = 1;
     bool _drawOctreeAABBs = false;
@@ -176,7 +177,10 @@ private:
     } _cameraState;
 
     // demo state (noise, etc)
+    std::deque<std::unique_ptr<VolumeSegment>> _segments;
     FastNoise _fastNoise;
+    float _distanceAlongZ = 0;
+    int _segmentSizeZ = 0;
 
 public:
     App()
@@ -385,16 +389,10 @@ private:
         // TODO: Decide how many sections we will create
         constexpr auto COUNT = 3;
 
+        _segmentSizeZ = 256;
         for (int i = 0; i < COUNT; i++) {
-            _segments.emplace_back(std::make_unique<VolumeSegment>(nThreads));
-        }
-
-        //
-        //  Build terrain
-        //
-
-        for (size_t i = 0; i < _segments.size(); i++) {
-            buildTerrainSection(i);
+            _segments.emplace_back(std::make_unique<VolumeSegment>(_segmentSizeZ, nThreads));
+            buildTerrainSection(_segments.back().get(), i);
         }
 
         marchSegments();
@@ -453,6 +451,7 @@ private:
         // WASD
         const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
         const float lookSpeed = radians<float>(90) * deltaT;
+        const float travelSpeed = movementSpeed;
 
         if (isKeyDown(GLFW_KEY_A)) {
             _cameraState.moveBy(movementSpeed * vec3(+1, 0, 0));
@@ -493,11 +492,20 @@ private:
         if (isKeyDown(GLFW_KEY_RIGHT)) {
             _cameraState.yaw -= lookSpeed;
         }
+
+        if (isKeyDown(GLFW_KEY_LEFT_BRACKET)) {
+            _distanceAlongZ -= travelSpeed;
+        }
+
+        if (isKeyDown(GLFW_KEY_RIGHT_BRACKET)) {
+            _distanceAlongZ += travelSpeed;
+        }
+
+        updateTerrainSections();
     }
 
     void drawFrame()
     {
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         mat4 view = _cameraState.view();
@@ -505,15 +513,13 @@ private:
 
         // draw volumes
         glDepthMask(GL_TRUE);
-        float segmentZ = 0;
+        mat4 terrainOffset = translate(mat4{1}, vec3(0,0,-_distanceAlongZ));
+
         for (const auto& segment : _segments) {
-            segment->model = translate(mat4 { 1 }, vec3(0, 0, segmentZ));
-            _terrainMaterial->bind(segment->model, view, projection, _cameraState.position);
+            _terrainMaterial->bind(segment->model * terrainOffset, view, projection, _cameraState.position);
             for (auto& tc : segment->triangles) {
                 tc->draw();
             }
-
-            segmentZ += segment->volume->size().z;
         }
 
         // draw skydome (after volume, it's depth is 1 in clip space)
@@ -522,13 +528,13 @@ private:
         _skydomeQuad.draw();
 
         if (_drawOctreeAABBs) {
-            // draw lines
             glDepthMask(GL_FALSE);
             for (const auto& segment : _segments) {
-                _lineMaterial->bind(projection * view * segment->model);
+                _lineMaterial->bind(projection * view * segment->model * terrainOffset);
                 segment->occupiedAABBs.draw();
             }
         }
+
         glDepthMask(GL_TRUE);
     }
 
@@ -537,7 +543,7 @@ private:
         ImGui::Begin("Demo window");
 
         ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
-        ImGui::LabelText("triangles", "%d", _triangleCount);
+        ImGui::LabelText("triangles", "%d", triangleCount());
 
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
@@ -545,22 +551,51 @@ private:
         ImGui::End();
     }
 
-    void buildTerrainSection(int which)
+    void updateTerrainSections() {
+        int currentIdx = _distanceAlongZ / _segmentSizeZ;
+
+        if (currentIdx < _segments.front()->idx) {
+            // we moved backwards and revealed a new segment.
+            // pop last segment, rebuild it for currentIdx and
+            // push it front
+
+            auto seg = std::move(_segments.back());
+            _segments.pop_back();
+
+            buildTerrainSection(seg.get(), currentIdx);
+
+            _segments.push_front(std::move(seg));
+
+        } else if (currentIdx > _segments.front()->idx) {
+            // we moved forward enough to hide first segment,
+            // it can be repurposed. pop front segment, generate
+            // a new end segment, and push it back
+
+            auto seg = std::move(_segments.front());
+            _segments.pop_front();
+
+            buildTerrainSection(seg.get(), _segments.back()->idx + 1);
+
+            _segments.push_back(std::move(seg));
+        }
+    }
+
+    void buildTerrainSection(VolumeSegment *segment, int which)
     {
         std::cout << "Building segment " << which << std::endl;
 
-        const auto& segment = _segments[which];
-
-        // remove existing samplers - it's OK, making new ones is cheap
+        segment->idx = which;
         segment->volume->clear();
+        segment->triangleCount = 0;
+        for (auto &tc : segment->triangles) {
+            tc->clear();
+        }
+
+        segment->model = translate(mat4{1}, vec3(0,0,_segmentSizeZ * which));
 
         //
         // build terrain sampler
         //
-
-        const float maxHeight = 8.0F;
-        const float floorThreshold = 1.25F;
-        const auto period = _segments.front()->volume->size().z * 1.0F;
 
         const mc::MaterialState floorTerrainMaterial {
             vec4(1),
@@ -577,36 +612,34 @@ private:
         };
 
         const mc::MaterialState highTerrainMaterial {
-            vec4(0.7,0.7,0.7,1),
+            vec4(0.7, 0.7, 0.7, 1),
             0,
             1,
             1
         };
 
         const mc::MaterialState archMaterial {
-            vec4(0.5,0.5,0.5,1),
+            vec4(0.5, 0.5, 0.5, 1),
             0.3,
             0,
             1
         };
 
+        const float maxHeight = 8.0F;
+        const float floorThreshold = 1.25F;
+        const auto frequency = 1.0F / _segmentSizeZ;
+        const auto zOffset = which * _segmentSizeZ;
+
         _fastNoise.SetNoiseType(FastNoise::Simplex);
-        _fastNoise.SetFrequency(1);
+        _fastNoise.SetFrequency(frequency);
 
-        const auto zOffset = which * segment->volume->size().z;
-
-        const auto groundSampler3D = [=](vec3 p) {
-            float v = _fastNoise.GetSimplex(p.x / period, p.y / period, (p.z + zOffset) / period);
-            return v * 0.5F + 0.5F;
-        };
-
-        const auto groundSampler2D = [=](vec2 p) {
-            float v = _fastNoise.GetSimplex(p.x / period, (p.y + zOffset) / period);
+        const auto groundSampler = [=](vec3 p) {
+            float v = _fastNoise.GetSimplex(p.x, p.y, p.z + zOffset);
             return v * 0.5F + 0.5F;
         };
 
         segment->groundSampler = segment->volume->add(
-            std::make_unique<GroundSampler>(groundSampler3D, groundSampler2D, maxHeight, floorThreshold,
+            std::make_unique<GroundSampler>(groundSampler, maxHeight, floorThreshold,
                 floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
 
         //
@@ -651,13 +684,18 @@ private:
 
     void marchSegments()
     {
-        _triangleCount = 0;
         for (const auto& s : _segments) {
             auto start = glfwGetTime();
-            _triangleCount += s->march();
+            s->march();
             auto elapsed = glfwGetTime() - start;
             std::cout << "March took " << elapsed << " seconds" << std::endl;
         }
+    }
+
+    int triangleCount() {
+        return std::accumulate(_segments.begin(), _segments.end(), 0, [](int acc, const auto &seg){
+            return acc + seg->triangleCount;
+        });
     }
 
     bool isKeyDown(int scancode) const

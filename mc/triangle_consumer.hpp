@@ -85,6 +85,11 @@ public:
         _gpuStorage.draw();
     }
 
+    void clear() {
+        _vertices.clear();
+        _numTriangles = 0;
+    }
+
     const auto& storage() const { return _gpuStorage; }
     auto& storage() { return _gpuStorage; }
 };
