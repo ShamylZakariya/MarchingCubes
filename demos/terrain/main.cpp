@@ -594,13 +594,19 @@ private:
         _fastNoise.SetFrequency(1);
 
         const auto zOffset = which * segment->volume->size().z;
-        const auto groundSampler = [=](vec3 p) {
+
+        const auto groundSampler3D = [=](vec3 p) {
             float v = _fastNoise.GetSimplex(p.x / period, p.y / period, (p.z + zOffset) / period);
             return v * 0.5F + 0.5F;
         };
 
+        const auto groundSampler2D = [=](vec2 p) {
+            float v = _fastNoise.GetSimplex(p.x / period, (p.y + zOffset) / period);
+            return v * 0.5F + 0.5F;
+        };
+
         segment->groundSampler = segment->volume->add(
-            std::make_unique<GroundSampler>(groundSampler, maxHeight, floorThreshold,
+            std::make_unique<GroundSampler>(groundSampler3D, groundSampler2D, maxHeight, floorThreshold,
                 floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
 
         //
