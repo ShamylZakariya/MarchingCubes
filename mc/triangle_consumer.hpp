@@ -62,8 +62,7 @@ public:
 
     void start()
     {
-        _vertices.clear();
-        _numTriangles = 0;
+        clear();
     }
 
     void addTriangle(const Triangle<VertexType>& t)
@@ -74,11 +73,12 @@ public:
         _numTriangles++;
     }
 
-    size_t numTriangles() const { return _numTriangles; }
     void finish()
     {
         _gpuStorage.update(_vertices);
     }
+
+    size_t numTriangles() const { return _numTriangles; }
 
     void draw() const
     {

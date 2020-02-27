@@ -20,13 +20,12 @@ void OctreeVolume::march(
 {
     marchSetup(marchedNodeObserver);
 
-    std::mutex popMutex;
     for (std::size_t i = 0, N = _marchPool->size(); i < N; i++) {
-        _marchPool->enqueue([&popMutex, this, N](int threadIdx) {
+        _marchPool->enqueue([this, N](int threadIdx) {
             while (true) {
                 Node* node = nullptr;
                 {
-                    std::lock_guard<std::mutex> popLock(popMutex);
+                    std::lock_guard<std::mutex> popLock(_queuePopMutex);
                     if (_nodesToMarch.empty()) {
                         // we're done, exit the loop
                         return;
@@ -52,15 +51,17 @@ void OctreeVolume::marchAsync(
     std::function<void()> onReady,
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
+    _asyncMarchId++;
+    auto id = _asyncMarchId;
+
     marchSetup(marchedNodeObserver);
 
-    std::mutex popMutex;
     for (std::size_t i = 0, N = _marchPool->size(); i < N; i++) {
-        _marchPool->enqueue([&popMutex, this, N](int threadIdx) {
+        _marchPool->enqueue([this, N](int threadIdx) {
             while (true) {
                 Node* node = nullptr;
                 {
-                    std::lock_guard<std::mutex> popLock(popMutex);
+                    std::lock_guard<std::mutex> popLock(_queuePopMutex);
                     if (_nodesToMarch.empty()) {
                         // we're done, exit the loop
                         return;
@@ -74,10 +75,22 @@ void OctreeVolume::marchAsync(
         });
     }
 
-    _waitPool->enqueue([this, onReady](int threadIdx) {
+    _waitPool->enqueue([this, onReady, id](int threadIdx) {
+        if (id != _asyncMarchId) {
+            // looks like a new march got queued before this one
+            // finished, so bail on this pass
+            std::cout << "[OctreeVolume::marchAsync] - waitPool - expected id: "
+                      << id << " but current asyncMarchId is: "
+                      << _asyncMarchId << " bailing." << std::endl;
+
+            return;
+        }
+
         _marchPool->wait();
+        std::cout << "[OctreeVolume::marchAsync] - waitPool - march complete; dispatching to main thread..." << std::endl;
 
         util::MainThreadQueue()->add([this, onReady]() {
+            std::cout << "[OctreeVolume::marchAsync] - waitPool - MainThreadQueue - finishing triangle consumers and dispatching onReady()" << std::endl;
             for (auto& tc : _triangleConsumers) {
                 tc->finish();
             }

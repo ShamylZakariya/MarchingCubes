@@ -88,6 +88,7 @@ public:
         }
 
         waypoints.clear();
+        waypointLineBuffer.clear();
 
         const float sizeZ = volume->size().z;
         model = translate(mat4 { 1 }, vec3(0, 0, sizeZ * idx));
@@ -175,7 +176,7 @@ public:
 
             vec3 waypoint = arch.axisOrigin + vec3(0, arch.innerRadius * 0.7F, 0);
             waypoints.push_back(waypoint);
-            waypointLineBuffer.addAxis(translate(mat4{1}, waypoint), 4);
+            waypointLineBuffer.addAxis(translate(mat4 { 1 }, waypoint), 4);
         }
     }
 
@@ -183,21 +184,27 @@ public:
     {
         aabbLineBuffer.clear();
 
-        if (synchronously) {
-            volume->march([this](mc::OctreeVolume::Node* node) {
-                {
-                    // update the occupied aabb display
-                    auto bounds = node->bounds;
-                    bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
-                    aabbLineBuffer.add(bounds, nodeColor(node->depth));
-                }
-            });
+        const auto nodeObserver = [this](mc::OctreeVolume::Node* node) {
+            {
+                // update the occupied aabb display
+                auto bounds = node->bounds;
+                bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
+                aabbLineBuffer.add(bounds, nodeColor(node->depth));
+            }
+        };
 
+        const auto onMarchComplete = [this]() {
             triangleCount = 0;
             for (const auto& tc : triangles) {
                 triangleCount += tc->numTriangles();
             }
+        };
+
+        if (synchronously) {
+            volume->march(nodeObserver);
+            onMarchComplete();
         } else {
+            volume->marchAsync(onMarchComplete, nodeObserver);
         }
     }
 
@@ -694,6 +701,7 @@ private:
             _segments.pop_back();
 
             seg->build(currentIdx, _fastNoise);
+            seg->march(false);
 
             _segments.push_front(std::move(seg));
 
@@ -708,6 +716,7 @@ private:
             _segments.pop_front();
 
             seg->build(_segments.back()->idx + 1, _fastNoise);
+            seg->march(false);
 
             _segments.push_back(std::move(seg));
         }

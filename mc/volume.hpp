@@ -11,6 +11,7 @@
 
 #include <array>
 #include <memory>
+#include <mutex>
 #include <unordered_set>
 #include <vector>
 
@@ -363,6 +364,8 @@ private:
     std::vector<Node*> _nodesToMarch;
     std::unique_ptr<util::ThreadPool> _marchPool, _waitPool;
     std::vector<util::unowned_ptr<TriangleConsumer<Vertex>>> _triangleConsumers;
+    std::size_t _asyncMarchId { 0 };
+    std::mutex _queuePopMutex;
 };
 
 } // namespace mc
