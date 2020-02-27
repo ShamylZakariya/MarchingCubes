@@ -67,6 +67,16 @@ namespace util {
             add(vertex_type { pos, blue }, vertex_type { pos + Z * size, blue });
         }
 
+        void addMarker(const glm::vec3& pos, float size, const glm::vec4& color)
+        {
+            add(vertex_type { pos, color }, vertex_type { pos + glm::vec3(-size, 0, 0), color });
+            add(vertex_type { pos, color }, vertex_type { pos + glm::vec3(+size, 0, 0), color });
+            add(vertex_type { pos, color }, vertex_type { pos + glm::vec3(0, -size, 0), color });
+            add(vertex_type { pos, color }, vertex_type { pos + glm::vec3(0, +size, 0), color });
+            add(vertex_type { pos, color }, vertex_type { pos + glm::vec3(0, 0, -size), color });
+            add(vertex_type { pos, color }, vertex_type { pos + glm::vec3(0, 0, +size), color });
+        }
+
         void draw()
         {
             if (_dirty) {

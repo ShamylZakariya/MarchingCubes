@@ -234,6 +234,7 @@ public:
 
 protected:
     void marchSetup(std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
+    void marchCollectedNodes();
     void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
 
     /**

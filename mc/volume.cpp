@@ -19,25 +19,7 @@ void OctreeVolume::march(
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
     marchSetup(marchedNodeObserver);
-
-    for (std::size_t i = 0, N = _marchPool->size(); i < N; i++) {
-        _marchPool->enqueue([this, N](int threadIdx) {
-            while (true) {
-                Node* node = nullptr;
-                {
-                    std::lock_guard<std::mutex> popLock(_queuePopMutex);
-                    if (_nodesToMarch.empty()) {
-                        // we're done, exit the loop
-                        return;
-                    }
-                    node = _nodesToMarch.back();
-                    _nodesToMarch.pop_back();
-                }
-
-                marchNode(node, *_triangleConsumers[threadIdx % N]);
-            }
-        });
-    }
+    marchCollectedNodes();
 
     // blocking wait
     _marchPool->wait();
@@ -55,26 +37,9 @@ void OctreeVolume::marchAsync(
     auto id = _asyncMarchId;
 
     marchSetup(marchedNodeObserver);
+    marchCollectedNodes();
 
-    for (std::size_t i = 0, N = _marchPool->size(); i < N; i++) {
-        _marchPool->enqueue([this, N](int threadIdx) {
-            while (true) {
-                Node* node = nullptr;
-                {
-                    std::lock_guard<std::mutex> popLock(_queuePopMutex);
-                    if (_nodesToMarch.empty()) {
-                        // we're done, exit the loop
-                        return;
-                    }
-                    node = _nodesToMarch.back();
-                    _nodesToMarch.pop_back();
-                }
-
-                marchNode(node, *_triangleConsumers[threadIdx % N]);
-            }
-        });
-    }
-
+    // punt blocking wait to the wait pool
     _waitPool->enqueue([this, onReady, id](int threadIdx) {
         if (id != _asyncMarchId) {
             // looks like a new march got queued before this one
@@ -87,10 +52,8 @@ void OctreeVolume::marchAsync(
         }
 
         _marchPool->wait();
-        std::cout << "[OctreeVolume::marchAsync] - waitPool - march complete; dispatching to main thread..." << std::endl;
 
         util::MainThreadQueue()->add([this, onReady]() {
-            std::cout << "[OctreeVolume::marchAsync] - waitPool - MainThreadQueue - finishing triangle consumers and dispatching onReady()" << std::endl;
             for (auto& tc : _triangleConsumers) {
                 tc->finish();
             }
@@ -138,6 +101,28 @@ void OctreeVolume::marchSetup(std::function<void(OctreeVolume::Node*)> marchedNo
         tc->start();
     }
 }
+
+void OctreeVolume::marchCollectedNodes() {
+    for (std::size_t i = 0, N = _marchPool->size(); i < N; i++) {
+        _marchPool->enqueue([this, N](int threadIdx) {
+            while (true) {
+                Node* node = nullptr;
+                {
+                    std::lock_guard<std::mutex> popLock(_queuePopMutex);
+                    if (_nodesToMarch.empty()) {
+                        // we're done, exit the loop
+                        return;
+                    }
+                    node = _nodesToMarch.back();
+                    _nodesToMarch.pop_back();
+                }
+
+                marchNode(node, *_triangleConsumers[threadIdx % N]);
+            }
+        });
+    }
+}
+
 
 void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc)
 {

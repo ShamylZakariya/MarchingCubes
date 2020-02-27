@@ -279,7 +279,7 @@ namespace util {
         /*
         Outset this AABB_ by scalar factor
     */
-        void outset(T d)
+        AABB_<T, Q>& outset(T d)
         {
             min.x -= d;
             min.y -= d;
@@ -287,6 +287,7 @@ namespace util {
             max.x += d;
             max.y += d;
             max.z += d;
+            return *this;
         }
 
         /*
@@ -307,7 +308,7 @@ namespace util {
         /*
         Inset this AABB_ by scalar factor
     */
-        void inset(T d)
+        AABB_<T, Q>& inset(T d)
         {
             min.x += d;
             min.y += d;
@@ -315,15 +316,17 @@ namespace util {
             max.x -= d;
             max.y -= d;
             max.z -= d;
+            return *this;
         }
 
         /*
         Transform this AABB_ by p
     */
-        void translate(const glm::vec<3, T, Q>& p)
+        AABB_<T, Q>& translate(const glm::vec<3, T, Q>& p)
         {
             min += p;
             max += p;
+            return *this;
         }
 
         /*
