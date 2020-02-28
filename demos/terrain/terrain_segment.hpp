@@ -40,7 +40,7 @@ public:
     {
         using namespace glm;
 
-        std::cout << "[VolumeSegment::build] idx " << idx << std::endl;
+        std::cout << "[TerrainSegment::build] idx " << idx << std::endl;
 
         this->idx = idx;
         volume->clear();

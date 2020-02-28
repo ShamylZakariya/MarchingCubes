@@ -43,8 +43,9 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr int WIDTH = 506;
-constexpr int HEIGHT = 900;
+constexpr bool AUTOMATIC = false;
+constexpr int WIDTH = AUTOMATIC ? 506 : 1440;
+constexpr int HEIGHT = AUTOMATIC ? 900 : 700;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
@@ -254,6 +255,8 @@ private:
                 V { vec3(+1, +1, 1), vec4(1, 0, 1, 1) },
                 V { vec3(-1, +1, 1), vec4(1, 1, 0, 1) } });
             _skydomeQuad.finish();
+
+            _axisMarker.addAxis(mat4{1}, 64);
         }
 
         //
@@ -277,11 +280,12 @@ private:
             _segments.back()->march(false);
         }
 
-        vec3 pos = vec3(_segments.front()->volume->size()) / 2.0F;
-        pos.z = 0;
-        vec3 at = pos + vec3(0, 0, 1);
-        _camera.lookAt(pos, at);
-        _syncCameraSprings = true;
+        if (!AUTOMATIC) {
+            vec3 size = vec3(_segments.front()->volume->size());
+            vec3 center = size/2.0F;
+            vec3 pos = center + vec3(-2*size.x, 0, 0);
+            _camera.lookAt(pos, center);
+        }
     }
 
     void onResize(int width, int height)
@@ -309,7 +313,7 @@ private:
 
     void onMouseMove(const vec2& pos, const vec2& delta)
     {
-        if (_mouseButtonState[0] && !_automaticCamera) {
+        if (_mouseButtonState[0] && !AUTOMATIC) {
             // simple x/y trackball
             float trackballSpeed = 0.004F * pi<float>();
             float deltaPitch = -delta.y * trackballSpeed;
@@ -365,6 +369,11 @@ private:
         _skydomeMaterial->bind(projection, view);
         _skydomeQuad.draw();
 
+        // draw the origin of our scene
+        _lineMaterial->bind(projection * view * mat4{1});
+        _axisMarker.draw();
+
+        // draw optional markers, aabbs, etc
         if (_drawOctreeAABBs || _drawWaypoints || _drawSegmentBounds) {
             for (const auto& segment : _segments) {
                 _lineMaterial->bind(projection * view * segment->model * terrainOffset);
@@ -394,9 +403,6 @@ private:
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
         ImGui::Checkbox("Waypoints", &_drawWaypoints);
-        if (ImGui::Checkbox("Auto Camera", &_automaticCamera) && _automaticCamera) {
-            _syncCameraSprings = true;
-        }
         ImGui::Checkbox("Scrolling", &_scrolling);
 
         ImGui::End();
@@ -407,7 +413,7 @@ private:
         const float scrollSpeed = 100 * deltaT;
         if (_scrolling) {
             _distanceAlongZ += scrollSpeed;
-        } else if (_automaticCamera) {
+        } else if (AUTOMATIC) {
             if (isKeyDown(GLFW_KEY_W)) {
                 _distanceAlongZ += scrollSpeed;
             }
@@ -449,7 +455,7 @@ private:
 
     void updateCamera(float deltaT)
     {
-        if (_automaticCamera) {
+        if (AUTOMATIC) {
 
             // the environment is scrolling; the camera is always at z = 0
             // find the two waypoints the camera currently is inclusively between
@@ -490,19 +496,7 @@ private:
             if (found) {
                 float t = (_camera.position.z - prevWaypoint.z) / (nextWaypoint.z - prevWaypoint.z);
                 vec3 position = mix(prevWaypoint, nextWaypoint, t);
-
-                _cameraMovementSpring.setTarget(position);
-                _cameraLookAtSpring.setTarget(nextWaypoint);
-
-                if (_syncCameraSprings) {
-                    _cameraMovementSpring.setValue(position);
-                    _cameraLookAtSpring.setValue(nextWaypoint);
-                    _syncCameraSprings = false;
-                }
-
-                // position = _cameraMovementSpring.step(deltaT);
-                // vec3 target = _cameraLookAtSpring.step(deltaT);
-                _camera.lookAt(position, position + vec3(0, 0, 1));
+                _camera.lookAt(position, nextWaypoint);
             }
 
         } else {
@@ -593,6 +587,7 @@ private:
     std::unique_ptr<LineMaterial> _lineMaterial;
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
+    mc::util::LineSegmentBuffer _axisMarker;
     float _aspect = 1;
 
 
@@ -602,7 +597,6 @@ private:
     bool _drawOctreeAABBs = false;
     bool _drawWaypoints = true;
     bool _drawSegmentBounds = true;
-    bool _automaticCamera = true;
     bool _scrolling = false;
 
     // demo state
@@ -610,9 +604,6 @@ private:
     int _segmentSizeZ = 0;
     std::deque<std::unique_ptr<TerrainSegment>> _segments;
     FastNoise _fastNoise;
-    spring3 _cameraMovementSpring { 1.0F, 1.0F, 1.0F };
-    spring3 _cameraLookAtSpring { 1.0F, 1.0F, 1.0F };
-    bool _syncCameraSprings = true;
 };
 
 //
