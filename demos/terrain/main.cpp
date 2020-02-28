@@ -33,6 +33,7 @@
 #include "../common/cubemap_blur.hpp"
 #include "FastNoise.h"
 #include "materials.hpp"
+#include "spring.hpp"
 #include "terrain_samplers.hpp"
 #include "xorshift.hpp"
 
@@ -47,7 +48,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr int WIDTH = 1440;
+constexpr int WIDTH = 506;
 constexpr int HEIGHT = 900;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
@@ -59,7 +60,6 @@ public:
     VolumeSegment(int size, int numThreadsToUse)
         : size(size)
     {
-        std::cout << "VolumeSegment::ctor size: " << size << " numThreadsToUse: " << numThreadsToUse << std::endl;
         std::vector<unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
         for (auto i = 0; i < numThreadsToUse; i++) {
             triangles.push_back(make_unique<mc::TriangleConsumer<mc::Vertex>>());
@@ -181,7 +181,8 @@ public:
 
             volume->add(std::make_unique<Tube>(arch));
 
-            vec3 waypoint = arch.axisOrigin + arch.axisPerp * arch.innerRadius * 0.4F;
+            vec3 waypoint = arch.axisOrigin + arch.axisPerp * arch.innerRadius * rng.nextFloat(0.2F, 0.8F);
+            waypoint.y = std::max(waypoint.y, maxHeight);
             waypoints.push_back(waypoint);
             waypointLineBuffer.addMarker(waypoint, 4, segmentColor);
         }
@@ -299,7 +300,7 @@ private:
         {
             auto up = glm::vec3 { look[0][1], look[1][1], look[2][1] };
             auto forward = glm::vec3 { look[0][2], look[1][2], look[2][2] };
-            return lookAt(position, position + forward, up);
+            return glm::lookAt(position, position + forward, up);
         }
 
         void moveBy(vec3 deltaLocal)
@@ -314,6 +315,24 @@ private:
             look = mat4 { look } * rotate(rotate(mat4 { 1 }, yaw, vec3 { 0, 1, 0 }), pitch, right);
         }
 
+        void lookAt(vec3 position, vec3 at, vec3 up = vec3(0, 1, 0))
+        {
+            this->position = position;
+
+            vec3 forward = normalize(at - position);
+            vec3 right = cross(up, forward);
+
+            look[0][0] = right.x;
+            look[1][0] = right.y;
+            look[2][0] = right.z;
+            look[0][1] = up.x;
+            look[1][1] = up.y;
+            look[2][1] = up.z;
+            look[0][2] = forward.x;
+            look[1][2] = forward.y;
+            look[2][2] = forward.z;
+        }
+
     } _cameraState;
 
     // demo state (noise, etc)
@@ -321,6 +340,7 @@ private:
     FastNoise _fastNoise;
     float _distanceAlongZ = 0;
     int _segmentSizeZ = 0;
+    spring3 _cameraMovementSpring { 1.0F, 1.0F, 1.0F };
 
 public:
     App()
@@ -536,7 +556,7 @@ private:
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march volumes" << std::endl;
 
-        // TODO: Decide how many sections we will create
+        // TODO: Decide how many sections we will use
         constexpr auto COUNT = 3;
 
         for (int i = 0; i < COUNT; i++) {
@@ -544,6 +564,11 @@ private:
             _segments.back()->build(i, _fastNoise);
             _segments.back()->march(false);
         }
+
+        vec3 pos = vec3(_segments.front()->volume->size()) / 2.0F;
+        pos.z = 0;
+        vec3 at = pos + vec3(0, 0, 1);
+        _cameraState.lookAt(pos, at);
     }
 
     void onResize(int width, int height)
@@ -664,19 +689,21 @@ private:
 
     void updateScroll(float deltaT)
     {
-        const float travelSpeed = 100 * deltaT;
+        const float scrollSpeed = 100 * deltaT;
         if (_scrolling) {
-            _distanceAlongZ += travelSpeed;
+            _distanceAlongZ += scrollSpeed;
+        } else if (_automaticCamera) {
+            if (isKeyDown(GLFW_KEY_W)) {
+                _distanceAlongZ += scrollSpeed;
+            }
+
+            if (isKeyDown(GLFW_KEY_S)) {
+                _distanceAlongZ -= scrollSpeed;
+            }
         }
 
-        int currentIdx = _distanceAlongZ / _segmentSizeZ;
-        if (currentIdx != _segments.front()->idx) {
-            std::cout << "currentIdx: " << currentIdx << " prevIdx: " << _segments.front()->idx << std::endl;
-        }
-
+        const int currentIdx = _distanceAlongZ / _segmentSizeZ;
         if (currentIdx < _segments.front()->idx) {
-            std::cout << "BACKWARDS - currentIdx: " << currentIdx << " PrevIdx: " << _segments.front()->idx << std::endl;
-
             // we moved backwards and revealed a new segment.
             // pop last segment, rebuild it for currentIdx and
             // push it front
@@ -690,8 +717,6 @@ private:
             _segments.push_front(std::move(seg));
 
         } else if (currentIdx > _segments.front()->idx) {
-            std::cout << "FORWARDS - currentIdx: " << currentIdx << " prevIdx: " << _segments.front()->idx << std::endl;
-
             // we moved forward enough to hide first segment,
             // it can be repurposed. pop front segment, generate
             // a new end segment, and push it back
@@ -709,6 +734,48 @@ private:
     void updateCamera(float deltaT)
     {
         if (_automaticCamera) {
+
+            // the environment is scrolling; the camera is always at z = 0
+            // find the two waypoints the camera currently is inclusively between
+            vec3 firstWaypointPosition = [=]()->vec3{
+                for (const auto& seg : _segments) {
+                    for (const auto& waypoint : seg->waypoints) {
+                        return waypoint;
+                    }
+                }
+                const auto &firstSeg = _segments.front();
+                return vec3(firstSeg->volume->size())/2.0F;
+            }();
+
+            vec3 prevWaypoint(firstWaypointPosition.x, firstWaypointPosition.y, 0);
+            vec3 nextWaypoint;
+            bool found = false;
+            int segIdx = 0;
+            for (const auto& seg : _segments) {
+                int wayPointIdx = 0;
+                for (auto waypoint : seg->waypoints) {
+                    waypoint = vec3(seg->model * vec4(waypoint, 1));
+                    waypoint.z -= _distanceAlongZ;
+                    if (waypoint.z <= 0) {
+                        prevWaypoint = waypoint;
+                    } else {
+                        nextWaypoint = waypoint;
+                        found = true;
+                        break;
+                    }
+                    wayPointIdx++;
+                }
+                if (found) {
+                    break;
+                }
+                segIdx++;
+            }
+
+            if (found) {
+                float t = (_cameraState.position.z - prevWaypoint.z) / (nextWaypoint.z - prevWaypoint.z);
+                vec3 position = mix(prevWaypoint, nextWaypoint, t);
+                _cameraState.lookAt(position, nextWaypoint);
+            }
 
         } else {
             // WASD
