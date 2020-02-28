@@ -158,6 +158,8 @@ public:
             // we have an arch, get its z position, use that to feed simplex
             // noise to perturb x position smoothly. Note - we inset a bit to
             // reduce likelyhood of clipping
+            // TODO: Use simplex to seed our arches too... this would prevent clipping
+            // because arches would clone across segment boundaries
             float archZ = 30 + (sizeZ - 60) * static_cast<float>(i) / maxArches;
             float archX = center.x + noise.GetSimplex(archZ + zOffset, 0) * size.x * 0.125F;
 
