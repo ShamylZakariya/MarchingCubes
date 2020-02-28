@@ -162,14 +162,14 @@ public:
             float archX = center.x + noise.GetSimplex(archZ + zOffset, 0) * size.x * 0.125F;
 
             Tube::Config arch;
-            arch.axisOrigin = vec3 { archX, 0, archZ};
+            arch.axisOrigin = vec3 { archX, 0, archZ };
 
             arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(4, 10), 0);
 
             arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
 
             arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
-            arch.length = 5; rng.nextFloat(7, 11);
+            arch.length = rng.nextFloat(7, 11);
             arch.innerRadius = rng.nextFloat(35, 43);
             arch.outerRadius = rng.nextFloat(48, 55);
             arch.frontFaceNormal = arch.axisDir;
@@ -290,30 +290,26 @@ private:
     vec2 _lastMousePosition { -1 };
 
     struct _CameraState {
-        float pitch = 0;
-        float yaw = 0;
+        mat3 look = mat3 { 1 };
         vec3 position = vec3 { 0, 0, -100 };
 
         mat4 view() const
         {
-            vec3 dir = vec3 { 0, 0, 1 };
-            vec3 up = vec3 { 0, 1, 0 };
-            mat3 rot = rotation();
-
-            dir = rot * dir;
-            up = rot * up;
-            return lookAt(position, position + dir, up);
-        }
-
-        mat3 rotation() const
-        {
-            return rotate(rotate(mat4 { 1 }, yaw, vec3 { 0, 1, 0 }), pitch, vec3 { 1, 0, 0 });
+            auto up = glm::vec3 { look[0][1], look[1][1], look[2][1] };
+            auto forward = glm::vec3 { look[0][2], look[1][2], look[2][2] };
+            return lookAt(position, position + forward, up);
         }
 
         void moveBy(vec3 deltaLocal)
         {
-            vec3 deltaWorld = rotation() * deltaLocal;
+            vec3 deltaWorld = inverse(look) * deltaLocal;
             position += deltaWorld;
+        }
+
+        void rotateBy(float yaw, float pitch)
+        {
+            auto right = glm::vec3 { look[0][0], look[1][0], look[2][0] };
+            look = mat4 { look } * rotate(rotate(mat4 { 1 }, yaw, vec3 { 0, 1, 0 }), pitch, right);
         }
 
     } _cameraState;
@@ -544,9 +540,8 @@ private:
         for (int i = 0; i < COUNT; i++) {
             _segments.emplace_back(std::make_unique<VolumeSegment>(_segmentSizeZ, nThreads));
             _segments.back()->build(i, _fastNoise);
+            _segments.back()->march(false);
         }
-
-        marchAllSegmentsSynchronously();
     }
 
     void onResize(int width, int height)
@@ -576,9 +571,10 @@ private:
     {
         if (_mouseButtonState[0] && !_automaticCamera) {
             // simple x/y trackball
-            float trackballSpeed = 0.004 * M_PI;
-            _cameraState.pitch += delta.y * trackballSpeed;
-            _cameraState.yaw += -delta.x * trackballSpeed;
+            float trackballSpeed = 0.004F * pi<float>();
+            float deltaPitch = -delta.y * trackballSpeed;
+            float deltaYaw = +delta.x * trackballSpeed;
+            _cameraState.rotateBy(deltaYaw, deltaPitch);
         }
     }
 
@@ -742,19 +738,19 @@ private:
             }
 
             if (isKeyDown(GLFW_KEY_UP)) {
-                _cameraState.pitch -= lookSpeed;
+                _cameraState.rotateBy(0, -lookSpeed);
             }
 
             if (isKeyDown(GLFW_KEY_DOWN)) {
-                _cameraState.pitch += lookSpeed;
+                _cameraState.rotateBy(0, lookSpeed);
             }
 
             if (isKeyDown(GLFW_KEY_LEFT)) {
-                _cameraState.yaw += lookSpeed;
+                _cameraState.rotateBy(-lookSpeed, 0);
             }
 
             if (isKeyDown(GLFW_KEY_RIGHT)) {
-                _cameraState.yaw -= lookSpeed;
+                _cameraState.rotateBy(+lookSpeed, 0);
             }
         }
     }
