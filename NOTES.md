@@ -6,3 +6,8 @@
     batch->enqueue()
     ...
     batch->wait()
+- We need to, periodically, reset scroll so as to not drift into float precision issues
+    if _distanceAlongX > N:
+        _distanceAlongX -= N
+        for seg in segments:
+            seg.model = seg.model * translate(mat4(1), vec3(0,0,-N))
