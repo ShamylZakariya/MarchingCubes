@@ -66,17 +66,17 @@ public:
         setDamping(damping);
     }
 
-    void setTarget(T target) { _target = target; }
+    void setTarget(glm::vec<L,T,Q> target) { _target = target; }
 
-    T target(void) const { return _target; }
+    glm::vec<L,T,Q> target(void) const { return _target; }
 
-    void setValue(T v)
+    void setValue(glm::vec<L,T,Q> v)
     {
         _value = v;
         _velocity = _zero;
     }
 
-    T value(void) const { return _value; }
+    glm::vec<L,T,Q> value(void) const { return _value; }
 
     void setMass(T m) { _mass = std::max(m, minimumMass()); }
 
@@ -104,9 +104,9 @@ public:
         if (deltaT < T(1e-4))
             return _value;
 
-        T error = _target - _value;
-        T correctiveForce = error * _force;
-        T correctiveAcceleration = correctiveForce / _mass;
+        auto error = _target - _value;
+        auto correctiveForce = error * _force;
+        auto correctiveAcceleration = correctiveForce / _mass;
 
         _velocity += correctiveAcceleration * deltaT;
 

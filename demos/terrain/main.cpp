@@ -9,22 +9,18 @@
 #include <chrono>
 #include <filesystem>
 #include <iostream>
-#include <map>
 #include <random>
 #include <set>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include <epoxy/gl.h>
-#include <glm/gtc/noise.hpp>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
-#include <mc/marching_cubes.hpp>
 #include <mc/util/op_queue.hpp>
 #include <mc/util/util.hpp>
 #include <mc/volume.hpp>
@@ -32,10 +28,9 @@
 
 #include "../common/cubemap_blur.hpp"
 #include "FastNoise.h"
-#include "materials.hpp"
+#include "camera.hpp"
 #include "spring.hpp"
-#include "terrain_samplers.hpp"
-#include "xorshift.hpp"
+#include "terrain_segment.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -53,295 +48,12 @@ constexpr int HEIGHT = 900;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
-constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
-
-struct VolumeSegment {
-public:
-    VolumeSegment(int size, int numThreadsToUse)
-        : size(size)
-    {
-        std::vector<unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
-        for (auto i = 0; i < numThreadsToUse; i++) {
-            triangles.push_back(make_unique<mc::TriangleConsumer<mc::Vertex>>());
-            unownedTriangleConsumers.push_back(triangles.back().get());
-        }
-
-        volume = make_unique<mc::OctreeVolume>(size, 4, 4, unownedTriangleConsumers);
-    }
-
-    ~VolumeSegment() = default;
-    VolumeSegment(const VolumeSegment&) = delete;
-    VolumeSegment(VolumeSegment&&) = delete;
-    VolumeSegment& operator==(const VolumeSegment&) = delete;
-
-    void build(int idx, FastNoise& noise)
-    {
-        std::cout << "[VolumeSegment::build] idx " << idx << std::endl;
-
-        this->idx = idx;
-        volume->clear();
-        triangleCount = 0;
-        for (auto& tc : triangles) {
-            tc->clear();
-        }
-
-        waypoints.clear();
-        waypointLineBuffer.clear();
-
-        const auto segmentColor = rainbow(static_cast<float>(idx % 5) / 5.0F);
-        const float sizeZ = volume->size().z;
-        model = translate(mat4 { 1 }, vec3(0, 0, sizeZ * idx));
-
-        //
-        // build terrain sampler
-        //
-
-        const mc::MaterialState floorTerrainMaterial {
-            vec4(1),
-            1,
-            0,
-            0
-        };
-
-        const mc::MaterialState lowTerrainMaterial {
-            vec4(1),
-            0,
-            1,
-            0
-        };
-
-        const mc::MaterialState highTerrainMaterial {
-            vec4(0.7, 0.7, 0.7, 1),
-            0,
-            1,
-            1
-        };
-
-        const mc::MaterialState archMaterial {
-            vec4(0.5, 0.5, 0.5, 1),
-            0.3,
-            0,
-            1
-        };
-
-        const float maxHeight = 8.0F;
-        const float floorThreshold = 1.25F;
-        const auto zOffset = idx * sizeZ;
-        const auto groundSampler = [=](vec3 p) {
-            float v = noise.GetSimplex(p.x, p.y, p.z + zOffset);
-            return v * 0.5F + 0.5F;
-        };
-
-        volume->add(std::make_unique<GroundSampler>(groundSampler, maxHeight, floorThreshold,
-            floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
-
-        //
-        //  Build an RNG seeded for this segment
-        //
-
-        auto rng = rng_xorshift64 { static_cast<uint64_t>(12345 * (idx + 1)) };
-
-        //
-        // build a broken arch
-        //
-
-        const auto size = vec3(volume->size());
-        const auto center = size / 2.0F;
-        const auto maxArches = 7;
-        for (int i = 0; i < maxArches; i++) {
-
-            // roll the dice to see if we get an arch here
-            if (rng.nextInt(10) < 5) {
-                continue;
-            }
-
-            // we have an arch, get its z position, use that to feed simplex
-            // noise to perturb x position smoothly. Note - we inset a bit to
-            // reduce likelyhood of clipping
-            // TODO: Use simplex to seed our arches too... this would prevent clipping
-            // because arches would clone across segment boundaries
-            float archZ = 30 + (sizeZ - 60) * static_cast<float>(i) / maxArches;
-            float archX = center.x + noise.GetSimplex(archZ + zOffset, 0) * size.x * 0.125F;
-
-            Tube::Config arch;
-            arch.axisOrigin = vec3 { archX, 0, archZ };
-
-            arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(4, 10), 0);
-
-            arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
-
-            arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
-            arch.length = rng.nextFloat(7, 11);
-            arch.innerRadius = rng.nextFloat(35, 43);
-            arch.outerRadius = rng.nextFloat(48, 55);
-            arch.frontFaceNormal = arch.axisDir;
-            arch.backFaceNormal = -arch.axisDir;
-            arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
-            arch.material = archMaterial;
-
-            volume->add(std::make_unique<Tube>(arch));
-
-            vec3 waypoint = arch.axisOrigin + arch.axisPerp * arch.innerRadius * rng.nextFloat(0.2F, 0.8F);
-            waypoint.y = std::max(waypoint.y, maxHeight);
-            waypoints.push_back(waypoint);
-            waypointLineBuffer.addMarker(waypoint, 4, segmentColor);
-        }
-
-        //
-        //  Build a debug frame to show our volume
-        //
-
-        boundingLineBuffer.clear();
-        boundingLineBuffer.add(AABB(vec3 { 0.0F }, size).inset(1), segmentColor);
-    }
-
-    void march(bool synchronously)
-    {
-        aabbLineBuffer.clear();
-
-        const auto nodeObserver = [this](mc::OctreeVolume::Node* node) {
-            {
-                // update the occupied aabb display
-                auto bounds = node->bounds;
-                bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
-                aabbLineBuffer.add(bounds, nodeColor(node->depth));
-            }
-        };
-
-        const auto onMarchComplete = [this]() {
-            triangleCount = 0;
-            for (const auto& tc : triangles) {
-                triangleCount += tc->numTriangles();
-            }
-        };
-
-        if (synchronously) {
-            volume->march(nodeObserver);
-            onMarchComplete();
-        } else {
-            volume->marchAsync(onMarchComplete, nodeObserver);
-        }
-    }
-
-    int idx = 0;
-    int size = 0;
-    int triangleCount;
-    unique_ptr<mc::OctreeVolume> volume;
-    std::vector<unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
-    mc::util::LineSegmentBuffer aabbLineBuffer;
-    mc::util::LineSegmentBuffer boundingLineBuffer;
-    mc::util::LineSegmentBuffer waypointLineBuffer;
-    std::vector<vec3> waypoints;
-    mat4 model;
-
-private:
-    std::vector<vec4> _nodeColors;
-
-    vec4 rainbow(float dist) const
-    {
-        using namespace mc::util::color;
-        const hsv hC { 360 * dist, 0.6F, 1.0F };
-        const auto rgbC = Hsv2Rgb(hC);
-        return vec4(rgbC.r, rgbC.g, rgbC.b, 1);
-    }
-
-    vec4 nodeColor(int atDepth)
-    {
-        using namespace mc::util::color;
-
-        auto depth = volume->depth();
-        if (_nodeColors.size() < depth) {
-            _nodeColors.clear();
-            const float hueStep = 360.0F / depth;
-            for (auto i = 0U; i <= depth; i++) {
-                const hsv hC { i * hueStep, 0.6F, 1.0F };
-                const auto rgbC = Hsv2Rgb(hC);
-                _nodeColors.emplace_back(rgbC.r, rgbC.g, rgbC.b, mix<float>(0.6, 0.25, static_cast<float>(i) / depth));
-            }
-        }
-
-        return _nodeColors[atDepth];
-    }
-};
 
 //
 // App
 //
 
 class App {
-private:
-    // app state
-    GLFWwindow* _window;
-    double _elapsedFrameTime = 0;
-    bool _running = true;
-
-    // render state
-    std::unique_ptr<TerrainMaterial> _terrainMaterial;
-    std::unique_ptr<LineMaterial> _lineMaterial;
-    std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
-    float _aspect = 1;
-    bool _drawOctreeAABBs = false;
-    bool _drawWaypoints = true;
-    bool _drawSegmentBounds = true;
-    bool _automaticCamera = false;
-    bool _scrolling = false;
-
-    // input state
-    bool _mouseButtonState[3] = { false, false, false };
-    std::set<int> _pressedkeyScancodes;
-    vec2 _lastMousePosition { -1 };
-
-    struct _CameraState {
-        mat3 look = mat3 { 1 };
-        vec3 position = vec3 { 0, 0, -100 };
-
-        mat4 view() const
-        {
-            auto up = glm::vec3 { look[0][1], look[1][1], look[2][1] };
-            auto forward = glm::vec3 { look[0][2], look[1][2], look[2][2] };
-            return glm::lookAt(position, position + forward, up);
-        }
-
-        void moveBy(vec3 deltaLocal)
-        {
-            vec3 deltaWorld = inverse(look) * deltaLocal;
-            position += deltaWorld;
-        }
-
-        void rotateBy(float yaw, float pitch)
-        {
-            auto right = glm::vec3 { look[0][0], look[1][0], look[2][0] };
-            look = mat4 { look } * rotate(rotate(mat4 { 1 }, yaw, vec3 { 0, 1, 0 }), pitch, right);
-        }
-
-        void lookAt(vec3 position, vec3 at, vec3 up = vec3(0, 1, 0))
-        {
-            this->position = position;
-
-            vec3 forward = normalize(at - position);
-            vec3 right = cross(up, forward);
-
-            look[0][0] = right.x;
-            look[1][0] = right.y;
-            look[2][0] = right.z;
-            look[0][1] = up.x;
-            look[1][1] = up.y;
-            look[2][1] = up.z;
-            look[0][2] = forward.x;
-            look[1][2] = forward.y;
-            look[2][2] = forward.z;
-        }
-
-    } _cameraState;
-
-    // demo state (noise, etc)
-    std::deque<std::unique_ptr<VolumeSegment>> _segments;
-    FastNoise _fastNoise;
-    float _distanceAlongZ = 0;
-    int _segmentSizeZ = 0;
-    spring3 _cameraMovementSpring { 1.0F, 1.0F, 1.0F };
-
 public:
     App()
     {
@@ -560,7 +272,7 @@ private:
         constexpr auto COUNT = 3;
 
         for (int i = 0; i < COUNT; i++) {
-            _segments.emplace_back(std::make_unique<VolumeSegment>(_segmentSizeZ, nThreads));
+            _segments.emplace_back(std::make_unique<TerrainSegment>(_segmentSizeZ, nThreads));
             _segments.back()->build(i, _fastNoise);
             _segments.back()->march(false);
         }
@@ -568,7 +280,8 @@ private:
         vec3 pos = vec3(_segments.front()->volume->size()) / 2.0F;
         pos.z = 0;
         vec3 at = pos + vec3(0, 0, 1);
-        _cameraState.lookAt(pos, at);
+        _camera.lookAt(pos, at);
+        _syncCameraSprings = true;
     }
 
     void onResize(int width, int height)
@@ -601,7 +314,7 @@ private:
             float trackballSpeed = 0.004F * pi<float>();
             float deltaPitch = -delta.y * trackballSpeed;
             float deltaYaw = +delta.x * trackballSpeed;
-            _cameraState.rotateBy(deltaYaw, deltaPitch);
+            _camera.rotateBy(deltaYaw, deltaPitch);
         }
     }
 
@@ -633,7 +346,7 @@ private:
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        mat4 view = _cameraState.view();
+        mat4 view = _camera.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
         // draw volumes
@@ -641,7 +354,7 @@ private:
         mat4 terrainOffset = translate(mat4 { 1 }, vec3(0, 0, -_distanceAlongZ));
 
         for (const auto& segment : _segments) {
-            _terrainMaterial->bind(segment->model * terrainOffset, view, projection, _cameraState.position);
+            _terrainMaterial->bind(segment->model * terrainOffset, view, projection, _camera.position);
             for (auto& tc : segment->triangles) {
                 tc->draw();
             }
@@ -681,7 +394,9 @@ private:
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
         ImGui::Checkbox("Waypoints", &_drawWaypoints);
-        ImGui::Checkbox("Auto Camera", &_automaticCamera);
+        if (ImGui::Checkbox("Auto Camera", &_automaticCamera) && _automaticCamera) {
+            _syncCameraSprings = true;
+        }
         ImGui::Checkbox("Scrolling", &_scrolling);
 
         ImGui::End();
@@ -696,11 +411,12 @@ private:
             if (isKeyDown(GLFW_KEY_W)) {
                 _distanceAlongZ += scrollSpeed;
             }
-
-            if (isKeyDown(GLFW_KEY_S)) {
-                _distanceAlongZ -= scrollSpeed;
-            }
         }
+
+        // TODO: check if _distanceAlongZ is *big* and reset all the scroll
+        // to reduce float precision error, since this is meant to
+        // run a long time uninterrupted. NOTE: This requires
+        // changing TerrainSegment::model to not be an absolute distance!
 
         const int currentIdx = _distanceAlongZ / _segmentSizeZ;
         if (currentIdx < _segments.front()->idx) {
@@ -737,14 +453,14 @@ private:
 
             // the environment is scrolling; the camera is always at z = 0
             // find the two waypoints the camera currently is inclusively between
-            vec3 firstWaypointPosition = [=]()->vec3{
+            vec3 firstWaypointPosition = [=]() -> vec3 {
                 for (const auto& seg : _segments) {
                     for (const auto& waypoint : seg->waypoints) {
                         return waypoint;
                     }
                 }
-                const auto &firstSeg = _segments.front();
-                return vec3(firstSeg->volume->size())/2.0F;
+                const auto& firstSeg = _segments.front();
+                return vec3(firstSeg->volume->size()) / 2.0F;
             }();
 
             vec3 prevWaypoint(firstWaypointPosition.x, firstWaypointPosition.y, 0);
@@ -772,9 +488,21 @@ private:
             }
 
             if (found) {
-                float t = (_cameraState.position.z - prevWaypoint.z) / (nextWaypoint.z - prevWaypoint.z);
+                float t = (_camera.position.z - prevWaypoint.z) / (nextWaypoint.z - prevWaypoint.z);
                 vec3 position = mix(prevWaypoint, nextWaypoint, t);
-                _cameraState.lookAt(position, nextWaypoint);
+
+                _cameraMovementSpring.setTarget(position);
+                _cameraLookAtSpring.setTarget(nextWaypoint);
+
+                if (_syncCameraSprings) {
+                    _cameraMovementSpring.setValue(position);
+                    _cameraLookAtSpring.setValue(nextWaypoint);
+                    _syncCameraSprings = false;
+                }
+
+                // position = _cameraMovementSpring.step(deltaT);
+                // vec3 target = _cameraLookAtSpring.step(deltaT);
+                _camera.lookAt(position, position + vec3(0, 0, 1));
             }
 
         } else {
@@ -783,43 +511,43 @@ private:
             const float lookSpeed = radians<float>(90) * deltaT;
 
             if (isKeyDown(GLFW_KEY_A)) {
-                _cameraState.moveBy(movementSpeed * vec3(+1, 0, 0));
+                _camera.moveBy(movementSpeed * vec3(+1, 0, 0));
             }
 
             if (isKeyDown(GLFW_KEY_D)) {
-                _cameraState.moveBy(movementSpeed * vec3(-1, 0, 0));
+                _camera.moveBy(movementSpeed * vec3(-1, 0, 0));
             }
 
             if (isKeyDown(GLFW_KEY_W)) {
-                _cameraState.moveBy(movementSpeed * vec3(0, 0, +1));
+                _camera.moveBy(movementSpeed * vec3(0, 0, +1));
             }
 
             if (isKeyDown(GLFW_KEY_S)) {
-                _cameraState.moveBy(movementSpeed * vec3(0, 0, -1));
+                _camera.moveBy(movementSpeed * vec3(0, 0, -1));
             }
 
             if (isKeyDown(GLFW_KEY_Q)) {
-                _cameraState.moveBy(movementSpeed * vec3(0, -1, 0));
+                _camera.moveBy(movementSpeed * vec3(0, -1, 0));
             }
 
             if (isKeyDown(GLFW_KEY_E)) {
-                _cameraState.moveBy(movementSpeed * vec3(0, +1, 0));
+                _camera.moveBy(movementSpeed * vec3(0, +1, 0));
             }
 
             if (isKeyDown(GLFW_KEY_UP)) {
-                _cameraState.rotateBy(0, -lookSpeed);
+                _camera.rotateBy(0, -lookSpeed);
             }
 
             if (isKeyDown(GLFW_KEY_DOWN)) {
-                _cameraState.rotateBy(0, lookSpeed);
+                _camera.rotateBy(0, lookSpeed);
             }
 
             if (isKeyDown(GLFW_KEY_LEFT)) {
-                _cameraState.rotateBy(-lookSpeed, 0);
+                _camera.rotateBy(-lookSpeed, 0);
             }
 
             if (isKeyDown(GLFW_KEY_RIGHT)) {
-                _cameraState.rotateBy(+lookSpeed, 0);
+                _camera.rotateBy(+lookSpeed, 0);
             }
         }
     }
@@ -848,6 +576,43 @@ private:
     {
         return _pressedkeyScancodes.find(glfwGetKeyScancode(scancode)) != _pressedkeyScancodes.end();
     }
+
+private:
+    // app state
+    GLFWwindow* _window;
+    double _elapsedFrameTime = 0;
+    bool _running = true;
+
+    // input state
+    bool _mouseButtonState[3] = { false, false, false };
+    std::set<int> _pressedkeyScancodes;
+    vec2 _lastMousePosition { -1 };
+
+    // render state
+    std::unique_ptr<TerrainMaterial> _terrainMaterial;
+    std::unique_ptr<LineMaterial> _lineMaterial;
+    std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
+    mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
+    float _aspect = 1;
+
+
+    Camera _camera;
+
+    // user input state
+    bool _drawOctreeAABBs = false;
+    bool _drawWaypoints = true;
+    bool _drawSegmentBounds = true;
+    bool _automaticCamera = true;
+    bool _scrolling = false;
+
+    // demo state
+    float _distanceAlongZ = 0;
+    int _segmentSizeZ = 0;
+    std::deque<std::unique_ptr<TerrainSegment>> _segments;
+    FastNoise _fastNoise;
+    spring3 _cameraMovementSpring { 1.0F, 1.0F, 1.0F };
+    spring3 _cameraLookAtSpring { 1.0F, 1.0F, 1.0F };
+    bool _syncCameraSprings = true;
 };
 
 //
