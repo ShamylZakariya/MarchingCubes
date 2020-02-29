@@ -19,7 +19,19 @@ namespace mc {
 void OctreeVolume::march(
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
-    marchSetup(marchedNodeObserver);
+    for (auto& tc : _triangleConsumers) {
+        tc->start();
+    }
+
+    marchSetup();
+
+    // if caller wants to know which nodes were marched
+    // we need to make a copy since marchCollectedNodes
+    // drains _nodesToMarch
+    if (marchedNodeObserver) {
+        _marchedNodes = _nodesToMarch;
+    }
+
     auto jobs = marchCollectedNodes();
 
     // blocking wait
@@ -30,54 +42,79 @@ void OctreeVolume::march(
     for (auto& tc : _triangleConsumers) {
         tc->finish();
     }
+
+    // if we hav an observer, pass collected march nodes to it
+    if (marchedNodeObserver) {
+        for (const auto& node : _marchedNodes) {
+            marchedNodeObserver(node);
+        }
+    }
 }
 
 void OctreeVolume::marchAsync(
     std::function<void()> onReady,
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
+    for (auto& tc : _triangleConsumers) {
+        tc->start();
+    }
+
     _asyncMarchId++;
     auto id = _asyncMarchId;
 
-    marchSetup(marchedNodeObserver);
-    auto jobs = marchCollectedNodes();
+    _asyncCollectWaiter = _threadPool->enqueue(
+        [this, onReady, marchedNodeObserver, id](int _) {
+            // collect the nodes to march
+            marchSetup();
 
-    // make a job to wait for march to complete, and subsequently notify main thread
-    _asyncMarchWaiter = _threadPool->enqueue([this, onReady, id, jobs { std::move(jobs) }](int threadIdx) {
-        if (id != _asyncMarchId) {
-            // looks like a new march got queued before this one
-            // finished, so bail on this pass
-            std::cout << "[OctreeVolume::marchAsync] - waitPool - expected id: "
-                      << id << " but current asyncMarchId is: "
-                      << _asyncMarchId << " bailing." << std::endl;
-
-            return;
-        }
-
-        for (auto& j : jobs) {
-            j.wait();
-        }
-
-        util::MainThreadQueue()->add([this, onReady]() {
-            for (auto& tc : _triangleConsumers) {
-                tc->finish();
+            // if caller needs the marched nodes, we need
+            // to make a copy
+            if (marchedNodeObserver) {
+                _marchedNodes = _nodesToMarch;
             }
-            onReady();
+
+            // march the collected nodes
+            auto jobs = marchCollectedNodes();
+
+            // make a job to wait for march to complete, and subsequently notify main thread
+            _asyncMarchWaiter = _threadPool->enqueue(
+                [this, onReady, marchedNodeObserver, id, jobs { std::move(jobs) }](int threadIdx) {
+                    if (id != _asyncMarchId) {
+                        // looks like a new march got queued before this one
+                        // finished, so bail on this pass
+                        std::cout << "[OctreeVolume::marchAsync] - waitPool - expected id: "
+                                  << id << " but current asyncMarchId is: "
+                                  << _asyncMarchId << " bailing." << std::endl;
+
+                        return;
+                    }
+
+                    // wait on the march job
+                    for (auto& j : jobs) {
+                        j.wait();
+                    }
+
+                    util::MainThreadQueue()->add([this, onReady, marchedNodeObserver]() {
+                        for (auto& tc : _triangleConsumers) {
+                            tc->finish();
+                        }
+                        onReady();
+
+                        // if we hav an observer, pass collected march nodes to it
+                        if (marchedNodeObserver) {
+                            for (const auto& node : _marchedNodes) {
+                                marchedNodeObserver(node);
+                            }
+                        }
+                    });
+                });
         });
-    });
 }
 
-void OctreeVolume::marchSetup(std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
+void OctreeVolume::marchSetup()
 {
     _nodesToMarch.clear();
     collect(_nodesToMarch);
-
-    // if we hav an observer, pass collected march nodes to it
-    if (marchedNodeObserver) {
-        for (const auto& node : _nodesToMarch) {
-            marchedNodeObserver(node);
-        }
-    }
 
     // collapse each node's set of samplers to a vector for faster iteration when marching
     for (const auto& node : _nodesToMarch) {
@@ -91,10 +128,6 @@ void OctreeVolume::marchSetup(std::function<void(OctreeVolume::Node*)> marchedNo
         std::copy(std::begin(node->subtractiveSamplers),
             std::end(node->subtractiveSamplers),
             std::back_inserter(node->_subtractiveSamplersVec));
-    }
-
-    for (auto& tc : _triangleConsumers) {
-        tc->start();
     }
 }
 

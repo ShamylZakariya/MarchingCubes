@@ -235,7 +235,7 @@ public:
     }
 
 protected:
-    void marchSetup(std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
+    void marchSetup();
     std::vector<std::future<void>> marchCollectedNodes();
     void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
 
@@ -364,12 +364,13 @@ private:
     util::AABB _bounds;
     size_t _treeDepth = 0;
     std::unique_ptr<Node> _root;
-    std::vector<Node*> _nodesToMarch;
+    std::vector<Node*> _nodesToMarch, _marchedNodes;
     std::shared_ptr<util::ThreadPool> _threadPool;
     std::vector<util::unowned_ptr<TriangleConsumer<Vertex>>> _triangleConsumers;
     std::size_t _asyncMarchId { 0 };
     std::mutex _queuePopMutex;
-    std::future<void> _asyncMarchWaiter;
+
+    std::future<void> _asyncCollectWaiter, _asyncMarchWaiter;
 };
 
 } // namespace mc
