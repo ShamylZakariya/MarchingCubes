@@ -43,9 +43,9 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOMATIC = false;
-constexpr int WIDTH = AUTOMATIC ? 506 : 1440;
-constexpr int HEIGHT = AUTOMATIC ? 900 : 700;
+constexpr bool AUTOPILOT = true;
+constexpr int WIDTH = AUTOPILOT ? 506 : 1440;
+constexpr int HEIGHT = AUTOPILOT ? 900 : 700;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
@@ -256,7 +256,7 @@ private:
                 V { vec3(-1, +1, 1), vec4(1, 1, 0, 1) } });
             _skydomeQuad.finish();
 
-            _axisMarker.addAxis(mat4{1}, 64);
+            _axisMarker.addAxis(mat4 { 1 }, 64);
         }
 
         //
@@ -280,11 +280,18 @@ private:
             _segments.back()->march(false);
         }
 
-        if (!AUTOMATIC) {
-            vec3 size = vec3(_segments.front()->volume->size());
-            vec3 center = size/2.0F;
-            vec3 pos = center + vec3(-2*size.x, 0, 0);
+
+        const auto size = vec3(_segments.front()->volume->size());
+        const auto center = size / 2.0F;
+
+        _lastWaypoint = vec3{center.x, center.y, 0};
+        _nextWaypoint = _segments.front()->waypoints.front();
+
+        if (!AUTOPILOT) {
+            vec3 pos = center + vec3(-2 * size.x, 0, 0);
             _camera.lookAt(pos, center);
+        } else {
+            updateCamera(0);
         }
     }
 
@@ -313,7 +320,7 @@ private:
 
     void onMouseMove(const vec2& pos, const vec2& delta)
     {
-        if (_mouseButtonState[0] && !AUTOMATIC) {
+        if (_mouseButtonState[0] && !AUTOPILOT) {
             // simple x/y trackball
             float trackballSpeed = 0.004F * pi<float>();
             float deltaPitch = -delta.y * trackballSpeed;
@@ -355,10 +362,11 @@ private:
 
         // draw volumes
         glDepthMask(GL_TRUE);
-        mat4 terrainOffset = translate(mat4 { 1 }, vec3(0, 0, -_distanceAlongZ));
 
-        for (const auto& segment : _segments) {
-            _terrainMaterial->bind(segment->model * terrainOffset, view, projection, _camera.position);
+        for (size_t i = 0, N = _segments.size(); i < N; i++) {
+            const auto& segment = _segments[i];
+            const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
+            _terrainMaterial->bind(model, view, projection, _camera.position);
             for (auto& tc : segment->triangles) {
                 tc->draw();
             }
@@ -370,13 +378,19 @@ private:
         _skydomeQuad.draw();
 
         // draw the origin of our scene
-        _lineMaterial->bind(projection * view * mat4{1});
+        _lineMaterial->bind(projection * view * mat4 { 1 });
         _axisMarker.draw();
+
+        if (!AUTOPILOT) {
+            _autopilotCameraAxis.draw();
+        }
 
         // draw optional markers, aabbs, etc
         if (_drawOctreeAABBs || _drawWaypoints || _drawSegmentBounds) {
-            for (const auto& segment : _segments) {
-                _lineMaterial->bind(projection * view * segment->model * terrainOffset);
+            for (size_t i = 0, N = _segments.size(); i < N; i++) {
+                const auto& segment = _segments[i];
+                const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
+                _lineMaterial->bind(projection * view * model);
                 if (_drawSegmentBounds) {
                     segment->boundingLineBuffer.draw();
                 }
@@ -410,35 +424,14 @@ private:
 
     void updateScroll(float deltaT)
     {
-        const float scrollSpeed = 100 * deltaT;
-        if (_scrolling) {
-            _distanceAlongZ += scrollSpeed;
-        } else if (AUTOMATIC) {
-            if (isKeyDown(GLFW_KEY_W)) {
-                _distanceAlongZ += scrollSpeed;
-            }
-        }
+        const float scrollDelta = _scrolling || isKeyDown(GLFW_KEY_RIGHT_BRACKET)
+            ? 100 * deltaT : 0;
 
-        // TODO: check if _distanceAlongZ is *big* and reset all the scroll
-        // to reduce float precision error, since this is meant to
-        // run a long time uninterrupted. NOTE: This requires
-        // changing TerrainSegment::model to not be an absolute distance!
+        _distanceAlongZ += scrollDelta;
 
-        const int currentIdx = _distanceAlongZ / _segmentSizeZ;
-        if (currentIdx < _segments.front()->idx) {
-            // we moved backwards and revealed a new segment.
-            // pop last segment, rebuild it for currentIdx and
-            // push it front
+        if (_distanceAlongZ > _segmentSizeZ) {
+            _distanceAlongZ -= _segmentSizeZ;
 
-            auto seg = std::move(_segments.back());
-            _segments.pop_back();
-
-            seg->build(currentIdx, _fastNoise);
-            seg->march(false);
-
-            _segments.push_front(std::move(seg));
-
-        } else if (currentIdx > _segments.front()->idx) {
             // we moved forward enough to hide first segment,
             // it can be repurposed. pop front segment, generate
             // a new end segment, and push it back
@@ -451,55 +444,48 @@ private:
 
             _segments.push_back(std::move(seg));
         }
-    }
 
-    void updateCamera(float deltaT)
-    {
-        if (AUTOMATIC) {
+        _lastWaypoint.z -= scrollDelta;
+        _nextWaypoint.z -= scrollDelta;
 
-            // the environment is scrolling; the camera is always at z = 0
-            // find the two waypoints the camera currently is inclusively between
-            vec3 firstWaypointPosition = [=]() -> vec3 {
-                for (const auto& seg : _segments) {
-                    for (const auto& waypoint : seg->waypoints) {
-                        return waypoint;
-                    }
-                }
-                const auto& firstSeg = _segments.front();
-                return vec3(firstSeg->volume->size()) / 2.0F;
-            }();
+        if (_nextWaypoint.z <= 0) {
+            _lastWaypoint = _nextWaypoint;
 
-            vec3 prevWaypoint(firstWaypointPosition.x, firstWaypointPosition.y, 0);
-            vec3 nextWaypoint;
-            bool found = false;
-            int segIdx = 0;
-            for (const auto& seg : _segments) {
-                int wayPointIdx = 0;
-                for (auto waypoint : seg->waypoints) {
-                    waypoint = vec3(seg->model * vec4(waypoint, 1));
-                    waypoint.z -= _distanceAlongZ;
-                    if (waypoint.z <= 0) {
-                        prevWaypoint = waypoint;
-                    } else {
-                        nextWaypoint = waypoint;
+            // find the next waypoint
+            for (size_t i = 0, N = _segments.size(); i < N; i++) {
+                bool found = false;
+                float dz = (i * _segmentSizeZ) - _distanceAlongZ;
+                const auto &segment = _segments[i];
+                for (const auto &waypoint : segment->waypoints) {
+                    auto waypointWorld = vec3(waypoint.x, waypoint.y, waypoint.z + dz);
+                    if (waypointWorld.z > 0) {
+                        _nextWaypoint = waypointWorld;
                         found = true;
                         break;
                     }
-                    wayPointIdx++;
                 }
                 if (found) {
                     break;
                 }
-                segIdx++;
             }
+        }
+    }
 
-            if (found) {
-                float t = (_camera.position.z - prevWaypoint.z) / (nextWaypoint.z - prevWaypoint.z);
-                vec3 position = mix(prevWaypoint, nextWaypoint, t);
-                _camera.lookAt(position, nextWaypoint);
-            }
+    void updateCamera(float deltaT)
+    {
+        float t = (0 - _lastWaypoint.z) / (_nextWaypoint.z - _lastWaypoint.z);
+        vec3 autoPilotPosition = mix(_lastWaypoint, _nextWaypoint, t);
+
+
+        if (AUTOPILOT) {
+
+            _camera.lookAt(autoPilotPosition, autoPilotPosition + vec3(0,0,1));
 
         } else {
+
+            _autopilotCameraAxis.clear();
+            _autopilotCameraAxis.addMarker(autoPilotPosition, 6, vec4(1,1,1,1));
+
             // WASD
             const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
             const float lookSpeed = radians<float>(90) * deltaT;
@@ -588,8 +574,8 @@ private:
     std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
     mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     mc::util::LineSegmentBuffer _axisMarker;
+    mc::util::LineSegmentBuffer _autopilotCameraAxis;
     float _aspect = 1;
-
 
     Camera _camera;
 
@@ -604,6 +590,7 @@ private:
     int _segmentSizeZ = 0;
     std::deque<std::unique_ptr<TerrainSegment>> _segments;
     FastNoise _fastNoise;
+    vec3 _lastWaypoint, _nextWaypoint;
 };
 
 //

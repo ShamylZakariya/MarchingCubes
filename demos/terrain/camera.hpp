@@ -47,6 +47,7 @@ struct Camera {
         look[1][2] = forward.y;
         look[2][2] = forward.z;
     }
+
 };
 
 #endif

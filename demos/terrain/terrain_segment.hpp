@@ -54,7 +54,6 @@ public:
 
         const auto segmentColor = rainbow(static_cast<float>(idx % 5) / 5.0F);
         const float sizeZ = volume->size().z;
-        model = translate(mat4 { 1 }, vec3(0, 0, sizeZ * idx));
 
         //
         // build terrain sampler
@@ -151,6 +150,14 @@ public:
             waypointLineBuffer.addMarker(waypoint, 4, segmentColor);
         }
 
+        // all segments have to have at least 1 waypoint; if the dice roll
+        // didn't give us any arches, make a default waypoint
+        if (waypoints.empty()) {
+            vec3 waypoint = vec3(center.x, maxHeight + rng.nextFloat(10), center.z);
+            waypoints.push_back(waypoint);
+            waypointLineBuffer.addMarker(waypoint, 4, vec4(1,1,0,1));
+        }
+
         //
         //  Build a debug frame to show our volume
         //
@@ -196,7 +203,6 @@ public:
     mc::util::LineSegmentBuffer boundingLineBuffer;
     mc::util::LineSegmentBuffer waypointLineBuffer;
     std::vector<vec3> waypoints;
-    mat4 model;
 
 private:
     std::vector<vec4> _nodeColors;
