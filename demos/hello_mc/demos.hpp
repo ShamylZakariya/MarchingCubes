@@ -144,7 +144,6 @@ private:
     mat3 _rotation { 1 };
 };
 
-
 class CompoundShapesDemo : public Demo {
 public:
     CompoundShapesDemo() = default;
@@ -291,7 +290,7 @@ public:
             center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
 
         _cube = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center + vec3(0,-5,0), vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Subtractive));
+            center + vec3(0, -5, 0), vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Subtractive));
     }
 
     void step(float time) override
@@ -302,10 +301,8 @@ public:
     }
 
 private:
-
     mc::util::unowned_ptr<mc::RectangularPrismVolumeSampler> _cube;
 };
-
 
 class SubtractiveHalfspaceDemo : public Demo {
 public:
@@ -353,10 +350,9 @@ public:
             center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
 
         volume->add(std::make_unique<mc::SphereVolumeSampler>(
-            center + vec3(0,-10,0), 10, mc::IVolumeSampler::Mode::Subtractive));
+            center + vec3(0, -10, 0), 10, mc::IVolumeSampler::Mode::Subtractive));
     }
 };
-
 
 //
 //  Demo Registry

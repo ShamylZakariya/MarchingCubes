@@ -287,7 +287,7 @@ private:
         const auto size = vec3(_segments.front()->volume->size());
         const auto center = size / 2.0F;
 
-        _lastWaypoint = vec3{center.x, center.y, 0};
+        _lastWaypoint = vec3 { center.x, center.y, 0 };
         _nextWaypoint = _segments.front()->waypoints.front();
 
         if (!AUTOPILOT) {
@@ -428,7 +428,8 @@ private:
     void updateScroll(float deltaT)
     {
         const float scrollDelta = _scrolling || isKeyDown(GLFW_KEY_RIGHT_BRACKET)
-            ? 100 * deltaT : 0;
+            ? 100 * deltaT
+            : 0;
 
         _distanceAlongZ += scrollDelta;
 
@@ -458,8 +459,8 @@ private:
             for (size_t i = 0, N = _segments.size(); i < N; i++) {
                 bool found = false;
                 float dz = (i * _segmentSizeZ) - _distanceAlongZ;
-                const auto &segment = _segments[i];
-                for (const auto &waypoint : segment->waypoints) {
+                const auto& segment = _segments[i];
+                for (const auto& waypoint : segment->waypoints) {
                     auto waypointWorld = vec3(waypoint.x, waypoint.y, waypoint.z + dz);
                     if (waypointWorld.z > 0) {
                         _nextWaypoint = waypointWorld;
@@ -492,8 +493,8 @@ private:
         } else {
 
             _autopilotCameraAxis.clear();
-            _autopilotCameraAxis.addMarker(autoPilotPosition, 6, vec4(1,1,1,1));
-            _autopilotCameraAxis.addMarker(autoPilotTargetPosition, 6, vec4(1,1,0,1));
+            _autopilotCameraAxis.addMarker(autoPilotPosition, 6, vec4(1, 1, 1, 1));
+            _autopilotCameraAxis.addMarker(autoPilotTargetPosition, 6, vec4(1, 1, 0, 1));
 
             // WASD
             const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);

@@ -48,21 +48,45 @@
 namespace mc {
 namespace util {
 
+    /**
+     * ThreadPool
+     * A minimalist thread pool allowing addition of work items, returning a handle
+     * for each which may be used to wait on the work's completion.
+     * Does not do anything fancy like marshalling arguments or return values.
+     */
     class ThreadPool {
     public:
+        /**
+         * Work function definition. Receives the stable index of the thread
+         * executing the job. This will be a value from [0, size())
+         */
+        typedef std::function<void(int)> WorkFn;
+
+    public:
+        /**
+         * Create a ThreadPool that will use a specified number of threads,
+         * and which will optionally pin those threads to specific CPUs.
+         */
         ThreadPool(size_t numThreads, bool pinned);
         ~ThreadPool();
 
+        /**
+         * Enqueue a job to execute on the pool.
+         * see `WorkFn`; job receives index of thread in pool
+         * executing its work.
+         * Returns a std::future which can be waited on to block
+         * until job is complete.
+         */
         template <class F>
         std::future<void> enqueue(F&& f);
 
+        /**
+         * Return number of threads being used
+         */
         size_t size() const { return _workers.size(); }
 
     private:
-        // need to keep track of threads so we can join them
         std::vector<std::thread> _workers;
-
-        // the task queue
         std::queue<std::function<void(int)>> _tasks;
 
         // synchronization
@@ -71,7 +95,6 @@ namespace util {
         bool _stop;
     };
 
-    // the constructor just launches some amount of workers
     inline ThreadPool::ThreadPool(size_t numThreads, bool pinned)
         : _stop(false)
     {
@@ -123,7 +146,6 @@ namespace util {
                 });
     }
 
-    // add new work item to the pool
     template <class F>
     std::future<void> ThreadPool::enqueue(F&& f)
     {
@@ -145,7 +167,6 @@ namespace util {
         return res;
     }
 
-    // the destructor joins all threads
     inline ThreadPool::~ThreadPool()
     {
         {

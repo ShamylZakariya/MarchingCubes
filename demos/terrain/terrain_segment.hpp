@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-
 #include <mc/marching_cubes.hpp>
 #include <mc/util/util.hpp>
 #include <mc/volume.hpp>
@@ -155,7 +154,7 @@ public:
         if (waypoints.empty()) {
             vec3 waypoint = vec3(center.x, maxHeight + rng.nextFloat(10), center.z);
             waypoints.push_back(waypoint);
-            waypointLineBuffer.addMarker(waypoint, 4, vec4(1,1,0,1));
+            waypointLineBuffer.addMarker(waypoint, 4, vec4(1, 1, 0, 1));
         }
 
         //

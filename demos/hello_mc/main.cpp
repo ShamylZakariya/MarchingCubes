@@ -140,7 +140,8 @@ public:
         }
     }
 
-    void setShininess(float s) {
+    void setShininess(float s)
+    {
         _shininess = clamp<float>(s, 0, 1);
     }
 

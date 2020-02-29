@@ -74,27 +74,27 @@ public:
     int nextInt(int min, int max)
     {
         const auto r = xorshift64(&_state);
-		constexpr auto range = 99999;
+        constexpr auto range = 99999;
         const int v = r % range;
-		const float t = static_cast<float>(v) / static_cast<float>(range);
-		return min + static_cast<int>(t * (max - min));
+        const float t = static_cast<float>(v) / static_cast<float>(range);
+        return min + static_cast<int>(t * (max - min));
     }
 
     int nextInt(int max)
     {
         const auto r = xorshift64(&_state);
-		constexpr auto range = 99999;
+        constexpr auto range = 99999;
         const int v = r % range;
-		const float t = static_cast<float>(v) / static_cast<float>(range);
-		return static_cast<int>(t * max);
+        const float t = static_cast<float>(v) / static_cast<float>(range);
+        return static_cast<int>(t * max);
     }
 
     float nextFloat(float min, float max)
     {
         const auto r = xorshift64(&_state);
-		constexpr auto range = 99999;
+        constexpr auto range = 99999;
         const int v = r % range;
-		const float t = static_cast<float>(v) / static_cast<float>(range);
+        const float t = static_cast<float>(v) / static_cast<float>(range);
         auto f = min + (t * (max - min));
         return f;
     }
@@ -102,9 +102,9 @@ public:
     float nextFloat(int max)
     {
         const auto r = xorshift64(&_state);
-		constexpr auto range = 99999;
+        constexpr auto range = 99999;
         const int v = r % range;
-		const float t = static_cast<float>(v) / static_cast<float>(range);
+        const float t = static_cast<float>(v) / static_cast<float>(range);
         auto f = t * max;
         return f;
     }

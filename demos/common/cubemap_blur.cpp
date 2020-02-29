@@ -42,7 +42,7 @@ std::unique_ptr<mc::util::TextureHandle> CreateGaussianKernel(int size)
 
     int halfSize = size / 2;
     float sum = 0;
-    for(int y = 0; y < size; y++) {
+    for (int y = 0; y < size; y++) {
         for (int x = 0; x < size; x++) {
             auto offset = vec2(x - halfSize, y - halfSize);
             auto mag = length(offset);
@@ -54,7 +54,7 @@ std::unique_ptr<mc::util::TextureHandle> CreateGaussianKernel(int size)
 
     // normalize kernel
     float normalizingScale = 1 / sum;
-    for(auto &v : float_data) {
+    for (auto& v : float_data) {
         v *= normalizingScale;
     }
 
@@ -157,7 +157,7 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
 
     // Check if current configuration of framebuffer is correct
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        throw std::runtime_error("Framebuffer not complete");;
+        throw std::runtime_error("Framebuffer not complete");
     }
 
     const vec3 lookAts[6] = {
@@ -177,7 +177,6 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
         vec3 { 0.0f, -1.0f, 0.0f }
     };
 
-
     mc::TriangleConsumer<mc::util::VertexP3C4> fullscreenQuad;
     {
         using V = decltype(fullscreenQuad)::vertex_type;
@@ -192,7 +191,6 @@ BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int s
             V { vec3(-1, +1, 1), vec4(1, 1, 1, 1) } });
         fullscreenQuad.finish();
     }
-
 
     BlurMaterial material(srcCubemap, CreateGaussianKernel(9), blurHalfArcWidth);
     const mat4 projection = perspective<float>(radians(90.0F), 1.0F, 1.0F, 100.0F);
