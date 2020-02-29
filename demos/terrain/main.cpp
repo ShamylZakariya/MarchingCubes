@@ -476,15 +476,21 @@ private:
         float t = (0 - _lastWaypoint.z) / (_nextWaypoint.z - _lastWaypoint.z);
         vec3 autoPilotPosition = mix(_lastWaypoint, _nextWaypoint, t);
 
+        _autopilotPositionSpring.setTarget(autoPilotPosition);
+        _autopilotTargetSpring.setTarget(_nextWaypoint);
+
+        autoPilotPosition = _autopilotPositionSpring.step(deltaT);
+        vec3 autoPilotTargetPosition = _autopilotTargetSpring.step(deltaT);
 
         if (AUTOPILOT) {
 
-            _camera.lookAt(autoPilotPosition, autoPilotPosition + vec3(0,0,1));
+            _camera.lookAt(autoPilotPosition, autoPilotTargetPosition);
 
         } else {
 
             _autopilotCameraAxis.clear();
             _autopilotCameraAxis.addMarker(autoPilotPosition, 6, vec4(1,1,1,1));
+            _autopilotCameraAxis.addMarker(autoPilotTargetPosition, 6, vec4(1,1,0,1));
 
             // WASD
             const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
@@ -591,6 +597,8 @@ private:
     std::deque<std::unique_ptr<TerrainSegment>> _segments;
     FastNoise _fastNoise;
     vec3 _lastWaypoint, _nextWaypoint;
+    spring3 _autopilotPositionSpring { 5, 40, 20 };
+    spring3 _autopilotTargetSpring { 10, 20, 20 };
 };
 
 //
