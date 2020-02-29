@@ -268,18 +268,21 @@ private:
         _fastNoise.SetNoiseType(FastNoise::Simplex);
         _fastNoise.SetFrequency(frequency);
 
-        auto nThreads = std::thread::hardware_concurrency();
+        const auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march volumes" << std::endl;
+        _threadPool = std::make_shared<mc::util::ThreadPool>(nThreads, true);
 
-        // TODO: Decide how many sections we will use
+        //
+        // build our terrain segments;
+        // TODO: Decide how many segments we need
+        //
+
         constexpr auto COUNT = 3;
-
         for (int i = 0; i < COUNT; i++) {
-            _segments.emplace_back(std::make_unique<TerrainSegment>(_segmentSizeZ, nThreads));
+            _segments.emplace_back(std::make_unique<TerrainSegment>(_segmentSizeZ, _threadPool));
             _segments.back()->build(i, _fastNoise);
             _segments.back()->march(false);
         }
-
 
         const auto size = vec3(_segments.front()->volume->size());
         const auto center = size / 2.0F;
@@ -592,6 +595,7 @@ private:
     bool _scrolling = false;
 
     // demo state
+    std::shared_ptr<mc::util::ThreadPool> _threadPool;
     float _distanceAlongZ = 0;
     int _segmentSizeZ = 0;
     std::deque<std::unique_ptr<TerrainSegment>> _segments;

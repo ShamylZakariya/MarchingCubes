@@ -19,16 +19,16 @@
 
 struct TerrainSegment {
 public:
-    TerrainSegment(int size, int numThreadsToUse)
+    TerrainSegment(int size, std::shared_ptr<mc::util::ThreadPool> threads)
         : size(size)
     {
         std::vector<mc::util::unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
-        for (auto i = 0; i < numThreadsToUse; i++) {
+        for (size_t i = 0, N = threads->size(); i < N; i++) {
             triangles.push_back(std::make_unique<mc::TriangleConsumer<mc::Vertex>>());
             unownedTriangleConsumers.push_back(triangles.back().get());
         }
 
-        volume = std::make_unique<mc::OctreeVolume>(size, 4, 4, unownedTriangleConsumers);
+        volume = std::make_unique<mc::OctreeVolume>(size, 4, 4, threads, unownedTriangleConsumers);
     }
 
     ~TerrainSegment() = default;

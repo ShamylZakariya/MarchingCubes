@@ -7,6 +7,7 @@
 //
 
 #include <atomic>
+#include <iostream>
 
 #include "util/op_queue.hpp"
 #include "volume.hpp"
@@ -19,10 +20,12 @@ void OctreeVolume::march(
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
     marchSetup(marchedNodeObserver);
-    marchCollectedNodes();
+    auto jobs = marchCollectedNodes();
 
     // blocking wait
-    _marchPool->wait();
+    for (auto &j : jobs) {
+        j.wait();
+    }
 
     for (auto& tc : _triangleConsumers) {
         tc->finish();
@@ -37,10 +40,10 @@ void OctreeVolume::marchAsync(
     auto id = _asyncMarchId;
 
     marchSetup(marchedNodeObserver);
-    marchCollectedNodes();
+    auto jobs = marchCollectedNodes();
 
-    // punt blocking wait to the wait pool
-    _waitPool->enqueue([this, onReady, id](int threadIdx) {
+    // make a job to wait for march to complete, and subsequently notify main thread
+    _asyncMarchWaiter = _threadPool->enqueue([this, onReady, id, jobs{std::move(jobs)}](int threadIdx) {
         if (id != _asyncMarchId) {
             // looks like a new march got queued before this one
             // finished, so bail on this pass
@@ -51,7 +54,9 @@ void OctreeVolume::marchAsync(
             return;
         }
 
-        _marchPool->wait();
+        for (auto &j : jobs) {
+            j.wait();
+        }
 
         util::MainThreadQueue()->add([this, onReady]() {
             for (auto& tc : _triangleConsumers) {
@@ -64,15 +69,6 @@ void OctreeVolume::marchAsync(
 
 void OctreeVolume::marchSetup(std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
-    if (!_marchPool) {
-        auto nThreads = _triangleConsumers.size();
-        _marchPool = std::make_unique<util::ThreadPool>(nThreads, true);
-    }
-
-    if (!_waitPool) {
-        _waitPool = std::make_unique<util::ThreadPool>(1, false);
-    }
-
     _nodesToMarch.clear();
     collect(_nodesToMarch);
 
@@ -102,9 +98,10 @@ void OctreeVolume::marchSetup(std::function<void(OctreeVolume::Node*)> marchedNo
     }
 }
 
-void OctreeVolume::marchCollectedNodes() {
-    for (std::size_t i = 0, N = _marchPool->size(); i < N; i++) {
-        _marchPool->enqueue([this, N](int threadIdx) {
+std::vector<std::future<void>> OctreeVolume::marchCollectedNodes() {
+    std::vector<std::future<void>> jobs;
+    for (std::size_t i = 0, N = _threadPool->size(); i < N; i++) {
+        jobs.push_back(_threadPool->enqueue([this, N](int threadIdx) {
             while (true) {
                 Node* node = nullptr;
                 {
@@ -119,8 +116,9 @@ void OctreeVolume::marchCollectedNodes() {
 
                 marchNode(node, *_triangleConsumers[threadIdx % N]);
             }
-        });
+        }));
     }
+    return jobs;
 }
 
 

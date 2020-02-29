@@ -34,7 +34,4 @@ include_dirs = [
 subdir('mc')
 subdir('demos')
 
-## build/register unit tests
-subdir('tests')
-
 

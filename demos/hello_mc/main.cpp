@@ -221,6 +221,7 @@ private:
     mat3 _trackballRotation { 1 };
 
     // volume and samplers
+    std::shared_ptr<mc::util::ThreadPool> _threadPool;
     unique_ptr<mc::OctreeVolume> _volume;
     std::vector<const char*> _demoNames;
     unique_ptr<Demo> _currentDemo;
@@ -473,6 +474,7 @@ private:
 
         auto nThreads = std::thread::hardware_concurrency();
         std::cout << "Using " << nThreads << " threads to march _volume" << std::endl;
+        _threadPool = std::make_shared<mc::util::ThreadPool>(nThreads, true);
 
         std::vector<unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
         for (auto i = 0u; i < nThreads; i++) {
@@ -480,7 +482,7 @@ private:
             unownedTriangleConsumers.push_back(_triangleConsumers.back().get());
         }
 
-        _volume = make_unique<mc::OctreeVolume>(64, _fuzziness, 4, unownedTriangleConsumers);
+        _volume = make_unique<mc::OctreeVolume>(64, _fuzziness, 4, _threadPool, unownedTriangleConsumers);
         _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
 
         _volume->walkOctree([this](mc::OctreeVolume::Node* node) {

@@ -11,3 +11,5 @@
         _distanceAlongX -= N
         for seg in segments:
             seg.model = seg.model * translate(mat4(1), vec3(0,0,-N))
+
+- I should collect/mark on a thread, because it's likely the source of the hiccup at runtime; this depends on the batching thread pool above to be gracefully implemented...

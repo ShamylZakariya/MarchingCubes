@@ -166,10 +166,12 @@ public:
 
 public:
     OctreeVolume(int size, float fuzziness, int minNodeSize,
+        const std::shared_ptr<util::ThreadPool> threadPool,
         const std::vector<util::unowned_ptr<TriangleConsumer<Vertex>>>& triangleConsumers)
         : BaseCompositeVolume(glm::ivec3 { size, size, size }, fuzziness)
         , _bounds(util::AABB(glm::ivec3(0, 0, 0), glm::ivec3(size, size, size)))
         , _root(buildOctreeNode(_bounds, minNodeSize, 0, 0))
+        , _threadPool(threadPool)
         , _triangleConsumers(triangleConsumers)
     {
     }
@@ -234,7 +236,7 @@ public:
 
 protected:
     void marchSetup(std::function<void(OctreeVolume::Node*)> marchedNodeObserver);
-    void marchCollectedNodes();
+    std::vector<std::future<void>> marchCollectedNodes();
     void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
 
     /**
@@ -363,10 +365,11 @@ private:
     size_t _treeDepth = 0;
     std::unique_ptr<Node> _root;
     std::vector<Node*> _nodesToMarch;
-    std::unique_ptr<util::ThreadPool> _marchPool, _waitPool;
+    std::shared_ptr<util::ThreadPool> _threadPool;
     std::vector<util::unowned_ptr<TriangleConsumer<Vertex>>> _triangleConsumers;
     std::size_t _asyncMarchId { 0 };
     std::mutex _queuePopMutex;
+    std::future<void> _asyncMarchWaiter;
 };
 
 } // namespace mc
