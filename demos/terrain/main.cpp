@@ -603,7 +603,7 @@ private:
     FastNoise _fastNoise;
     vec3 _lastWaypoint, _nextWaypoint;
     spring3 _autopilotPositionSpring { 5, 40, 20 };
-    spring3 _autopilotTargetSpring { 10, 20, 20 };
+    spring3 _autopilotTargetSpring { 5, 20, 10 };
 };
 
 //

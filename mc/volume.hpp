@@ -370,7 +370,7 @@ private:
     std::size_t _asyncMarchId { 0 };
     std::mutex _queuePopMutex;
 
-    std::future<void> _asyncCollectWaiter, _asyncMarchWaiter;
+    std::future<void> _asyncWaiter;
 };
 
 } // namespace mc

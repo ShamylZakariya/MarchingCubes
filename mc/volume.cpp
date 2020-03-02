@@ -62,7 +62,7 @@ void OctreeVolume::marchAsync(
     _asyncMarchId++;
     auto id = _asyncMarchId;
 
-    _asyncCollectWaiter = _threadPool->enqueue(
+    _asyncWaiter = _threadPool->enqueue(
         [this, onReady, marchedNodeObserver, id](int _) {
             // collect the nodes to march
             marchSetup();
@@ -76,38 +76,34 @@ void OctreeVolume::marchAsync(
             // march the collected nodes
             auto jobs = marchCollectedNodes();
 
-            // make a job to wait for march to complete, and subsequently notify main thread
-            _asyncMarchWaiter = _threadPool->enqueue(
-                [this, onReady, marchedNodeObserver, id, jobs { std::move(jobs) }](int threadIdx) {
-                    if (id != _asyncMarchId) {
-                        // looks like a new march got queued before this one
-                        // finished, so bail on this pass
-                        std::cout << "[OctreeVolume::marchAsync] - waitPool - expected id: "
-                                  << id << " but current asyncMarchId is: "
-                                  << _asyncMarchId << " bailing." << std::endl;
+            // wait on the march job
+            for (auto& j : jobs) {
+                j.wait();
+            }
 
-                        return;
+            if (id != _asyncMarchId) {
+                // looks like a new march got queued before this one
+                // finished, so bail on this pass
+                std::cout << "[OctreeVolume::marchAsync] - waitPool - expected id: "
+                          << id << " but current asyncMarchId is: "
+                          << _asyncMarchId << " bailing." << std::endl;
+
+                return;
+            }
+
+            util::MainThreadQueue()->add([this, onReady, marchedNodeObserver]() {
+                for (auto& tc : _triangleConsumers) {
+                    tc->finish();
+                }
+                onReady();
+
+                // if we hav an observer, pass collected march nodes to it
+                if (marchedNodeObserver) {
+                    for (const auto& node : _marchedNodes) {
+                        marchedNodeObserver(node);
                     }
-
-                    // wait on the march job
-                    for (auto& j : jobs) {
-                        j.wait();
-                    }
-
-                    util::MainThreadQueue()->add([this, onReady, marchedNodeObserver]() {
-                        for (auto& tc : _triangleConsumers) {
-                            tc->finish();
-                        }
-                        onReady();
-
-                        // if we hav an observer, pass collected march nodes to it
-                        if (marchedNodeObserver) {
-                            for (const auto& node : _marchedNodes) {
-                                marchedNodeObserver(node);
-                            }
-                        }
-                    });
-                });
+                }
+            });
         });
 }
 
