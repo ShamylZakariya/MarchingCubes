@@ -12,6 +12,13 @@
             "preLaunchTask": "Build"
         },
         {
+            "name": "terrain (CodeLLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/meson-out/terrain",
+            "preLaunchTask": "Build"
+        },
+        {
             "name": "hello_mc (gdb)",
             "type": "cppdbg",
             "request": "launch",

@@ -111,7 +111,7 @@ public:
         return sPtr;
     }
 
-    void clear()
+    virtual void clear()
     {
         _samplers.clear();
         _additiveSamplers.clear();
@@ -176,6 +176,11 @@ public:
     {
     }
 
+    void clear() override {
+        BaseCompositeVolume::clear();
+        clear(_root.get());
+    }
+
     void collect(std::vector<Node*>& collector)
     {
         /*
@@ -238,6 +243,22 @@ protected:
     void marchSetup();
     std::vector<std::future<void>> marchCollectedNodes();
     void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
+
+    void clear(Node* currentNode) {
+        currentNode->empty = true;
+        currentNode->march = false;
+
+        currentNode->additiveSamplers.clear();
+        currentNode->subtractiveSamplers.clear();
+        currentNode->_additiveSamplersVec.clear();
+        currentNode->_subtractiveSamplersVec.clear();
+
+        for (const auto &node : currentNode->children) {
+            if (!node->isLeaf) {
+                clear(node.get());
+            }
+        }
+    }
 
     /**
      * Mark the nodes which should be marched.

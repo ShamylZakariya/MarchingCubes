@@ -109,7 +109,6 @@ private:
     vec3 _ambientLight;
     mc::util::TextureHandleRef _reflectionMap;
     float _shininess;
-    float _creaseThresholdRadians;
 
 public:
     VolumeMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight, mc::util::TextureHandleRef reflectionMap, float shininess)
@@ -272,22 +271,31 @@ public:
 
     void run()
     {
+#ifdef __APPLE__
+        constexpr double SCALE = 1.25;
+#else
+        constexpr double SCALE = 2;
+#endif
         // start imgui
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.ScaleAllSizes(2);
+        style.ScaleAllSizes(SCALE);
 
         const auto fontFile = "./fonts/ConsolaMono.ttf";
         if (std::filesystem::exists(fontFile)) {
-            ImGui::GetIO().Fonts->AddFontFromFileTTF(fontFile, 24);
+            ImGui::GetIO().Fonts->AddFontFromFileTTF(fontFile, 12 * SCALE);
         }
 
         // set imgui platform/renderer bindings
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
+#ifdef __APPLE__
+        ImGui_ImplOpenGL3_Init("#version 330 core");
+#else
         ImGui_ImplOpenGL3_Init();
+#endif
 
         // enter run loop
         _fpsCalculator.reset();
