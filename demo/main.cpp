@@ -295,7 +295,9 @@ public:
 
         // set imgui platform/renderer bindings
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
-        ImGui_ImplOpenGL3_Init();
+        #ifdef __APPLE__
+        ImGui_ImplOpenGL3_Init("#version 330 core");
+        #endif
 
         // enter run loop
         _fpsCalculator.reset();
