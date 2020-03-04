@@ -104,6 +104,69 @@ private:
     mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
 };
 
+class HeightmapSampler : public mc::IVolumeSampler {
+public:
+    typedef std::function<float(vec3)> NoiseSampler3D;
+
+public:
+    HeightmapSampler() = delete;
+    HeightmapSampler(const GroundSampler&) = delete;
+    HeightmapSampler(GroundSampler&&) = delete;
+
+    HeightmapSampler(float* heightmap, int size, float maxHeight, float floorThreshold,
+        const mc::MaterialState& floorMaterial,
+        const mc::MaterialState& lowMaterial,
+        const mc::MaterialState& highMaterial)
+        : IVolumeSampler(IVolumeSampler::Mode::Additive)
+        , _heightmap(heightmap)
+        , _size(size)
+        , _maxHeight(maxHeight)
+        , _floorPinion(floorThreshold / maxHeight)
+        , _floorMaterial(floorMaterial)
+        , _lowMaterial(lowMaterial)
+        , _highMaterial(highMaterial)
+    {
+    }
+
+    ~HeightmapSampler() = default;
+
+    bool intersects(AABB bounds) const override
+    {
+        // We know that the geometry will span [x,y] and be no taller than
+        // the _height, so we can do an easy test
+        // TODO: query the heightmap?
+        return bounds.min.y <= _maxHeight;
+    }
+
+    AABBIntersection intersection(AABB bounds) const override
+    {
+        // This is only meaningful for subtractive samplers
+        throw std::runtime_error("intersection only meanignful for subtractive volumes");
+    }
+
+    float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
+    {
+        const ivec2 xz(p.x, p.z);
+        const int offset = xz.y * _size + xz.x;
+        const float height = _heightmap[offset];
+        const float innerHeight = max(height - fuzziness, 1.0F);
+
+        if (p.y > height) {
+            return 0;
+        } else if (p.y < innerHeight) {
+            return 1;
+        }
+        return 1 - ((p.y - innerHeight) / fuzziness);
+    }
+
+private:
+    float* _heightmap = nullptr;
+    int _size = 0;
+    float _maxHeight = 0;
+    float _floorPinion { 0 };
+    mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
+};
+
 class Tube : public mc::IVolumeSampler {
 private:
     vec3 _tubeAxisOrigin { 0 };

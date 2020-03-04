@@ -62,7 +62,8 @@ public:
 
     void start()
     {
-        clear();
+        _vertices.clear();
+        _numTriangles = 0;
     }
 
     void addTriangle(const Triangle<VertexType>& t)

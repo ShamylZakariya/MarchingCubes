@@ -43,7 +43,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = true;
+constexpr bool AUTOPILOT = false;
 constexpr int WIDTH = AUTOPILOT ? 506 : 1440;
 constexpr int HEIGHT = AUTOPILOT ? 900 : 700;
 constexpr float NEAR_PLANE = 0.1f;
@@ -288,9 +288,9 @@ private:
 
         constexpr auto COUNT = 3;
         for (int i = 0; i < COUNT; i++) {
-            _segments.emplace_back(std::make_unique<TerrainSegment>(_segmentSizeZ, _threadPool));
+            _segments.emplace_back(std::make_unique<TerrainSegment>(_segmentSizeZ, _threadPool, _fastNoise));
             _segments.back()->build(i, _fastNoise);
-            _segments.back()->march(false);
+            _segments.back()->march();
         }
 
         const auto size = vec3(_segments.front()->volume->size());
@@ -300,7 +300,7 @@ private:
         _nextWaypoint = _segments.front()->waypoints.front();
 
         if (!AUTOPILOT) {
-            vec3 pos = center + vec3(-2 * size.x, 0, 0);
+            vec3 pos = center + vec3(-1 * size.x, 0, 0);
             _camera.lookAt(pos, center);
         } else {
             updateCamera(0);
@@ -317,9 +317,6 @@ private:
     {
         if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
             _running = false;
-        }
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_M)) {
-            marchAllSegmentsSynchronously();
         }
         if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
             _scrolling = !_scrolling;
@@ -426,6 +423,13 @@ private:
         ImGui::LabelText("FPS", "%03.0f", fps);
         ImGui::LabelText("triangles", "%d", triangleCount());
 
+        double avgMarchDuration = 0;
+        for (const auto &s : _segments) {
+            avgMarchDuration += s->lastMarchDurationSeconds;
+        }
+        avgMarchDuration /= _segments.size();
+        ImGui::LabelText("march duration", "%.2fs", avgMarchDuration);
+
         ImGui::Separator();
         ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
         ImGui::Checkbox("Waypoints", &_drawWaypoints);
@@ -453,7 +457,7 @@ private:
             _segments.pop_front();
 
             seg->build(_segments.back()->idx + 1, _fastNoise);
-            seg->march(false);
+            seg->march();
 
             _segments.push_back(std::move(seg));
         }
@@ -549,19 +553,6 @@ private:
                 _camera.rotateBy(+lookSpeed, 0);
             }
         }
-    }
-
-    // this is mainly for performance testiung
-    void marchAllSegmentsSynchronously()
-    {
-        std::cout << "[App::marchAllSegmentsSynchronously] ";
-        for (const auto& s : _segments) {
-            auto start = glfwGetTime();
-            s->march(true);
-            auto elapsed = glfwGetTime() - start;
-            std::cout << "(" << s->idx << " @ " << elapsed << "s)";
-        }
-        std::cout << std::endl;
     }
 
     int triangleCount()
