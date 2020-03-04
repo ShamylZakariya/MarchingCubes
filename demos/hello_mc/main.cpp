@@ -415,7 +415,7 @@ private:
         float volumeShininess = 0.75F;
         vec3 ambientLight { 0.0f, 0.0f, 0.0f };
 
-        auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
+        auto skyboxTexture = mc::util::LoadTextureCube("textures/sky", ".jpg");
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
 
         _volumeMaterial = std::make_unique<VolumeMaterial>(std::move(lightprobeTex), ambientLight, skyboxTexture, volumeShininess);
