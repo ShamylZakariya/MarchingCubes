@@ -43,7 +43,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = false;
+constexpr bool AUTOPILOT = true;
 constexpr int WIDTH = AUTOPILOT ? 506 : 1440;
 constexpr int HEIGHT = AUTOPILOT ? 900 : 700;
 constexpr float NEAR_PLANE = 0.1f;
@@ -213,19 +213,19 @@ private:
         // load materials
         //
 
-        vec3 ambientLight { 0.0f, 0.0f, 0.0f };
-        auto skyboxTexture = mc::util::LoadTextureCube("textures/skybox", ".jpg");
-        auto backgroundTex = BlurCubemap(skyboxTexture, radians<float>(30), 64);
+        auto ambientLight = vec3(0.8, 0.8, 0.9);
+        auto skyboxTexture = mc::util::LoadTextureCube("textures/sky", ".jpg");
         auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
-        auto terrainTexture0 = mc::util::LoadTexture2D("textures/Metal_Hammered_001_basecolor.jpg");
-        auto terrainTexture1 = mc::util::LoadTexture2D("textures/Metal_006_Base_Color.png");
+        auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg");
+        auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
-            std::move(lightprobeTex), ambientLight, skyboxTexture,
-            terrainTexture0, 20, terrainTexture1, 3.5);
+            ambientLight,
+            std::move(lightprobeTex), skyboxTexture,
+            terrainTexture0, 30, terrainTexture1, 30);
 
         _lineMaterial = std::make_unique<LineMaterial>();
-        _skydomeMaterial = std::make_unique<SkydomeMaterial>(std::move(backgroundTex));
+        _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
 
         //
         // some constant GL state

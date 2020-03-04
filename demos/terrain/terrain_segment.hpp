@@ -62,29 +62,29 @@ public:
         //
 
         const mc::MaterialState floorTerrainMaterial {
-            vec4(1),
+            vec4(0,0,0,1),
             1,
             0,
             0
         };
 
         const mc::MaterialState lowTerrainMaterial {
-            vec4(1),
+            vec4(1,1,1,1),
             0,
             1,
             0
         };
 
         const mc::MaterialState highTerrainMaterial {
-            vec4(0.7, 0.7, 0.7, 1),
+            vec4(0.3, 0.3, 0.3, 1),
             0,
             1,
             1
         };
 
         const mc::MaterialState archMaterial {
-            vec4(0.5, 0.5, 0.5, 1),
-            0.3,
+            vec4(0.6, 0.6, 0.6, 1),
+            0,
             0,
             1
         };
@@ -193,7 +193,7 @@ public:
 
     void updateHeightmap()
     {
-        const auto minZ = 0.5F;
+        const auto minZ = 0.001F;
         const auto zRange = maxTerrainHeight - minZ;
         const auto zOffset = idx * size;
         const auto dim = size + 1;

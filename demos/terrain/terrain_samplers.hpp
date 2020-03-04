@@ -121,7 +121,7 @@ public:
         , _heightmap(heightmap)
         , _size(size)
         , _maxHeight(maxHeight)
-        , _floorPinion(floorThreshold / maxHeight)
+        , _floorThreshold(floorThreshold)
         , _floorMaterial(floorMaterial)
         , _lowMaterial(lowMaterial)
         , _highMaterial(highMaterial)
@@ -151,9 +151,16 @@ public:
         const float height = _heightmap[offset];
         const float innerHeight = max(height - fuzziness, 1.0F);
 
+        if (height < _floorThreshold) {
+            material = _floorMaterial;
+        } else {
+            float t = clamp((height - _floorThreshold) / (_maxHeight - _floorThreshold), 0.0F, 1.0F);
+            material = mix(_lowMaterial, _highMaterial, t);
+        }
+
         if (p.y > height) {
             return 0;
-        } else if (p.y < innerHeight) {
+        } else if (p.y < innerHeight || p.y < 1e-3) {
             return 1;
         }
         return 1 - ((p.y - innerHeight) / fuzziness);
@@ -163,7 +170,7 @@ private:
     float* _heightmap = nullptr;
     int _size = 0;
     float _maxHeight = 0;
-    float _floorPinion { 0 };
+    float _floorThreshold { 0 };
     mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
 };
 

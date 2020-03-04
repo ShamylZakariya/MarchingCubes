@@ -10,6 +10,7 @@ layout(location = 5) in float inTex1Contribution;
 out VS_OUT
 {
     vec4 color;
+    vec3 modelPosition;
     vec3 worldNormal;
     vec3 worldPosition;
     float shininess;
@@ -26,6 +27,7 @@ void main()
     gl_Position = uMVP * vec4(inPosition, 1.0);
 
     vs_out.color = inColor;
+    vs_out.modelPosition = inPosition;
     vs_out.worldNormal = mat3(uModel) * inTriangleNormal;
     vs_out.worldPosition = vec3(uModel * vec4(inPosition, 1.0));
     vs_out.shininess = inShininess;

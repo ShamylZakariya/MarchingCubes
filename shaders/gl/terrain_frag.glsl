@@ -3,6 +3,7 @@
 in VS_OUT
 {
     vec4 color;
+    vec3 modelPosition;
     vec3 worldNormal;
     vec3 worldPosition;
     float shininess;
@@ -11,9 +12,9 @@ in VS_OUT
 }
 fs_in;
 
+uniform vec3 uAmbientLight;
 uniform vec3 uCameraPosition;
 uniform samplerCube uLightprobeSampler;
-uniform vec3 uAmbientLight;
 uniform samplerCube uReflectionMapSampler;
 uniform float uReflectionMapMipLevels;
 
@@ -28,9 +29,9 @@ out vec4 fragColor;
 
 vec4 TriPlanarTexture(sampler2D sampler, float scale)
 {
-    vec2 yUV = fs_in.worldPosition.xz / scale;
-    vec2 xUV = fs_in.worldPosition.zy / scale;
-    vec2 zUV = fs_in.worldPosition.xy / scale;
+    vec2 yUV = fs_in.modelPosition.xz / scale;
+    vec2 xUV = fs_in.modelPosition.zy / scale;
+    vec2 zUV = fs_in.modelPosition.xy / scale;
 
     vec4 yDiff = texture(sampler, yUV);
     vec4 xDiff = texture(sampler, xUV);
@@ -50,14 +51,14 @@ void main()
 
     float mipLevel = mix(uReflectionMapMipLevels, 0, fs_in.shininess);
     vec3 reflectionColor = textureLod(uReflectionMapSampler, R, mipLevel).rgb;
-
-    vec3 lightProbeColor = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
+    vec3 lightProbeLight = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
 
     vec3 diffuse0 = mix(fs_in.color, fs_in.color * TriPlanarTexture(uTexture0Sampler, uTexture0Scale), fs_in.tex0Contribution).rgb;
     vec3 diffuse1 = mix(fs_in.color, fs_in.color * TriPlanarTexture(uTexture1Sampler, uTexture1Scale), fs_in.tex1Contribution).rgb;
-    vec3 diffuse = 0.5 * (diffuse0 + diffuse1);
+    vec3 color = 0.5 * (diffuse0 + diffuse1);
 
-    vec3 color = diffuse * (uAmbientLight + mix(lightProbeColor, reflectionColor, fs_in.shininess));
+    color *= uAmbientLight + lightProbeLight;
+    color = mix(color, reflectionColor, fs_in.shininess);
 
     fragColor = vec4(color, fs_in.color.a);
 }

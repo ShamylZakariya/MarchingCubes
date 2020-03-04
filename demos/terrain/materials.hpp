@@ -69,7 +69,9 @@ private:
     float _texture1Scale = 1;
 
 public:
-    TerrainMaterial(mc::util::TextureHandleRef lightProbe, vec3 ambientLight,
+    TerrainMaterial(
+        vec3 ambientLight,
+        mc::util::TextureHandleRef lightProbe,
         mc::util::TextureHandleRef reflectionMap,
         mc::util::TextureHandleRef texture0, float tex0Scale,
         mc::util::TextureHandleRef texture1, float tex1Scale)
