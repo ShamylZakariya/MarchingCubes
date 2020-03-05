@@ -63,7 +63,9 @@ public:
             unownedTriangleConsumers.push_back(triangles.back().get());
         }
 
-        volume = std::make_unique<mc::OctreeVolume>(size, 4, 4, threadPool, unownedTriangleConsumers);
+        const int minNodeSize = 4;
+        const float fuzziness = 2.0F;
+        volume = std::make_unique<mc::OctreeVolume>(size, fuzziness, minNodeSize, threadPool, unownedTriangleConsumers);
 
         //  +1 gives us the edge case for marching
         heightmap.resize((size + 1) * (size + 1));

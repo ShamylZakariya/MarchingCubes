@@ -337,9 +337,8 @@ public:
             return 0;
         }
 
-        float planeBoundsContribution = min<float>(-frontFaceDist / fuzziness, 1);
-        planeBoundsContribution += min<float>(-frontFaceDist / fuzziness, 1);
-        planeBoundsContribution = min<float>(planeBoundsContribution, 1);
+        float frontFaceContribution = min<float>(-frontFaceDist / fuzziness, 1);
+        float backFaceContribution = min<float>(-backFaceDist / fuzziness, 1);
 
         float tubeContribution = 1;
         float outerRadiusInner = _outerRadius - fuzziness;
@@ -357,7 +356,7 @@ public:
             tubeContribution = 1 - ((radialDist - outerRadiusInner) / fuzziness);
         }
 
-        float totalContribution = planeBoundsContribution * tubeContribution;
+        float totalContribution = frontFaceContribution * backFaceContribution * tubeContribution;
 
         if (_cutAngleRadians > 0) {
             vec3 dir = normalize(p - closestPointOnAxis);
