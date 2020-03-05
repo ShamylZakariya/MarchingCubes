@@ -146,15 +146,14 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
     {
-        const ivec2 xz(p.x, p.z);
-        const int offset = xz.y * _size + xz.x;
-        const float height = _heightmap[offset];
+        const float height = this->height(p.x, p.z);
         const float innerHeight = max(height - fuzziness, 1.0F);
 
         if (height < _floorThreshold) {
-            material = _floorMaterial;
+            float t = height / _floorThreshold;
+            material = mix(_floorMaterial, _lowMaterial, t);
         } else {
-            float t = clamp((height - _floorThreshold) / (_maxHeight - _floorThreshold), 0.0F, 1.0F);
+            float t = (height - _floorThreshold) / (_maxHeight - _floorThreshold);
             material = mix(_lowMaterial, _highMaterial, t);
         }
 
@@ -167,6 +166,12 @@ public:
     }
 
 private:
+    inline float height(int x, int y) const
+    {
+        const int offset = y * _size + x;
+        return _heightmap[offset];
+    }
+
     float* _heightmap = nullptr;
     int _size = 0;
     float _maxHeight = 0;

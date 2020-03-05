@@ -43,7 +43,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = true;
+constexpr bool AUTOPILOT = false;
 constexpr int WIDTH = AUTOPILOT ? 506 : 1440;
 constexpr int HEIGHT = AUTOPILOT ? 900 : 700;
 constexpr float NEAR_PLANE = 0.1f;
@@ -299,12 +299,7 @@ private:
         _lastWaypoint = vec3 { center.x, center.y, 0 };
         _nextWaypoint = _segments.front()->waypoints.front();
 
-        if (!AUTOPILOT) {
-            vec3 pos = center + vec3(-1 * size.x, 0, 0);
-            _camera.lookAt(pos, center);
-        } else {
-            updateCamera(0);
-        }
+        updateCamera(0);
     }
 
     void onResize(int width, int height)

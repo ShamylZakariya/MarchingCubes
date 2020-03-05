@@ -16,7 +16,40 @@
 #include "terrain_samplers.hpp"
 #include "xorshift.hpp"
 
+
 struct TerrainSegment {
+private:
+
+    const mc::MaterialState kFloorTerrainMaterial {
+        vec4(0,0,0,1),
+        1,
+        0,
+        0
+    };
+
+    const mc::MaterialState kLowTerrainMaterial {
+        vec4(1,1,1,1),
+        0,
+        1,
+        0
+    };
+
+    const mc::MaterialState kHighTerrainMaterial {
+        vec4(0.3, 0.3, 0.3, 1),
+        0,
+        1,
+        1
+    };
+
+    const mc::MaterialState kArchMaterial {
+        vec4(0.6, 0.6, 0.6, 1),
+        0,
+        0,
+        1
+    };
+
+    const float kFloorThreshold = 1.0F;
+
 public:
     TerrainSegment(int size, std::shared_ptr<mc::util::ThreadPool> threadPool, FastNoise& noise)
         : idx(-1)
@@ -31,6 +64,8 @@ public:
         }
 
         volume = std::make_unique<mc::OctreeVolume>(size, 4, 4, threadPool, unownedTriangleConsumers);
+
+        //  +1 gives us the edge case for marching
         heightmap.resize((size + 1) * (size + 1));
     }
 
@@ -61,39 +96,9 @@ public:
         // build terrain sampler
         //
 
-        const mc::MaterialState floorTerrainMaterial {
-            vec4(0,0,0,1),
-            1,
-            0,
-            0
-        };
 
-        const mc::MaterialState lowTerrainMaterial {
-            vec4(1,1,1,1),
-            0,
-            1,
-            0
-        };
-
-        const mc::MaterialState highTerrainMaterial {
-            vec4(0.3, 0.3, 0.3, 1),
-            0,
-            1,
-            1
-        };
-
-        const mc::MaterialState archMaterial {
-            vec4(0.6, 0.6, 0.6, 1),
-            0,
-            0,
-            1
-        };
-
-        const float floorThreshold = 1.25F;
-        const float zOffset = idx * size;
-
-        volume->add(std::make_unique<HeightmapSampler>(heightmap.data(), size, maxTerrainHeight, floorThreshold,
-            floorTerrainMaterial, lowTerrainMaterial, highTerrainMaterial));
+        volume->add(std::make_unique<HeightmapSampler>(heightmap.data(), size, maxTerrainHeight, kFloorThreshold,
+            kFloorTerrainMaterial, kLowTerrainMaterial, kHighTerrainMaterial));
 
         //
         //  Build an RNG seeded for this segment
@@ -102,9 +107,10 @@ public:
         auto rng = rng_xorshift64 { static_cast<uint64_t>(12345 * (idx + 1)) };
 
         //
-        // build a broken arch
+        // build arches
         //
 
+        const float zOffset = idx * size;
         const auto size = vec3(volume->size());
         const auto center = size / 2.0F;
         const auto maxArches = 7;
@@ -137,7 +143,7 @@ public:
             arch.frontFaceNormal = arch.axisDir;
             arch.backFaceNormal = -arch.axisDir;
             arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
-            arch.material = archMaterial;
+            arch.material = kArchMaterial;
 
             volume->add(std::make_unique<Tube>(arch));
 
@@ -193,8 +199,6 @@ public:
 
     void updateHeightmap()
     {
-        const auto minZ = 0.001F;
-        const auto zRange = maxTerrainHeight - minZ;
         const auto zOffset = idx * size;
         const auto dim = size + 1;
 
@@ -216,13 +220,13 @@ public:
                         // sand-dune like structure
                         float dune = n * 5;
                         dune = dune - floor(dune);
-                        dune = dune * dune * zRange;
+                        dune = dune * dune * maxTerrainHeight;
 
                         // floor
                         float f = n * n * n;
-                        float floor = f * zRange;
+                        float floor = f * maxTerrainHeight;
 
-                        heightmap[y * size + x] = minZ + floor + dune;
+                        heightmap[y * size + x] = floor + dune;
                     }
                 }
             }));
