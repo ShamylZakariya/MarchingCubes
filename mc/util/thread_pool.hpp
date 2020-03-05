@@ -101,7 +101,7 @@ namespace util {
         for (size_t i = 0; i < numThreads; ++i)
             _workers.emplace_back(
                 [this, i, numThreads, pinned] {
-                    #ifndef __APPLE__
+#ifndef __APPLE__
                     if (pinned) {
                         cpu_set_t mask;
                         CPU_ZERO(&mask);
@@ -126,7 +126,7 @@ namespace util {
                             throw std::runtime_error("[ThreadPool::ctor] - sched_setaffinity failed: " + err);
                         }
                     }
-                    #endif
+#endif
                     for (;;) {
                         std::function<void(int)> task;
 

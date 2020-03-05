@@ -43,7 +43,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = false;
+constexpr bool AUTOPILOT = true;
 constexpr int WIDTH = AUTOPILOT ? 506 : 1440;
 constexpr int HEIGHT = AUTOPILOT ? 900 : 700;
 constexpr float NEAR_PLANE = 0.1f;
@@ -209,20 +209,27 @@ private:
 
     void initApp()
     {
+        _segmentSizeZ = 256;
+
         //
         // load materials
         //
 
-        auto ambientLight = vec3(0.8, 0.8, 0.9);
-        auto skyboxTexture = mc::util::LoadTextureCube("textures/sky", ".jpg");
-        auto lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
-        auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg");
-        auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
+        const auto ambientLight = vec3(0.45, 0.5, 0.0);
+        const auto skyboxTexture = mc::util::LoadTextureCube("textures/sky", ".jpg");
+        const mc::util::TextureHandleRef lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
+        const auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg");
+        const auto terrainTexture0Scale = 30;
+        const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
+        const auto terrainTexture1Scale = 30;
+        const auto renderDistance = _segmentSizeZ * 2;
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
             ambientLight,
-            std::move(lightprobeTex), skyboxTexture,
-            terrainTexture0, 30, terrainTexture1, 30);
+            lightprobeTex, skyboxTexture,
+            terrainTexture0, terrainTexture0Scale,
+            terrainTexture1, terrainTexture1Scale,
+            renderDistance);
 
         _lineMaterial = std::make_unique<LineMaterial>();
         _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
@@ -272,7 +279,6 @@ private:
         // build a volume
         //
 
-        _segmentSizeZ = 256;
         const auto frequency = 1.0F / _segmentSizeZ;
         _fastNoise.SetNoiseType(FastNoise::Simplex);
         _fastNoise.SetFrequency(frequency);
@@ -299,7 +305,11 @@ private:
         _lastWaypoint = vec3 { center.x, center.y, 0 };
         _nextWaypoint = _segments.front()->waypoints.front();
 
-        updateCamera(0);
+        if (AUTOPILOT) {
+            updateCamera(0);
+        } else {
+            _camera.lookAt(vec3(center.x, center.y, 0), center);
+        }
     }
 
     void onResize(int width, int height)
@@ -366,6 +376,8 @@ private:
 
         // draw volumes
         glDepthMask(GL_TRUE);
+        _skydomeMaterial->bind(projection, view);
+        _skydomeQuad.draw();
 
         for (size_t i = 0, N = _segments.size(); i < N; i++) {
             const auto& segment = _segments[i];
@@ -376,10 +388,7 @@ private:
             }
         }
 
-        // draw skydome (after volume, it's depth is 1 in clip space)
         glDepthMask(GL_FALSE);
-        _skydomeMaterial->bind(projection, view);
-        _skydomeQuad.draw();
 
         // draw the origin of our scene
         _lineMaterial->bind(projection * view * mat4 { 1 });
@@ -419,16 +428,16 @@ private:
         ImGui::LabelText("triangles", "%d", triangleCount());
 
         double avgMarchDuration = 0;
-        for (const auto &s : _segments) {
+        for (const auto& s : _segments) {
             avgMarchDuration += s->lastMarchDurationSeconds;
         }
         avgMarchDuration /= _segments.size();
         ImGui::LabelText("march duration", "%.2fs", avgMarchDuration);
 
         ImGui::Separator();
-        ImGui::Checkbox("AABBs", &_drawOctreeAABBs);
-        ImGui::Checkbox("Waypoints", &_drawWaypoints);
-        ImGui::Checkbox("Scrolling", &_scrolling);
+        ImGui::Checkbox("Draw AABBs", &_drawOctreeAABBs);
+        ImGui::Checkbox("Draw Waypoints", &_drawWaypoints);
+        ImGui::Checkbox("Draw Segment Bounds", &_drawSegmentBounds);
 
         ImGui::End();
     }
@@ -586,9 +595,9 @@ private:
 
     // user input state
     bool _drawOctreeAABBs = false;
-    bool _drawWaypoints = true;
-    bool _drawSegmentBounds = true;
-    bool _scrolling = false;
+    bool _drawWaypoints = !AUTOPILOT;
+    bool _drawSegmentBounds = !AUTOPILOT;
+    bool _scrolling = AUTOPILOT;
 
     // demo state
     std::shared_ptr<mc::util::ThreadPool> _threadPool;

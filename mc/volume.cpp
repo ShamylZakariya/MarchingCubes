@@ -153,8 +153,8 @@ std::vector<std::future<void>> OctreeVolume::marchCollectedNodes()
 
 void OctreeVolume::marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc)
 {
-    auto fuzziness = this->_fuzziness;
-    auto valueSampler = [fuzziness, node](const vec3& p, mc::MaterialState& material) {
+    const auto fuzziness = this->_fuzziness;
+    const auto valueSampler = [fuzziness, node](const vec3& p, mc::MaterialState& material) {
         // run additive samplers, interpolating
         // material state
         float value = 0;

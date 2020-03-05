@@ -16,19 +16,17 @@
 #include "terrain_samplers.hpp"
 #include "xorshift.hpp"
 
-
 struct TerrainSegment {
 private:
-
     const mc::MaterialState kFloorTerrainMaterial {
-        vec4(0,0,0,1),
+        vec4(0, 0, 0, 1),
         1,
         0,
         0
     };
 
     const mc::MaterialState kLowTerrainMaterial {
-        vec4(1,1,1,1),
+        vec4(1, 1, 1, 1),
         0,
         1,
         0
@@ -42,8 +40,8 @@ private:
     };
 
     const mc::MaterialState kArchMaterial {
-        vec4(0.6, 0.6, 0.6, 1),
-        0,
+        vec4(0.1, 0.2, 0.1, 1),
+        0.125,
         0,
         1
     };
@@ -98,7 +96,6 @@ public:
         // build terrain sampler
         //
 
-
         volume->add(std::make_unique<HeightmapSampler>(heightmap.data(), size, maxTerrainHeight, kFloorThreshold,
             kFloorTerrainMaterial, kLowTerrainMaterial, kHighTerrainMaterial));
 
@@ -150,7 +147,7 @@ public:
             volume->add(std::make_unique<Tube>(arch));
 
             vec3 waypoint = arch.axisOrigin + arch.axisPerp * arch.innerRadius * rng.nextFloat(0.2F, 0.8F);
-            waypoint.y = std::max(waypoint.y, maxTerrainHeight);
+            waypoint.y = std::max(waypoint.y, maxTerrainHeight + 2);
             waypoints.push_back(waypoint);
             waypointLineBuffer.addMarker(waypoint, 4, segmentColor);
         }
@@ -186,7 +183,7 @@ public:
             }
         };
 
-        const auto onMarchComplete = [this,startTime]() {
+        const auto onMarchComplete = [this, startTime]() {
             lastMarchDurationSeconds = glfwGetTime() - startTime;
 
             triangleCount = 0;
@@ -219,16 +216,20 @@ public:
                     for (int x = 0; x < dim; x++) {
                         float n = noise.GetSimplex(x, y + zOffset) * 0.5F + 0.5F;
 
-                        // sand-dune like structure
-                        float dune = n * 5;
+                        // sand-dune like structures
+                        float dune = n;
                         dune = dune - floor(dune);
                         dune = dune * dune * maxTerrainHeight;
 
-                        // floor
-                        float f = n * n * n;
-                        float floor = f * maxTerrainHeight;
+                        float dune2 = n * 2;
+                        dune2 = dune2 - floor(dune2);
+                        dune2 = smoothstep(dune2) * maxTerrainHeight;
 
-                        heightmap[y * size + x] = floor + dune;
+                        // floor
+                        float f = smoothstep(n);
+                        float floor = maxTerrainHeight * f;
+
+                        heightmap[y * size + x] = (floor + dune + dune2) / 3.0F;
                     }
                 }
             }));
@@ -237,6 +238,17 @@ public:
         for (auto& w : workers) {
             w.wait();
         }
+    }
+
+    static float smoothstep(float t)
+    {
+        return t * t * (3 - 2 * t);
+    }
+
+    static float smoothstep(float edge0, float edge1, float t)
+    {
+        t = (t - edge0) / (edge1 - edge0);
+        return t * t * (3 - 2 * t);
     }
 
     const float maxTerrainHeight = 8.0F;

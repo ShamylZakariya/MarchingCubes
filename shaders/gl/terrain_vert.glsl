@@ -16,11 +16,13 @@ out VS_OUT
     float shininess;
     float tex0Contribution;
     float tex1Contribution;
+    float worldDistance;
 }
 vs_out;
 
 uniform mat4 uMVP;
 uniform mat4 uModel;
+uniform vec3 uCameraPosition;
 
 void main()
 {
@@ -33,4 +35,5 @@ void main()
     vs_out.shininess = inShininess;
     vs_out.tex0Contribution = inTex0Contribution;
     vs_out.tex1Contribution = inTex1Contribution;
+    vs_out.worldDistance = distance(vs_out.worldPosition, uCameraPosition);
 }

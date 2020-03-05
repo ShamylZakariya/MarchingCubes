@@ -176,7 +176,8 @@ public:
     {
     }
 
-    void clear() override {
+    void clear() override
+    {
         BaseCompositeVolume::clear();
         clear(_root.get());
     }
@@ -244,7 +245,8 @@ protected:
     std::vector<std::future<void>> marchCollectedNodes();
     void marchNode(OctreeVolume::Node* node, TriangleConsumer<Vertex>& tc);
 
-    void clear(Node* currentNode) {
+    void clear(Node* currentNode)
+    {
         currentNode->empty = true;
         currentNode->march = false;
 
@@ -253,7 +255,7 @@ protected:
         currentNode->_additiveSamplersVec.clear();
         currentNode->_subtractiveSamplersVec.clear();
 
-        for (const auto &node : currentNode->children) {
+        for (const auto& node : currentNode->children) {
             if (!node->isLeaf) {
                 clear(node.get());
             }

@@ -23,8 +23,8 @@ public:
     virtual ~Demo() = default;
 
     virtual void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) = 0;
-    virtual void step(float time) {}
-    virtual void drawDebugLines(mc::util::LineSegmentBuffer&) {}
+    virtual void step(float time) { }
+    virtual void drawDebugLines(mc::util::LineSegmentBuffer&) { }
 };
 
 class CubeDemo : public Demo {
