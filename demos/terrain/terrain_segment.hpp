@@ -36,7 +36,7 @@ private:
         vec4(0.3, 0.3, 0.3, 1),
         0,
         1,
-        1
+        0
     };
 
     const mc::MaterialState kArchMaterial {
@@ -74,7 +74,7 @@ public:
     TerrainSegment(TerrainSegment&&) = delete;
     TerrainSegment& operator==(const TerrainSegment&) = delete;
 
-    void build(int idx, FastNoise& noise)
+    void build(int idx)
     {
         using namespace glm;
 
@@ -217,7 +217,7 @@ public:
                         float n = noise.GetSimplex(x, y + zOffset) * 0.5F + 0.5F;
 
                         // sand-dune like structures
-                        float dune = n;
+                        float dune = n * 3;
                         dune = dune - floor(dune);
                         dune = dune * dune * maxTerrainHeight;
 

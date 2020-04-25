@@ -295,7 +295,7 @@ private:
         constexpr auto COUNT = 3;
         for (int i = 0; i < COUNT; i++) {
             _segments.emplace_back(std::make_unique<TerrainSegment>(_segmentSizeZ, _threadPool, _fastNoise));
-            _segments.back()->build(i, _fastNoise);
+            _segments.back()->build(i);
             _segments.back()->march();
         }
 
@@ -460,7 +460,7 @@ private:
             auto seg = std::move(_segments.front());
             _segments.pop_front();
 
-            seg->build(_segments.back()->idx + 1, _fastNoise);
+            seg->build(_segments.back()->idx + 1);
             seg->march();
 
             _segments.push_back(std::move(seg));
