@@ -291,11 +291,17 @@ public:
 
         // set imgui platform/renderer bindings
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
+<<<<<<< HEAD:demos/hello_mc/main.cpp
 #ifdef __APPLE__
         ImGui_ImplOpenGL3_Init("#version 330 core");
 #else
         ImGui_ImplOpenGL3_Init();
 #endif
+=======
+        #ifdef __APPLE__
+        ImGui_ImplOpenGL3_Init("#version 330 core");
+        #endif
+>>>>>>> b14e1d3b3e9493705fc802f58816636c47a197c9:demo/main.cpp
 
         // enter run loop
         _fpsCalculator.reset();
