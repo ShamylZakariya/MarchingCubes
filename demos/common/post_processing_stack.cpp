@@ -20,7 +20,9 @@ namespace {
 
 void Fbo::create(const ivec2& size, bool includeDepth)
 {
-    if (size == _size) return;
+    if (size == _size)
+        return;
+    mc::util::CheckGlError("Fbo::create");
 
     // clean up previous configuration
     destroy();
@@ -34,11 +36,12 @@ void Fbo::create(const ivec2& size, bool includeDepth)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glBindTexture(GL_TEXTURE_2D, 0);
-
+    mc::util::CheckGlError("Fbo::create - created _colorTex");
 
     glGenFramebuffers(1, &_fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _colorTex, 0);
+    mc::util::CheckGlError("Fbo::create - assigned _colorTex");
 
     if (includeDepth) {
         glGenTextures(1, &_depthTex);
@@ -46,8 +49,11 @@ void Fbo::create(const ivec2& size, bool includeDepth)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, size.x, size.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        mc::util::CheckGlError("Fbo::create - created _depthTex");
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _depthTex, 0);
+        mc::util::CheckGlError("Fbo::create - assigned _depthTex");
     }
 
     // Check if current configuration of framebuffer is correct
@@ -56,6 +62,7 @@ void Fbo::create(const ivec2& size, bool includeDepth)
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    mc::util::CheckGlError("Fbo::create - create - DONE");
 }
 
 void Fbo::destroy()
@@ -72,16 +79,17 @@ void Fbo::destroy()
         glDeleteFramebuffers(1, &_fbo);
         _fbo = 0;
     }
-    _size = ivec2{0,0};
+    _size = ivec2 { 0, 0 };
 }
 
-void Filter::_execute(FboRelay &relay, GLuint depthTex) {
+void Filter::_execute(FboRelay& relay, GLuint depthTex)
+{
     auto srcFbo = relay.getSrc();
     auto dstFbo = relay.getDst();
 
     // bind the destination Fbo
     glBindFramebuffer(GL_FRAMEBUFFER, dstFbo->getFramebuffer());
-    glViewport(0,0, _size.x, _size.y);
+    glViewport(0, 0, _size.x, _size.y);
 
     if (_clearsColorBuffer) {
         glClearColor(_clearColor.r, _clearColor.g, _clearColor.b, _clearColor.a);
@@ -96,13 +104,17 @@ void Filter::_execute(FboRelay &relay, GLuint depthTex) {
     relay.next();
 }
 
-FilterStack::~FilterStack()
+FilterStack::FilterStack()
 {
 }
 
-unowned_ptr<Fbo> FilterStack::capture(glm::ivec2 captureSize, std::function<void()> renderFunc) {
+unowned_ptr<Fbo> FilterStack::capture(glm::ivec2 captureSize, std::function<void()> renderFunc)
+{
+    mc::util::CheckGlError("FilterStack::capture");
     if (captureSize != _captureFbo.getSize()) {
         // recreate FBOs, and resize filters
+        // Note: only the capture buffer has a depth attachment, it's not needed
+        // for filter stack processing, so the other buffer is color only.
         _captureFbo.create(captureSize, true);
         _buffer.create(captureSize, false);
 
@@ -113,32 +125,83 @@ unowned_ptr<Fbo> FilterStack::capture(glm::ivec2 captureSize, std::function<void
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, _captureFbo.getFramebuffer());
-    glViewport(0,0, _captureFbo.getSize().x, _captureFbo.getSize().y);
+    glViewport(0, 0, _captureFbo.getSize().x, _captureFbo.getSize().y);
+    mc::util::CheckGlError("FilterStack::capture - bound framebuffer and set viewport");
 
     renderFunc();
+    mc::util::CheckGlError("FilterStack::capture - renderFunc");
 
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return &_captureFbo;
 }
 
-unowned_ptr<Fbo> FilterStack::execute(unowned_ptr<Fbo> source) {
-
-    // TODO: I think I should go back to bufferA, bufferB and
-    // blit the color tex to bufferA; it's possible though that
-    // disabling depth writes obviates this and leaves the depth
-    // texture effectively read-only
-
+unowned_ptr<Fbo> FilterStack::execute(unowned_ptr<Fbo> source)
+{
+    bool didExecute = false;
     FboRelay relay(source, &_buffer);
+    glDepthMask(GL_FALSE);
     if (!_filters.empty()) {
-        for (const auto &f : _filters) {
+        for (const auto& f : _filters) {
             if (f->getAlpha() >= kAlphaEpsilon) {
                 f->_execute(relay, source->getDepthTex());
+                didExecute = true;
             }
         }
     }
 
-    return nullptr;
+    glDepthMask(GL_TRUE);
+    return didExecute ? relay.getDst() : source;
 }
 
+void FilterStack::draw(unowned_ptr<Fbo> source)
+{
+    // lazily build composite material and clipspace quad
+    if (!_compositeMaterial) {
+        _compositeMaterial = std::make_unique<CompositeMaterial>();
+
+        // build a quad that fills the viewport in clip space
+        using V = decltype(_clipspaceQuad)::vertex_type;
+        _clipspaceQuad.start();
+        _clipspaceQuad.addTriangle(mc::Triangle {
+            V { vec3(-1, -1, 1), vec4(0, 0, 1, 1) },
+            V { vec3(+1, -1, 1), vec4(1, 0, 1, 1) },
+            V { vec3(+1, +1, 1), vec4(1, 1, 1, 1) } });
+        _clipspaceQuad.addTriangle(mc::Triangle {
+            V { vec3(-1, -1, 1), vec4(0, 0, 1, 1) },
+            V { vec3(+1, +1, 1), vec4(1, 1, 1, 1) },
+            V { vec3(-1, +1, 1), vec4(0, 1, 1, 1) } });
+        _clipspaceQuad.finish();
+    }
+
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    _compositeMaterial->bind(source->getColorTex());
+    _clipspaceQuad.draw();
+    glUseProgram(0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+FilterStack::CompositeMaterial::CompositeMaterial()
+{
+    using namespace mc::util;
+    _program = CreateProgramFromFiles("shaders/gl/composite_vert.glsl", "shaders/gl/composite_frag.glsl");
+    _uColorTexSampler = glGetUniformLocation(_program, "uColorTexSampler");
+}
+
+FilterStack::CompositeMaterial::~CompositeMaterial()
+{
+    glDeleteProgram(_program);
+}
+
+void FilterStack::CompositeMaterial::bind(GLuint colorTex)
+{
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, colorTex);
+
+    glUseProgram(_program);
+    glUniform1i(_uColorTexSampler, 0);
+}
 
 
 } // namespace post_processing

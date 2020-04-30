@@ -27,6 +27,7 @@
 #include <mc/volume_samplers.hpp>
 
 #include "../common/cubemap_blur.hpp"
+#include "../common/post_processing_stack.hpp"
 #include "FastNoise.h"
 #include "camera.hpp"
 #include "spring.hpp"
@@ -44,11 +45,12 @@ using std::unique_ptr;
 //
 
 constexpr bool AUTOPILOT = true;
-constexpr int WIDTH = AUTOPILOT ? 506 : 1440;
-constexpr int HEIGHT = AUTOPILOT ? 900 : 700;
+constexpr int WIDTH = 1440;
+constexpr int HEIGHT = 700;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
+constexpr double UI_SCALE = 1.5;
 
 //
 // App
@@ -66,31 +68,23 @@ public:
 
     void run()
     {
-#ifdef __APPLE__
-        constexpr double SCALE = 1.25;
-#else
-        constexpr double SCALE = 2;
-#endif
+
         // start imgui
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.ScaleAllSizes(SCALE);
+        style.ScaleAllSizes(UI_SCALE);
 
         const auto fontFile = "./fonts/ConsolaMono.ttf";
         if (std::filesystem::exists(fontFile)) {
-            ImGui::GetIO().Fonts->AddFontFromFileTTF(fontFile, 12 * SCALE);
+            ImGui::GetIO().Fonts->AddFontFromFileTTF(fontFile, 12 * UI_SCALE);
         }
 
         // set imgui platform/renderer bindings
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
-#ifdef __APPLE__
-        ImGui_ImplOpenGL3_Init("#version 330 core");
-#else
         ImGui_ImplOpenGL3_Init();
-#endif
 
         // enter run loop
         double lastTime = glfwGetTime();
@@ -314,6 +308,7 @@ private:
 
     void onResize(int width, int height)
     {
+        _contextSize = ivec2 { width, height };
         glViewport(0, 0, width, height);
         _aspect = static_cast<float>(width) / static_cast<float>(height);
     }
@@ -369,24 +364,31 @@ private:
 
     void drawFrame()
     {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         mat4 view = _camera.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
-        // draw volumes
-        glDepthMask(GL_TRUE);
-        _skydomeMaterial->bind(projection, view);
-        _skydomeQuad.draw();
+        auto capture = _postProcessingFilters.capture(_contextSize, [=](){
 
-        for (size_t i = 0, N = _segments.size(); i < N; i++) {
-            const auto& segment = _segments[i];
-            const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
-            _terrainMaterial->bind(model, view, projection, _camera.position);
-            for (auto& tc : segment->triangles) {
-                tc->draw();
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // draw volumes
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_TRUE);
+            _skydomeMaterial->bind(projection, view);
+            _skydomeQuad.draw();
+
+            for (size_t i = 0, N = _segments.size(); i < N; i++) {
+                const auto& segment = _segments[i];
+                const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
+                _terrainMaterial->bind(model, view, projection, _camera.position);
+                for (auto& tc : segment->triangles) {
+                    tc->draw();
+                }
             }
-        }
+        });
+
+        _postProcessingFilters.draw(capture);
+
 
         glDepthMask(GL_FALSE);
 
@@ -576,6 +578,7 @@ private:
     GLFWwindow* _window;
     double _elapsedFrameTime = 0;
     bool _running = true;
+    ivec2 _contextSize { WIDTH, HEIGHT };
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };
@@ -592,6 +595,7 @@ private:
     float _aspect = 1;
 
     Camera _camera;
+    post_processing::FilterStack _postProcessingFilters;
 
     // user input state
     bool _drawOctreeAABBs = false;

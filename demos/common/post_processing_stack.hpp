@@ -113,8 +113,8 @@ private:
 
 class FilterStack {
 public:
-    FilterStack() = default;
-    virtual ~FilterStack();
+    FilterStack();
+    ~FilterStack() = default;
 
     void push(std::unique_ptr<Filter>&& filter)
     {
@@ -183,10 +183,30 @@ public:
     /// Execute the filter stack against the input Fbo
     unowned_ptr<Fbo> execute(unowned_ptr<Fbo> source);
 
+    /// helper function to draw the color texture from `source` to screen
+    void draw(unowned_ptr<Fbo> source);
+
 private:
+    struct CompositeMaterial {
+    private:
+        GLuint _program;
+        GLint _uColorTexSampler;
+        GLuint _colorTex;
+
+    public:
+        CompositeMaterial();
+        ~CompositeMaterial();
+
+        void bind(GLuint colorTex);
+    };
+
     std::vector<std::unique_ptr<Filter>> _filters;
     Fbo _captureFbo;
     Fbo _buffer;
+
+    // components for the draw() method
+    std::unique_ptr<CompositeMaterial> _compositeMaterial;
+    mc::TriangleConsumer<mc::util::VertexP3C4> _clipspaceQuad;
 };
 
 }
