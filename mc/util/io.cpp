@@ -117,7 +117,8 @@ namespace util {
 #endif
     }
 
-    GLuint CreateShader(GLenum shader_type, const char* src, const char* filename)
+    GLuint CreateShader(GLenum shader_type, const char* src,
+        std::function<void(int, const std::string&)> onError)
     {
         GLuint shader = glCreateShader(shader_type);
         if (!shader) {
@@ -136,17 +137,7 @@ namespace util {
                 auto* infoLog = (GLchar*)malloc(static_cast<size_t>(infoLogLen));
                 if (infoLog) {
                     glGetShaderInfoLog(shader, infoLogLen, nullptr, infoLog);
-                    if (filename) {
-                        std::cerr << "Could not compile "
-                                  << (shader_type == GL_VERTEX_SHADER ? "vertex" : "fragment")
-                                  << " file (" << filename << ")\t error: "
-                                  << std::string(infoLog) << std::endl;
-                    } else {
-                        std::cerr << "Could not compile "
-                                  << (shader_type == GL_VERTEX_SHADER ? "vertex" : "fragment")
-                                  << " error: " << std::string(infoLog) << std::endl;
-                    }
-
+                    onError(0, std::string(infoLog));
                     throw std::runtime_error("Could not compile shader");
                 }
             }
@@ -157,18 +148,20 @@ namespace util {
         return shader;
     }
 
-    GLuint CreateProgram(const char* vtxSrc, const char* fragSrc)
+    GLuint CreateProgram(const char* vtxSrc, const char* fragSrc,
+        std::function<void(int, const std::string&)> onVertexError,
+        std::function<void(int, const std::string&)> onFragmentError)
     {
         GLuint vtxShader = 0;
         GLuint fragShader = 0;
         GLuint program = 0;
         GLint linked = GL_FALSE;
 
-        vtxShader = CreateShader(GL_VERTEX_SHADER, vtxSrc);
+        vtxShader = CreateShader(GL_VERTEX_SHADER, vtxSrc, onVertexError);
         if (!vtxShader)
             goto exit;
 
-        fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc);
+        fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc, onFragmentError);
         if (!fragShader)
             goto exit;
 
@@ -224,11 +217,18 @@ namespace util {
         GLuint program = 0;
         GLint linked = GL_FALSE;
 
-        vtxShader = CreateShader(GL_VERTEX_SHADER, vertSrc.c_str(), vtxFile);
+        vtxShader = CreateShader(GL_VERTEX_SHADER, vertSrc.c_str(), [vtxFile](int line, const std::string& error) {
+            std::cerr << "Could not compile vertex shader. File: " << vtxFile << "\nError:\n"
+                      << error << std::endl;
+        });
         if (!vtxShader)
             goto exit;
 
-        fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc.c_str(), fragFile);
+        fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc.c_str(), [fragFile](int line, const std::string& error) {
+            std::cerr << "Could not compile fragment shader. File: " << fragFile << "\nError:\n"
+                      << error << std::endl;
+        });
+
         if (!fragShader)
             goto exit;
 
@@ -263,6 +263,97 @@ namespace util {
         glDeleteShader(vtxShader);
         glDeleteShader(fragShader);
         return program;
+    }
+
+    namespace {
+
+        std::vector<std::string> split(const std::string& str, const std::string& delimeter)
+        {
+            using namespace std;
+
+            std::vector<std::string> tokens;
+
+            size_t start = 0, next = string::npos;
+            while (true) {
+                bool done = false;
+                string ss; //substring
+                next = str.find(delimeter, start);
+                if (next != string::npos) {
+                    ss = str.substr(start, next - start);
+                } else {
+                    ss = str.substr(start, (str.length() - start));
+                    done = true;
+                }
+
+                tokens.push_back(ss);
+                if (done)
+                    break;
+
+                start = next + delimeter.length();
+            }
+
+            return tokens;
+        }
+
+        void replace(std::string& str, const std::string& token, const std::string& with)
+        {
+            std::string::size_type pos = str.find(token);
+            while (pos != std::string::npos) {
+                str.replace(pos, token.size(), with);
+                pos = str.find(token, pos);
+            }
+        }
+
+        void apply_substitutions(std::string& src, const std::map<std::string, std::string>& substitutions)
+        {
+            for (const auto& s : substitutions) {
+                replace(src, s.first, s.second);
+            }
+        }
+    }
+
+    GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string> &substitutions)
+    {
+        auto glslSrc = ReadFile(glslFile);
+        std::vector<std::string> bufferLines = split(glslSrc, "\n");
+
+        std::string vertex, fragment;
+        std::string* current = nullptr;
+        int firstVertexLine = 0;
+        int firstFragmentLine = 0;
+        int currentLine = 0;
+        for (auto line : bufferLines) {
+            if (line.find("vertex:") != std::string::npos) {
+                current = &vertex;
+                firstVertexLine = currentLine;
+            } else if (line.find("fragment:") != std::string::npos) {
+                current = &fragment;
+                firstFragmentLine = currentLine;
+            } else if (current != nullptr) {
+                *current += line + "\n";
+            }
+            currentLine++;
+        }
+
+        if (vertex.empty()) {
+            throw std::runtime_error("GLSL file missing \"vertex:\" shader section");
+        }
+        if (fragment.empty()) {
+            throw std::runtime_error("GLSL file missing \"vertex:\" shader section");
+        }
+
+        apply_substitutions(vertex, substitutions);
+        apply_substitutions(fragment, substitutions);
+        return CreateProgram(
+            vertex.c_str(), fragment.c_str(),
+            [glslFile](int line, const std::string& error) {
+                std::cerr << "Could not compile vertex shader. File: " << glslFile << "\nError:\n"
+                          << error << std::endl;
+            },
+            [glslFile](int line, const std::string& error) {
+                std::cerr << "Could not compile fragment shader. File: " << glslFile << "\nError:\n"
+                          << error << std::endl;
+            });
     }
 
 }

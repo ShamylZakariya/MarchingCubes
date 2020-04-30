@@ -10,6 +10,26 @@
 namespace post_processing {
 using mc::util::unowned_ptr;
 
+namespace detail {
+    struct VertexP2T2 {
+        glm::vec2 pos;
+        glm::vec2 texCoord;
+
+        enum class AttributeLayout : GLuint {
+            Pos = 0,
+            TexCoord = 1
+        };
+
+        bool operator==(const VertexP2T2& other) const
+        {
+            return pos == other.pos && texCoord == other.texCoord;
+        }
+
+        static void bindVertexAttributes();
+    };
+}
+
+
 class Fbo {
 private:
     GLuint _fbo = 0;
@@ -206,7 +226,7 @@ private:
 
     // components for the draw() method
     std::unique_ptr<CompositeMaterial> _compositeMaterial;
-    mc::TriangleConsumer<mc::util::VertexP3C4> _clipspaceQuad;
+    mc::TriangleConsumer<detail::VertexP2T2> _clipspaceQuad;
 };
 
 }

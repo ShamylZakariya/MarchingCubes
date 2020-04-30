@@ -11,7 +11,9 @@
 
 #include <array>
 #include <cmath>
+#include <functional>
 #include <limits>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -110,18 +112,24 @@ namespace util {
     /**
     Creates a shader of specified type from provided source
     */
-    GLuint CreateShader(GLenum shader_type, const char* src, const char* filename = nullptr);
+    GLuint CreateShader(GLenum shader_type, const char* src, std::function<void(int, const std::string&)> onError);
 
     /**
     Creates full shader program from vertex and fragment sources
     */
-    GLuint CreateProgram(const char* vtxSrc, const char* fragSrc);
+    GLuint CreateProgram(const char* vtxSrc, const char* fragSrc,
+        std::function<void(int, const std::string &)> onVertexError,
+        std::function<void(int, const std::string &)> onFragmentError);
 
     /**
      * Create full shader program from files
      */
     GLuint CreateProgramFromFiles(const char* vtxFile, const char* fragFile);
 
+    /**
+     * Create full shader program from a file which has a "vertex:" section and "fragment:" section
+     */
+    GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string> &substitutions = {});
 }
 } // namespace mc::util
 

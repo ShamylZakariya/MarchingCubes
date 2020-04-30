@@ -18,6 +18,29 @@ namespace {
     constexpr float kAlphaEpsilon = 1.0f / 255.0f;
 }
 
+namespace detail {
+    void VertexP2T2::bindVertexAttributes()
+    {
+        glVertexAttribPointer(
+            static_cast<GLuint>(AttributeLayout::Pos),
+            2,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(VertexP2T2),
+            (const GLvoid*)offsetof(VertexP2T2, pos));
+        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::Pos));
+
+        glVertexAttribPointer(
+            static_cast<GLuint>(AttributeLayout::TexCoord),
+            2,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(VertexP2T2),
+            (const GLvoid*)offsetof(VertexP2T2, texCoord));
+        glEnableVertexAttribArray(static_cast<GLuint>(AttributeLayout::TexCoord));
+    }
+}
+
 void Fbo::create(const ivec2& size, bool includeDepth)
 {
     if (size == _size)
@@ -137,6 +160,12 @@ unowned_ptr<Fbo> FilterStack::capture(glm::ivec2 captureSize, std::function<void
 
 unowned_ptr<Fbo> FilterStack::execute(unowned_ptr<Fbo> source)
 {
+
+    // TODO: Make a custom VertexP2TC2 format
+
+    // TODO: Optimization opportinity here; when the use-case is capture->execute->composite to screen
+    // the final filter can treat the screen as its destination
+
     bool didExecute = false;
     FboRelay relay(source, &_buffer);
     glDepthMask(GL_FALSE);
@@ -163,13 +192,13 @@ void FilterStack::draw(unowned_ptr<Fbo> source)
         using V = decltype(_clipspaceQuad)::vertex_type;
         _clipspaceQuad.start();
         _clipspaceQuad.addTriangle(mc::Triangle {
-            V { vec3(-1, -1, 1), vec4(0, 0, 1, 1) },
-            V { vec3(+1, -1, 1), vec4(1, 0, 1, 1) },
-            V { vec3(+1, +1, 1), vec4(1, 1, 1, 1) } });
+            V { vec2(-1, -1), vec2(0, 0) },
+            V { vec2(+1, -1), vec2(1, 0) },
+            V { vec2(+1, +1), vec2(1, 1) } });
         _clipspaceQuad.addTriangle(mc::Triangle {
-            V { vec3(-1, -1, 1), vec4(0, 0, 1, 1) },
-            V { vec3(+1, +1, 1), vec4(1, 1, 1, 1) },
-            V { vec3(-1, +1, 1), vec4(0, 1, 1, 1) } });
+            V { vec2(-1, -1), vec2(0, 0) },
+            V { vec2(+1, +1), vec2(1, 1) },
+            V { vec2(-1, +1), vec2(0, 1) } });
         _clipspaceQuad.finish();
     }
 
@@ -185,7 +214,7 @@ void FilterStack::draw(unowned_ptr<Fbo> source)
 FilterStack::CompositeMaterial::CompositeMaterial()
 {
     using namespace mc::util;
-    _program = CreateProgramFromFiles("shaders/gl/composite_vert.glsl", "shaders/gl/composite_frag.glsl");
+    _program = CreateProgramFromFile("shaders/gl/composite.glsl");
     _uColorTexSampler = glGetUniformLocation(_program, "uColorTexSampler");
 }
 
@@ -202,6 +231,5 @@ void FilterStack::CompositeMaterial::bind(GLuint colorTex)
     glUseProgram(_program);
     glUniform1i(_uColorTexSampler, 0);
 }
-
 
 } // namespace post_processing
