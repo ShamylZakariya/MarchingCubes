@@ -30,55 +30,6 @@ namespace detail {
     };
 }
 
-class Fbo {
-private:
-    GLuint _fbo = 0;
-    GLuint _colorTex = 0;
-    GLuint _depthTex = 0;
-    glm::ivec2 _size { 0, 0 };
-
-public:
-    Fbo() = default;
-
-    // non-copyable
-    Fbo(const Fbo& other) = delete;
-    Fbo(Fbo&& other) = delete;
-    Fbo& operator=(const Fbo& other) = delete;
-
-    ~Fbo()
-    {
-        destroy();
-    }
-
-    void create(const glm::ivec2& size, bool includeDepth);
-    void destroy();
-
-    GLuint getFramebuffer() const { return _fbo; }
-    GLuint getColorTex() const { return _colorTex; }
-    GLuint getDepthTex() const { return _depthTex; }
-    glm::ivec2 getSize() const { return _size; }
-};
-
-class FboRelay {
-public:
-    FboRelay(unowned_ptr<Fbo> src, unowned_ptr<Fbo> dst)
-        : _a(src)
-        , _b(dst)
-    {
-    }
-
-    unowned_ptr<Fbo> getSrc() const { return _a; }
-    unowned_ptr<Fbo> getDst() const { return _b; }
-
-    void next()
-    {
-        std::swap(_a, _b);
-    }
-
-private:
-    unowned_ptr<Fbo> _a, _b;
-};
-
 class Filter {
 public:
     Filter(const std::string& name)
@@ -116,7 +67,7 @@ protected:
     virtual void _update(double time) { }
 
     /// Called by FilterStack to prepare render state; you should most-likely implement _render() and leave this alone
-    virtual void _execute(FboRelay& relay, GLuint depthTexture, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad);
+    virtual void _execute(GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad);
 
     /// Perform your filtered render using input as your source texture data.
     virtual void _render(GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad) = 0;
@@ -134,7 +85,7 @@ private:
 class FilterStack {
 public:
     FilterStack();
-    ~FilterStack() = default;
+    ~FilterStack();
 
     void push(std::unique_ptr<Filter>&& filter)
     {
@@ -198,13 +149,13 @@ public:
 
     /// Capture the render output of renderFunc into an RGBA+Depth Fbo.
     /// Returns the capture Fbo
-    unowned_ptr<Fbo> capture(glm::ivec2 size, std::function<void()> renderFunc);
+    void execute(glm::ivec2 size, std::function<void()> renderFunc);
 
-    /// Execute the filter stack against the input Fbo
-    unowned_ptr<Fbo> execute(unowned_ptr<Fbo> source);
+protected:
 
-    /// helper function to draw the color texture from `source` to screen
-    void draw(unowned_ptr<Fbo> source);
+    void draw(GLuint colorTex, GLuint depthTex);
+    void destroyAttachments();
+    void createAttachments(glm::ivec2 size);
 
 private:
     struct CompositeMaterial {
@@ -221,8 +172,12 @@ private:
     };
 
     std::vector<std::unique_ptr<Filter>> _filters;
-    Fbo _captureFbo;
-    Fbo _buffer;
+
+    GLuint _fbo = 0;
+    GLuint _colorTexSrc = 0;
+    GLuint _colorTexDst = 0;
+    GLuint _depthTex = 0;
+    glm::ivec2 _size { 0, 0 };
 
     // components for the draw() method
     std::unique_ptr<CompositeMaterial> _compositeMaterial;

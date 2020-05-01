@@ -378,7 +378,7 @@ private:
         mat4 view = _camera.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
-        auto capture = _postProcessingFilters->capture(_contextSize, [=]() {
+        _postProcessingFilters->execute(_contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // draw volumes
@@ -396,9 +396,6 @@ private:
                 }
             }
         });
-
-        auto processed = _postProcessingFilters->execute(capture);
-        _postProcessingFilters->draw(processed);
 
         glDepthMask(GL_FALSE);
 

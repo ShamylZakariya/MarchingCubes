@@ -42,95 +42,17 @@ namespace detail {
 }
 
 //
-// Fbo
-//
-
-void Fbo::create(const ivec2& size, bool includeDepth)
-{
-    if (size == _size)
-        return;
-    mc::util::CheckGlError("Fbo::create");
-
-    // clean up previous configuration
-    destroy();
-
-    _size = size;
-    glGenTextures(1, &_colorTex);
-    glBindTexture(GL_TEXTURE_2D, _colorTex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    mc::util::CheckGlError("Fbo::create - created _colorTex");
-
-    glGenFramebuffers(1, &_fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _colorTex, 0);
-    mc::util::CheckGlError("Fbo::create - assigned _colorTex");
-
-    if (includeDepth) {
-        glGenTextures(1, &_depthTex);
-        glBindTexture(GL_TEXTURE_2D, _depthTex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, size.x, size.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        mc::util::CheckGlError("Fbo::create - created _depthTex");
-
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _depthTex, 0);
-        mc::util::CheckGlError("Fbo::create - assigned _depthTex");
-    }
-
-    // Check if current configuration of framebuffer is correct
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        throw std::runtime_error("[FilterStack::Fbo::create] - Framebuffer not complete");
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    mc::util::CheckGlError("Fbo::create - create - DONE");
-}
-
-void Fbo::destroy()
-{
-    if (_colorTex) {
-        glDeleteTextures(1, &_colorTex);
-        _colorTex = 0;
-    }
-    if (_depthTex) {
-        glDeleteTextures(1, &_depthTex);
-        _depthTex = 0;
-    }
-    if (_fbo) {
-        glDeleteFramebuffers(1, &_fbo);
-        _fbo = 0;
-    }
-    _size = ivec2 { 0, 0 };
-}
-
-//
 // Filter
 //
 
-void Filter::_execute(FboRelay& relay, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
+void Filter::_execute(GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
 {
-    auto srcFbo = relay.getSrc();
-    auto dstFbo = relay.getDst();
-
-    // bind the destination Fbo
-    glBindFramebuffer(GL_FRAMEBUFFER, dstFbo->getFramebuffer());
-    glViewport(0, 0, _size.x, _size.y);
-
     if (_clearsColorBuffer) {
         glClearColor(_clearColor.r, _clearColor.g, _clearColor.b, _clearColor.a);
         glClear(GL_COLOR_BUFFER_BIT);
     }
 
-    _render(srcFbo->getColorTex(), depthTex, clipspaceQuad);
-
-    // prepare for next pass
-    relay.next();
+    _render(colorTex, depthTex, clipspaceQuad);
 }
 
 //
@@ -138,7 +60,10 @@ void Filter::_execute(FboRelay& relay, GLuint depthTex, const mc::TriangleConsum
 //
 
 FilterStack::FilterStack()
+    : _compositeMaterial(std::make_unique<CompositeMaterial>())
 {
+    glGenFramebuffers(1, &_fbo);
+
     // build a quad that fills the viewport in clip space
     using V = decltype(_clipspaceQuad)::vertex_type;
     _clipspaceQuad.start();
@@ -153,65 +78,116 @@ FilterStack::FilterStack()
     _clipspaceQuad.finish();
 }
 
-unowned_ptr<Fbo> FilterStack::capture(glm::ivec2 captureSize, std::function<void()> renderFunc)
+FilterStack::~FilterStack()
+{
+    destroyAttachments();
+    glDeleteFramebuffers(1, &_fbo);
+}
+
+void FilterStack::execute(glm::ivec2 captureSize, std::function<void()> renderFunc)
 {
     mc::util::CheckGlError("FilterStack::capture");
-    if (captureSize != _captureFbo.getSize()) {
-        // recreate FBOs, and resize filters
-        // Note: only the capture buffer has a depth attachment, it's not needed
-        // for filter stack processing, so the other buffer is color only.
-        _captureFbo.create(captureSize, true);
-        _buffer.create(captureSize, false);
-
+    if (captureSize != _size) {
+        createAttachments(captureSize);
         for (const auto& f : _filters) {
             f->_size = captureSize;
             f->_resize(captureSize);
         }
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, _captureFbo.getFramebuffer());
-    glViewport(0, 0, _captureFbo.getSize().x, _captureFbo.getSize().y);
-    mc::util::CheckGlError("FilterStack::capture - bound framebuffer and set viewport");
+    glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _colorTexDst, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _depthTex, 0);
+
+#ifndef NDEBUG
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        throw std::runtime_error("[FilterStack::execute] - Framebuffer not complete");
+    }
+#endif
+
+    glViewport(0, 0, _size.x, _size.y);
+    mc::util::CheckGlError("FilterStack::execute - bound framebuffer and set viewport");
 
     renderFunc();
-    mc::util::CheckGlError("FilterStack::capture - renderFunc");
+    mc::util::CheckGlError("FilterStack::execute - renderFunc");
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    return &_captureFbo;
-}
+    // remove depth attachment
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
+    mc::util::CheckGlError("FilterStack::execute - removed depth attachment");
 
-unowned_ptr<Fbo> FilterStack::execute(unowned_ptr<Fbo> source)
-{
-    // TODO: Optimization opportinity here; when the use-case is capture->execute->composite to screen
-    // the final filter can treat the screen as its destination
-
-    FboRelay relay(source, &_buffer);
-    glDepthMask(GL_FALSE);
+    GLuint colorTexSrc = _colorTexSrc;
+    GLuint colorTexDst = _colorTexDst;
     for (const auto& f : _filters) {
         if (f->getAlpha() >= kAlphaEpsilon) {
-            f->_execute(relay, source->getDepthTex(), _clipspaceQuad);
+            // swap src and dst, and bind fbo to the new dst
+            std::swap(colorTexSrc, colorTexDst);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexDst, 0);
+
+#ifndef NDEBUG
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                throw std::runtime_error("[FilterStack::execute] - Framebuffer not complete");
+            }
+#endif
+
+            f->_execute(colorTexSrc, _depthTex, _clipspaceQuad);
         }
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glDepthMask(GL_TRUE);
-
-    // after next() is called on a relay, src is always the previous pass's dst
-    return relay.getSrc();
+    draw(colorTexDst, _depthTex);
 }
 
-void FilterStack::draw(unowned_ptr<Fbo> source)
+void FilterStack::draw(GLuint colorTex, GLuint depthTex)
 {
-    // lazily build composite material
-    if (!_compositeMaterial) {
-        _compositeMaterial = std::make_unique<CompositeMaterial>();
-    }
-
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
-    _compositeMaterial->bind(source->getColorTex());
+    _compositeMaterial->bind(colorTex);
     _clipspaceQuad.draw();
     glUseProgram(0);
+}
+
+void FilterStack::destroyAttachments()
+{
+    if (_colorTexSrc)
+        glDeleteTextures(1, &_colorTexSrc);
+    if (_colorTexDst)
+        glDeleteTextures(1, &_colorTexDst);
+    if (_depthTex)
+        glDeleteTextures(1, &_depthTex);
+    _colorTexSrc = _colorTexDst = _depthTex = 0;
+}
+
+void FilterStack::createAttachments(glm::ivec2 size)
+{
+    destroyAttachments();
+
+    glGenTextures(1, &_colorTexSrc);
+    glBindTexture(GL_TEXTURE_2D, _colorTexSrc);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenTextures(1, &_colorTexDst);
+    glBindTexture(GL_TEXTURE_2D, _colorTexDst);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenTextures(1, &_depthTex);
+    glBindTexture(GL_TEXTURE_2D, _depthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, size.x, size.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    mc::util::CheckGlError("Fbo::create - created _depthTex");
+
+    _size = size;
 }
 
 //
