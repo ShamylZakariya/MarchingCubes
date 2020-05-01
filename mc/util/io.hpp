@@ -112,14 +112,14 @@ namespace util {
     /**
     Creates a shader of specified type from provided source
     */
-    GLuint CreateShader(GLenum shader_type, const char* src, std::function<void(int, const std::string&)> onError);
+    GLuint CreateShader(GLenum shader_type, const char* src, std::function<void(const std::string&)> onError);
 
     /**
     Creates full shader program from vertex and fragment sources
     */
     GLuint CreateProgram(const char* vtxSrc, const char* fragSrc,
-        std::function<void(int, const std::string&)> onVertexError,
-        std::function<void(int, const std::string&)> onFragmentError);
+        std::function<void(const std::string&)> onVertexError,
+        std::function<void(const std::string&)> onFragmentError);
 
     /**
      * Create full shader program from files

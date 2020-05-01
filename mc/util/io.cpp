@@ -5,6 +5,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 
@@ -118,7 +119,7 @@ namespace util {
     }
 
     GLuint CreateShader(GLenum shader_type, const char* src,
-        std::function<void(int, const std::string&)> onError)
+        std::function<void(const std::string&)> onError)
     {
         GLuint shader = glCreateShader(shader_type);
         if (!shader) {
@@ -137,12 +138,7 @@ namespace util {
                 auto* infoLog = (GLchar*)malloc(static_cast<size_t>(infoLogLen));
                 if (infoLog) {
                     glGetShaderInfoLog(shader, infoLogLen, nullptr, infoLog);
-
-                    // error format looks something like:
-                    // 0:16(19): error: no matching function for call to `mix(vec4, vec3, float)'; candidates are:
-                    // TODO: Determine the line indicated by the error
-
-                    onError(0, std::string(infoLog));
+                    onError(std::string(infoLog));
                     throw std::runtime_error("Could not compile shader");
                 }
             }
@@ -154,8 +150,8 @@ namespace util {
     }
 
     GLuint CreateProgram(const char* vtxSrc, const char* fragSrc,
-        std::function<void(int, const std::string&)> onVertexError,
-        std::function<void(int, const std::string&)> onFragmentError)
+        std::function<void(const std::string&)> onVertexError,
+        std::function<void(const std::string&)> onFragmentError)
     {
         GLuint vtxShader = 0;
         GLuint fragShader = 0;
@@ -222,14 +218,14 @@ namespace util {
         GLuint program = 0;
         GLint linked = GL_FALSE;
 
-        vtxShader = CreateShader(GL_VERTEX_SHADER, vertSrc.c_str(), [vtxFile](int line, const std::string& error) {
+        vtxShader = CreateShader(GL_VERTEX_SHADER, vertSrc.c_str(), [vtxFile](const std::string& error) {
             std::cerr << "Could not compile vertex shader. File: " << vtxFile << "\nError:\n"
                       << error << std::endl;
         });
         if (!vtxShader)
             goto exit;
 
-        fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc.c_str(), [fragFile](int line, const std::string& error) {
+        fragShader = CreateShader(GL_FRAGMENT_SHADER, fragSrc.c_str(), [fragFile](const std::string& error) {
             std::cerr << "Could not compile fragment shader. File: " << fragFile << "\nError:\n"
                       << error << std::endl;
         });
@@ -315,6 +311,43 @@ namespace util {
                 replace(src, s.first, s.second);
             }
         }
+
+
+        std::string offset_error_line(const std::string& line, int offset)
+        {
+            // error format looks something like:
+            // 0:16(19): error: no matching function for call to `mix(vec4, vec3, float)'; candidates are:
+            static const std::regex kErrorPositionMatcher = std::regex(R"(^(\d+):(\d+)\((\d+)\))");
+
+            if (offset == 0) return line;
+
+            std::smatch pieces;
+            if (std::regex_search(line, pieces, kErrorPositionMatcher) && pieces.size() == 4) {
+                auto a = pieces[1].str();
+                int b = std::stoi(pieces[2].str());
+                auto c = pieces[3].str();
+
+                b += offset;
+
+                std::string updatedErrorPosition = a + ":" + std::to_string(b) + "(" + c + ")";
+                std::string result = line;
+                replace(result, pieces[0].str(), updatedErrorPosition);
+
+                return result;
+            }
+            // no match found, leave line alone
+            return line;
+        }
+
+        std::string offset_error_lines(const std::string& errorMessage, int lineOffset)
+        {
+            std::string result;
+            for (const auto &line : split(errorMessage, "\n")) {
+                auto updatedLine = offset_error_line(line, lineOffset);
+                result += updatedLine + "\n";
+            }
+            return result;
+        }
     }
 
     GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string>& substitutions)
@@ -349,15 +382,16 @@ namespace util {
 
         apply_substitutions(vertex, substitutions);
         apply_substitutions(fragment, substitutions);
+
         return CreateProgram(
             vertex.c_str(), fragment.c_str(),
-            [glslFile](int line, const std::string& error) {
+            [glslFile, firstVertexLine](const std::string& error) {
                 std::cerr << "Could not compile vertex shader. File: " << glslFile << "\nError:\n"
-                          << error << std::endl;
+                          << offset_error_lines(error, firstVertexLine) << std::endl;
             },
-            [glslFile](int line, const std::string& error) {
+            [glslFile, firstFragmentLine](const std::string& error) {
                 std::cerr << "Could not compile fragment shader. File: " << glslFile << "\nError:\n"
-                          << error << std::endl;
+                          << offset_error_lines(error, firstFragmentLine) << std::endl;
             });
     }
 
