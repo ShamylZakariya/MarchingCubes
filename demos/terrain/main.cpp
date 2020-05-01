@@ -27,6 +27,7 @@
 #include <mc/volume_samplers.hpp>
 
 #include "../common/cubemap_blur.hpp"
+#include "../common/post_processing_filters.hpp"
 #include "../common/post_processing_stack.hpp"
 #include "FastNoise.h"
 #include "camera.hpp"
@@ -304,6 +305,16 @@ private:
         } else {
             _camera.lookAt(vec3(center.x, center.y, 0), center);
         }
+
+        //
+        //  Build a post-processing stack
+        //
+
+        _postProcessingFilters = std::make_unique<post_processing::FilterStack>();
+
+        auto grayscale = std::make_unique<post_processing::GrayscaleFilter>("Grayscaler");
+        grayscale->setAlpha(1);
+        _postProcessingFilters->push(std::move(grayscale));
     }
 
     void onResize(int width, int height)
@@ -367,8 +378,7 @@ private:
         mat4 view = _camera.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
-        auto capture = _postProcessingFilters.capture(_contextSize, [=](){
-
+        auto capture = _postProcessingFilters->capture(_contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // draw volumes
@@ -387,8 +397,8 @@ private:
             }
         });
 
-        _postProcessingFilters.draw(capture);
-
+        auto processed = _postProcessingFilters->execute(capture);
+        _postProcessingFilters->draw(processed);
 
         glDepthMask(GL_FALSE);
 
@@ -595,7 +605,7 @@ private:
     float _aspect = 1;
 
     Camera _camera;
-    post_processing::FilterStack _postProcessingFilters;
+    std::unique_ptr<post_processing::FilterStack> _postProcessingFilters;
 
     // user input state
     bool _drawOctreeAABBs = false;

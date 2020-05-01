@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <epoxy/gl.h>
 
+#include <mc/triangle_consumer.hpp>
 #include <mc/util/io.hpp>
 #include <mc/util/unowned_ptr.hpp>
 
@@ -28,7 +29,6 @@ namespace detail {
         static void bindVertexAttributes();
     };
 }
-
 
 class Fbo {
 private:
@@ -107,19 +107,19 @@ public:
 
 protected:
     /// Called by FilterStack when it's resized; Note: FilterStack directly sets _size before calling this.
-    virtual void _resize(const glm::ivec2& newSize) {}
+    virtual void _resize(const glm::ivec2& newSize) { }
 
     /// Called via setAlpha() to respond to changes to alpha
-    virtual void _alphaChanged(double oldAlpha, double newAlpha) {}
+    virtual void _alphaChanged(double oldAlpha, double newAlpha) { }
 
     /// Perform time-based updates
-    virtual void _update(double time) {}
+    virtual void _update(double time) { }
 
     /// Called by FilterStack to prepare render state; you should most-likely implement _render() and leave this alone
-    virtual void _execute(FboRelay& relay, GLuint depthTexture);
+    virtual void _execute(FboRelay& relay, GLuint depthTexture, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad);
 
     /// Perform your filtered render using input as your source texture data.
-    virtual void _render(GLuint colorTex, GLuint depthTex) = 0;
+    virtual void _render(GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad) = 0;
 
 private:
     friend class FilterStack;

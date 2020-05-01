@@ -41,6 +41,10 @@ namespace detail {
     }
 }
 
+//
+// Fbo
+//
+
 void Fbo::create(const ivec2& size, bool includeDepth)
 {
     if (size == _size)
@@ -105,7 +109,11 @@ void Fbo::destroy()
     _size = ivec2 { 0, 0 };
 }
 
-void Filter::_execute(FboRelay& relay, GLuint depthTex)
+//
+// Filter
+//
+
+void Filter::_execute(FboRelay& relay, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
 {
     auto srcFbo = relay.getSrc();
     auto dstFbo = relay.getDst();
@@ -119,16 +127,30 @@ void Filter::_execute(FboRelay& relay, GLuint depthTex)
         glClear(GL_COLOR_BUFFER_BIT);
     }
 
-    _render(srcFbo->getColorTex(), depthTex);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    _render(srcFbo->getColorTex(), depthTex, clipspaceQuad);
 
     // prepare for next pass
     relay.next();
 }
 
+//
+// FilterStack
+//
+
 FilterStack::FilterStack()
 {
+    // build a quad that fills the viewport in clip space
+    using V = decltype(_clipspaceQuad)::vertex_type;
+    _clipspaceQuad.start();
+    _clipspaceQuad.addTriangle(mc::Triangle {
+        V { vec2(-1, -1), vec2(0, 0) },
+        V { vec2(+1, -1), vec2(1, 0) },
+        V { vec2(+1, +1), vec2(1, 1) } });
+    _clipspaceQuad.addTriangle(mc::Triangle {
+        V { vec2(-1, -1), vec2(0, 0) },
+        V { vec2(+1, +1), vec2(1, 1) },
+        V { vec2(-1, +1), vec2(0, 1) } });
+    _clipspaceQuad.finish();
 }
 
 unowned_ptr<Fbo> FilterStack::capture(glm::ivec2 captureSize, std::function<void()> renderFunc)
@@ -160,46 +182,29 @@ unowned_ptr<Fbo> FilterStack::capture(glm::ivec2 captureSize, std::function<void
 
 unowned_ptr<Fbo> FilterStack::execute(unowned_ptr<Fbo> source)
 {
-
-    // TODO: Make a custom VertexP2TC2 format
-
     // TODO: Optimization opportinity here; when the use-case is capture->execute->composite to screen
     // the final filter can treat the screen as its destination
 
-    bool didExecute = false;
     FboRelay relay(source, &_buffer);
     glDepthMask(GL_FALSE);
-    if (!_filters.empty()) {
-        for (const auto& f : _filters) {
-            if (f->getAlpha() >= kAlphaEpsilon) {
-                f->_execute(relay, source->getDepthTex());
-                didExecute = true;
-            }
+    for (const auto& f : _filters) {
+        if (f->getAlpha() >= kAlphaEpsilon) {
+            f->_execute(relay, source->getDepthTex(), _clipspaceQuad);
         }
     }
 
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDepthMask(GL_TRUE);
-    return didExecute ? relay.getDst() : source;
+
+    // after next() is called on a relay, src is always the previous pass's dst
+    return relay.getSrc();
 }
 
 void FilterStack::draw(unowned_ptr<Fbo> source)
 {
-    // lazily build composite material and clipspace quad
+    // lazily build composite material
     if (!_compositeMaterial) {
         _compositeMaterial = std::make_unique<CompositeMaterial>();
-
-        // build a quad that fills the viewport in clip space
-        using V = decltype(_clipspaceQuad)::vertex_type;
-        _clipspaceQuad.start();
-        _clipspaceQuad.addTriangle(mc::Triangle {
-            V { vec2(-1, -1), vec2(0, 0) },
-            V { vec2(+1, -1), vec2(1, 0) },
-            V { vec2(+1, +1), vec2(1, 1) } });
-        _clipspaceQuad.addTriangle(mc::Triangle {
-            V { vec2(-1, -1), vec2(0, 0) },
-            V { vec2(+1, +1), vec2(1, 1) },
-            V { vec2(-1, +1), vec2(0, 1) } });
-        _clipspaceQuad.finish();
     }
 
     glDisable(GL_DEPTH_TEST);
@@ -209,12 +214,14 @@ void FilterStack::draw(unowned_ptr<Fbo> source)
     glUseProgram(0);
 }
 
-///////////////////////////////////////////////////////////////////////////////
+//
+// FilterStack::CompositeMaterial
+//
 
 FilterStack::CompositeMaterial::CompositeMaterial()
 {
     using namespace mc::util;
-    _program = CreateProgramFromFile("shaders/gl/composite.glsl");
+    _program = CreateProgramFromFile("shaders/gl/postprocessing/passthrough.glsl");
     _uColorTexSampler = glGetUniformLocation(_program, "uColorTexSampler");
 }
 

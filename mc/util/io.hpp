@@ -118,8 +118,8 @@ namespace util {
     Creates full shader program from vertex and fragment sources
     */
     GLuint CreateProgram(const char* vtxSrc, const char* fragSrc,
-        std::function<void(int, const std::string &)> onVertexError,
-        std::function<void(int, const std::string &)> onFragmentError);
+        std::function<void(int, const std::string&)> onVertexError,
+        std::function<void(int, const std::string&)> onFragmentError);
 
     /**
      * Create full shader program from files
@@ -129,7 +129,7 @@ namespace util {
     /**
      * Create full shader program from a file which has a "vertex:" section and "fragment:" section
      */
-    GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string> &substitutions = {});
+    GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string>& substitutions = {});
 }
 } // namespace mc::util
 

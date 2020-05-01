@@ -137,6 +137,11 @@ namespace util {
                 auto* infoLog = (GLchar*)malloc(static_cast<size_t>(infoLogLen));
                 if (infoLog) {
                     glGetShaderInfoLog(shader, infoLogLen, nullptr, infoLog);
+
+                    // error format looks something like:
+                    // 0:16(19): error: no matching function for call to `mix(vec4, vec3, float)'; candidates are:
+                    // TODO: Determine the line indicated by the error
+
                     onError(0, std::string(infoLog));
                     throw std::runtime_error("Could not compile shader");
                 }
@@ -312,7 +317,7 @@ namespace util {
         }
     }
 
-    GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string> &substitutions)
+    GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string>& substitutions)
     {
         auto glslSrc = ReadFile(glslFile);
         std::vector<std::string> bufferLines = split(glslSrc, "\n");
