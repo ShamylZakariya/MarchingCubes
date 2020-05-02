@@ -42,7 +42,7 @@ using std::unique_ptr;
 //
 
 constexpr int WIDTH = 1440;
-constexpr int HEIGHT = 900;
+constexpr int HEIGHT = 1440;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;

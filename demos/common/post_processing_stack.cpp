@@ -45,14 +45,14 @@ namespace detail {
 // Filter
 //
 
-void Filter::_execute(GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
+void Filter::_execute(const glm::ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
 {
     if (_clearsColorBuffer) {
         glClearColor(_clearColor.r, _clearColor.g, _clearColor.b, _clearColor.a);
         glClear(GL_COLOR_BUFFER_BIT);
     }
 
-    _render(colorTex, depthTex, clipspaceQuad);
+    _render(size, colorTex, depthTex, clipspaceQuad);
 }
 
 //
@@ -128,7 +128,7 @@ void FilterStack::execute(glm::ivec2 captureSize, std::function<void()> renderFu
             }
 #endif
 
-            f->_execute(colorTexSrc, _depthTex, _clipspaceQuad);
+            f->_execute(captureSize, colorTexSrc, _depthTex, _clipspaceQuad);
         }
     }
 

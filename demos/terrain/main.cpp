@@ -27,10 +27,10 @@
 #include <mc/volume_samplers.hpp>
 
 #include "../common/cubemap_blur.hpp"
-#include "../common/post_processing_filters.hpp"
 #include "../common/post_processing_stack.hpp"
 #include "FastNoise.h"
 #include "camera.hpp"
+#include "filters.hpp"
 #include "spring.hpp"
 #include "terrain_segment.hpp"
 
@@ -47,7 +47,7 @@ using std::unique_ptr;
 
 constexpr bool AUTOPILOT = true;
 constexpr int WIDTH = 1440;
-constexpr int HEIGHT = 700;
+constexpr int HEIGHT = 1440;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
@@ -312,9 +312,16 @@ private:
 
         _postProcessingFilters = std::make_unique<post_processing::FilterStack>();
 
-        auto grayscale = std::make_unique<post_processing::GrayscaleFilter>("Grayscaler");
-        grayscale->setAlpha(1);
-        _postProcessingFilters->push(std::move(grayscale));
+        auto palettizer = std::make_unique<PalettizeFilter>(
+            "Palettizer",
+            ivec3(8,8,8),
+            PalettizeFilter::ColorSpace::RGB);
+        palettizer->setAlpha(1);
+        _postProcessingFilters->push(std::move(palettizer));
+
+        auto pixelate = std::make_unique<PixelateFilter>("Pixelator", 8);
+        pixelate->setAlpha(1);
+        _postProcessingFilters->push(std::move(pixelate));
     }
 
     void onResize(int width, int height)

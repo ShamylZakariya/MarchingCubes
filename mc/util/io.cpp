@@ -311,11 +311,11 @@ namespace util {
             vertex.c_str(), fragment.c_str(),
             [glslFile, firstVertexLine](const std::string& error) {
                 std::cerr << "Could not compile vertex shader. File: " << glslFile << "\nError:\n"
-                          << offset_error_lines(error, firstVertexLine) << std::endl;
+                          << offset_error_lines(error, firstVertexLine + 1) << std::endl;
             },
             [glslFile, firstFragmentLine](const std::string& error) {
                 std::cerr << "Could not compile fragment shader. File: " << glslFile << "\nError:\n"
-                          << offset_error_lines(error, firstFragmentLine) << std::endl;
+                          << offset_error_lines(error, firstFragmentLine + 1) << std::endl;
             });
     }
 

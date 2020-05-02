@@ -67,10 +67,10 @@ protected:
     virtual void _update(double time) { }
 
     /// Called by FilterStack to prepare render state; you should most-likely implement _render() and leave this alone
-    virtual void _execute(GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad);
+    virtual void _execute(const glm::ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad);
 
     /// Perform your filtered render using input as your source texture data.
-    virtual void _render(GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad) = 0;
+    virtual void _render(const glm::ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad) = 0;
 
 private:
     friend class FilterStack;

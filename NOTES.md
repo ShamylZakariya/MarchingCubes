@@ -4,3 +4,6 @@
 
 # POST PROCESSING
 - look into a raymarched cloud/fog https://www.shadertoy.com/view/Msf3zX
+- Build a single filter which:
+    - color grades/paletizes
+    - renders raymarched clouds
