@@ -397,7 +397,8 @@ private:
             }
         });
 
-        glDepthMask(GL_FALSE);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
 
         // draw the origin of our scene
         _lineMaterial->bind(projection * view * mat4 { 1 });
@@ -607,7 +608,7 @@ private:
     // user input state
     bool _drawOctreeAABBs = false;
     bool _drawWaypoints = !AUTOPILOT;
-    bool _drawSegmentBounds = !AUTOPILOT;
+    bool _drawSegmentBounds = true;
     bool _scrolling = AUTOPILOT;
 
     // demo state

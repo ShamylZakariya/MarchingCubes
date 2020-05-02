@@ -60,7 +60,6 @@ void Filter::_execute(GLuint colorTex, GLuint depthTex, const mc::TriangleConsum
 //
 
 FilterStack::FilterStack()
-    : _compositeMaterial(std::make_unique<CompositeMaterial>())
 {
     glGenFramebuffers(1, &_fbo);
 
@@ -86,7 +85,7 @@ FilterStack::~FilterStack()
 
 void FilterStack::execute(glm::ivec2 captureSize, std::function<void()> renderFunc)
 {
-    mc::util::CheckGlError("FilterStack::capture");
+    CHECK_GL_ERROR("FilterStack::capture");
     if (captureSize != _size) {
         createAttachments(captureSize);
         for (const auto& f : _filters) {
@@ -106,14 +105,14 @@ void FilterStack::execute(glm::ivec2 captureSize, std::function<void()> renderFu
 #endif
 
     glViewport(0, 0, _size.x, _size.y);
-    mc::util::CheckGlError("FilterStack::execute - bound framebuffer and set viewport");
+    CHECK_GL_ERROR("FilterStack::execute - bound framebuffer and set viewport");
 
     renderFunc();
-    mc::util::CheckGlError("FilterStack::execute - renderFunc");
+    CHECK_GL_ERROR("FilterStack::execute - renderFunc");
 
     // remove depth attachment
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
-    mc::util::CheckGlError("FilterStack::execute - removed depth attachment");
+    CHECK_GL_ERROR("FilterStack::execute - removed depth attachment");
 
     GLuint colorTexSrc = _colorTexSrc;
     GLuint colorTexDst = _colorTexDst;
@@ -134,16 +133,27 @@ void FilterStack::execute(glm::ivec2 captureSize, std::function<void()> renderFu
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    draw(colorTexDst, _depthTex);
+    blit(colorTexDst, _depthTex);
 }
 
-void FilterStack::draw(GLuint colorTex, GLuint depthTex)
+void FilterStack::blit(GLuint colorTex, GLuint depthTex)
 {
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    _compositeMaterial->bind(colorTex);
-    _clipspaceQuad.draw();
-    glUseProgram(0);
+    CHECK_GL_ERROR("FilterStack::blit - Start");
+
+    glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, _fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER_EXT, 0);
+    glBlitFramebuffer(
+        0, 0, _size.x, _size.y,
+        0, 0, _size.x, _size.y,
+        GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
+        GL_NEAREST);
+
+    CHECK_GL_ERROR("FilterStack::blit - DONE");
 }
 
 void FilterStack::destroyAttachments()
@@ -185,34 +195,9 @@ void FilterStack::createAttachments(glm::ivec2 size)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
-    mc::util::CheckGlError("Fbo::create - created _depthTex");
+    CHECK_GL_ERROR("Fbo::create - created _depthTex");
 
     _size = size;
-}
-
-//
-// FilterStack::CompositeMaterial
-//
-
-FilterStack::CompositeMaterial::CompositeMaterial()
-{
-    using namespace mc::util;
-    _program = CreateProgramFromFile("shaders/gl/postprocessing/passthrough.glsl");
-    _uColorTexSampler = glGetUniformLocation(_program, "uColorTexSampler");
-}
-
-FilterStack::CompositeMaterial::~CompositeMaterial()
-{
-    glDeleteProgram(_program);
-}
-
-void FilterStack::CompositeMaterial::bind(GLuint colorTex)
-{
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, colorTex);
-
-    glUseProgram(_program);
-    glUniform1i(_uColorTexSampler, 0);
 }
 
 } // namespace post_processing

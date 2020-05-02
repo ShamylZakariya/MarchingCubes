@@ -133,4 +133,10 @@ namespace util {
 }
 } // namespace mc::util
 
+#ifndef NDEBUG
+#define CHECK_GL_ERROR(ctx) mc::util::CheckGlError((ctx))
+#else
+#define CHECK_GL_ERROR(ctx) ;
+#endif
+
 #endif /* util_h */

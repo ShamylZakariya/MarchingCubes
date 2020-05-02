@@ -147,30 +147,18 @@ public:
         }
     }
 
-    /// Capture the render output of renderFunc into an RGBA+Depth Fbo.
-    /// Returns the capture Fbo
+    /// Capture the render output of renderFunc, execute the installed filters,
+    /// and then draw the result to the active framebuffer
     void execute(glm::ivec2 size, std::function<void()> renderFunc);
 
 protected:
 
-    void draw(GLuint colorTex, GLuint depthTex);
+    /// blits colorTex and depthTex to default framebuffer (e.g., display)
+    void blit(GLuint colorTex, GLuint depthTex);
     void destroyAttachments();
     void createAttachments(glm::ivec2 size);
 
 private:
-    struct CompositeMaterial {
-    private:
-        GLuint _program;
-        GLint _uColorTexSampler;
-        GLuint _colorTex;
-
-    public:
-        CompositeMaterial();
-        ~CompositeMaterial();
-
-        void bind(GLuint colorTex);
-    };
-
     std::vector<std::unique_ptr<Filter>> _filters;
 
     GLuint _fbo = 0;
@@ -178,9 +166,6 @@ private:
     GLuint _colorTexDst = 0;
     GLuint _depthTex = 0;
     glm::ivec2 _size { 0, 0 };
-
-    // components for the draw() method
-    std::unique_ptr<CompositeMaterial> _compositeMaterial;
     mc::TriangleConsumer<detail::VertexP2T2> _clipspaceQuad;
 };
 

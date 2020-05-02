@@ -102,20 +102,16 @@ namespace util {
 
     void CheckGlError(const char* ctx)
     {
-#ifndef NDEBUG
         GLint err = glGetError();
         if (err != GL_NO_ERROR) {
             std::cerr << "GL error at " << ctx << " err: " << err << std::endl;
             throw std::runtime_error("CheckGLError");
         }
-#endif
     }
 
     void CheckGlError(const std::string& ctx)
     {
-#ifndef NDEBUG
         CheckGlError(ctx.c_str());
-#endif
     }
 
     GLuint CreateShader(GLenum shader_type, const char* src,
