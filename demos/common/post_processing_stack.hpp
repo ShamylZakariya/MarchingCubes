@@ -152,7 +152,6 @@ public:
     void execute(glm::ivec2 size, std::function<void()> renderFunc);
 
 protected:
-
     /// blits colorTex and depthTex to default framebuffer (e.g., display)
     void blit(GLuint colorTex, GLuint depthTex);
     void destroyAttachments();

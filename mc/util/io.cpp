@@ -236,14 +236,14 @@ namespace util {
             }
         }
 
-
         std::string offset_error_line(const std::string& line, int offset)
         {
             // error format looks something like:
             // 0:16(19): error: no matching function for call to `mix(vec4, vec3, float)'; candidates are:
             static const std::regex kErrorPositionMatcher = std::regex(R"(^(\d+):(\d+)\((\d+)\))");
 
-            if (offset == 0) return line;
+            if (offset == 0)
+                return line;
 
             std::smatch pieces;
             if (std::regex_search(line, pieces, kErrorPositionMatcher) && pieces.size() == 4) {
@@ -266,7 +266,7 @@ namespace util {
         std::string offset_error_lines(const std::string& errorMessage, int lineOffset)
         {
             std::string result;
-            for (const auto &line : split(errorMessage, "\n")) {
+            for (const auto& line : split(errorMessage, "\n")) {
                 auto updatedLine = offset_error_line(line, lineOffset);
                 result += updatedLine + "\n";
             }
