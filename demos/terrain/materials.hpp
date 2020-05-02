@@ -19,7 +19,7 @@ public:
         : _skyboxTex(skybox)
     {
         using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/skydome_vert.glsl", "shaders/gl/skydome_frag.glsl");
+        _program = CreateProgramFromFile("shaders/gl/skydome.glsl");
         _uProjectionInverse = glGetUniformLocation(_program, "uProjectionInverse");
         _uModelViewInverse = glGetUniformLocation(_program, "uModelViewInverse");
         _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
@@ -87,7 +87,7 @@ public:
         , _renderDistance(renderDistance)
     {
         using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/terrain_vert.glsl", "shaders/gl/terrain_frag.glsl");
+        _program = CreateProgramFromFile("shaders/gl/terrain.glsl");
         _uMVP = glGetUniformLocation(_program, "uMVP");
         _uModel = glGetUniformLocation(_program, "uModel");
         _uCameraPos = glGetUniformLocation(_program, "uCameraPosition");
@@ -151,7 +151,7 @@ public:
     LineMaterial()
     {
         using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/line_vert.glsl", "shaders/gl/line_frag.glsl");
+        _program = CreateProgramFromFile("shaders/gl/line.glsl");
         _uMVP = glGetUniformLocation(_program, "uMVP");
     }
     LineMaterial(const LineMaterial& other) = delete;

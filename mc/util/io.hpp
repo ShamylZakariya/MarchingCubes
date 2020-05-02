@@ -122,11 +122,6 @@ namespace util {
         std::function<void(const std::string&)> onFragmentError);
 
     /**
-     * Create full shader program from files
-     */
-    GLuint CreateProgramFromFiles(const char* vtxFile, const char* fragFile);
-
-    /**
      * Create full shader program from a file which has a "vertex:" section and "fragment:" section
      */
     GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string>& substitutions = {});

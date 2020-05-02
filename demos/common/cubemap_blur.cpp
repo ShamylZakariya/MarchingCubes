@@ -93,7 +93,7 @@ public:
         , _blurHalfArcWidth(blurHalfArcWidth)
     {
         using namespace mc::util;
-        _program = CreateProgramFromFiles("shaders/gl/cubemap_blur_vert.glsl", "shaders/gl/cubemap_blur_frag.glsl");
+        _program = CreateProgramFromFile("shaders/gl/cubemap_blur.glsl");
         _uProjectionInverse = glGetUniformLocation(_program, "uProjectionInverse");
         _uModelViewInverse = glGetUniformLocation(_program, "uModelViewInverse");
         _uSrcCubemapSampler = glGetUniformLocation(_program, "uSrcCubemapSampler");
