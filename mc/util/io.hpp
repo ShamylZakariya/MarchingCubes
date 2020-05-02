@@ -104,10 +104,10 @@ namespace util {
     TextureHandleRef LoadTextureCube(const std::string& folder, const std::string& ext = ".jpg");
 
     /**
-    Checks for GL error, throwing if there is one
+    Checks for GL error, throwing if there is one. Note: If you want a version
+    which is compiled away for release builds see the CHECK_GL_ERROR macro.
     */
     void CheckGlError(const char* ctx);
-    void CheckGlError(const std::string& ctx);
 
     /**
     Creates a shader of specified type from provided source

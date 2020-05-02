@@ -109,17 +109,12 @@ namespace util {
         }
     }
 
-    void CheckGlError(const std::string& ctx)
-    {
-        CheckGlError(ctx.c_str());
-    }
-
     GLuint CreateShader(GLenum shader_type, const char* src,
         std::function<void(const std::string&)> onError)
     {
         GLuint shader = glCreateShader(shader_type);
         if (!shader) {
-            CheckGlError("glCreateShader");
+            CHECK_GL_ERROR("glCreateShader");
             return 0;
         }
         glShaderSource(shader, 1, &src, nullptr);
@@ -164,7 +159,7 @@ namespace util {
 
         program = glCreateProgram();
         if (!program) {
-            CheckGlError("glCreateProgram");
+            CHECK_GL_ERROR("glCreateProgram");
             goto exit;
         }
         glAttachShader(program, vtxShader);
@@ -231,7 +226,7 @@ namespace util {
 
         program = glCreateProgram();
         if (!program) {
-            CheckGlError("glCreateProgram");
+            CHECK_GL_ERROR("glCreateProgram");
             goto exit;
         }
         glAttachShader(program, vtxShader);

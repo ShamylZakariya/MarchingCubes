@@ -143,8 +143,6 @@ public:
 std::unique_ptr<mc::util::TextureHandle>
 BlurCubemap(mc::util::TextureHandleRef srcCubemap, float blurHalfArcWidth, int size)
 {
-    using mc::util::CheckGlError;
-
     GLuint framebuffer = 0;
     GLuint destCubemapTexId = CreateDestinationCubemapTexture(size);
 

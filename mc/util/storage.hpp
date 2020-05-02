@@ -81,11 +81,11 @@ namespace util {
         void draw() const
         {
             if (_vao > 0) {
-                CheckGlError("VertexStorage::draw enter");
+                CHECK_GL_ERROR("VertexStorage::draw enter");
                 glBindVertexArray(_vao);
                 glDrawArrays(_mode, 0, static_cast<GLsizei>(_numVertices));
                 glBindVertexArray(0);
-                CheckGlError("VertexStorage::draw exit");
+                CHECK_GL_ERROR("VertexStorage::draw exit");
             }
         }
 
@@ -105,7 +105,7 @@ namespace util {
     private:
         void _updateVertices(const std::vector<VertexType>& vertices)
         {
-            CheckGlError("VertexStorage::_updateVertices enter");
+            CHECK_GL_ERROR("VertexStorage::_updateVertices enter");
             if (vertices.size() > _vertexStorageSize) {
                 _vertexStorageSize = static_cast<std::size_t>(vertices.size() * _growthFactor);
                 _numVertices = vertices.size();
@@ -140,7 +140,7 @@ namespace util {
                         vertices.data());
                 }
             }
-            CheckGlError("VertexStorage::_updateVertices exit");
+            CHECK_GL_ERROR("VertexStorage::_updateVertices exit");
         }
     };
 
