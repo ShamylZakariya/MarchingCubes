@@ -314,8 +314,8 @@ private:
 
         auto palettizer = std::make_unique<PalettizeFilter>(
             "Palettizer",
-            ivec3(8,8,8),
-            PalettizeFilter::ColorSpace::RGB);
+            ivec3(16,16,16),
+            PalettizeFilter::ColorSpace::YUV);
         palettizer->setAlpha(1);
         _postProcessingFilters->push(std::move(palettizer));
 
