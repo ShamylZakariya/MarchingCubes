@@ -1,9 +1,13 @@
-# NEXT:
-- material application is wonky; you can see it where arches meet the ground
-- sometimes crashes on quit because the worker threads are still running. We need to have some kind of termination signal to prevent new jobs from starting when quitting, and to wait for current jobs to finish.
+# TODO:
+1) Fix the crashes on shutdown
+2) Make error handling (glsl compiler errors, etc) NOT blow up the job queues
 
 # POST PROCESSING
 - look into a raymarched cloud/fog https://www.shadertoy.com/view/Msf3zX
+    - start with a static fog plane, this will help me learn the basics...
+
 - Build a single filter which:
     - color grades/paletizes
     - renders raymarched clouds
+
+- for the ffect to look more legit i need to palettize texture sampling too... need to use nearest interpolation, palettize colors, etc.
