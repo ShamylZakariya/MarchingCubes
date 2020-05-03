@@ -45,9 +45,9 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = true;
+constexpr bool AUTOPILOT = false;
 constexpr int WIDTH = 1440;
-constexpr int HEIGHT = 1440;
+constexpr int HEIGHT = 1100;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
@@ -69,6 +69,7 @@ public:
 
     void run()
     {
+        _running = true;
 
         // start imgui
         IMGUI_CHECKVERSION();
@@ -89,7 +90,7 @@ public:
 
         // enter run loop
         double lastTime = glfwGetTime();
-        while (_running && !glfwWindowShouldClose(_window)) {
+        while (isRunning()) {
             glfwPollEvents();
 
             // execute any queued operations
@@ -125,6 +126,24 @@ public:
     }
 
 private:
+
+    bool isRunning() {
+        if (_running && !glfwWindowShouldClose(_window)) {
+            return true;
+        }
+
+        // looks like we should terminate; but check first that
+        // we don't have any active march jobs running
+        for (const auto &seg : _segments) {
+            if (seg->isWorking()) {
+                return true;
+            }
+        }
+
+        // looks like we can safely terminate
+        return false;
+    }
+
     void initWindow()
     {
         glfwInit();
@@ -271,6 +290,24 @@ private:
         }
 
         //
+        //  Build a post-processing stack
+        //
+
+        _postProcessingFilters = std::make_unique<post_processing::FilterStack>();
+
+        auto palettizer = std::make_unique<PalettizeFilter>(
+            "Palettizer",
+            ivec3(16,16,16),
+            PalettizeFilter::ColorSpace::YUV);
+        palettizer->setAlpha(1);
+        _postProcessingFilters->push(std::move(palettizer));
+
+        auto pixelate = std::make_unique<PixelateFilter>("Pixelator", 8);
+        pixelate->setAlpha(1);
+        _postProcessingFilters->push(std::move(pixelate));
+
+
+        //
         // build a volume
         //
 
@@ -294,11 +331,11 @@ private:
             _segments.back()->march();
         }
 
-        const auto size = vec3(_segments.front()->volume->size());
+        const auto size = vec3(_segments.front()->getVolume()->size());
         const auto center = size / 2.0F;
 
         _lastWaypoint = vec3 { center.x, center.y, 0 };
-        _nextWaypoint = _segments.front()->waypoints.front();
+        _nextWaypoint = _segments.front()->getWaypoints().front();
 
         if (AUTOPILOT) {
             updateCamera(0);
@@ -306,22 +343,6 @@ private:
             _camera.lookAt(vec3(center.x, center.y, 0), center);
         }
 
-        //
-        //  Build a post-processing stack
-        //
-
-        _postProcessingFilters = std::make_unique<post_processing::FilterStack>();
-
-        auto palettizer = std::make_unique<PalettizeFilter>(
-            "Palettizer",
-            ivec3(16,16,16),
-            PalettizeFilter::ColorSpace::YUV);
-        palettizer->setAlpha(1);
-        _postProcessingFilters->push(std::move(palettizer));
-
-        auto pixelate = std::make_unique<PixelateFilter>("Pixelator", 8);
-        pixelate->setAlpha(1);
-        _postProcessingFilters->push(std::move(pixelate));
     }
 
     void onResize(int width, int height)
@@ -398,8 +419,8 @@ private:
                 const auto& segment = _segments[i];
                 const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
                 _terrainMaterial->bind(model, view, projection, _camera.position);
-                for (auto& tc : segment->triangles) {
-                    tc->draw();
+                for (auto& buffer : segment->getGeometry()) {
+                    buffer->draw();
                 }
             }
         });
@@ -422,13 +443,13 @@ private:
                 const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
                 _lineMaterial->bind(projection * view * model);
                 if (_drawSegmentBounds) {
-                    segment->boundingLineBuffer.draw();
+                    segment->getBoundingLineBuffer().draw();
                 }
                 if (_drawOctreeAABBs) {
-                    segment->aabbLineBuffer.draw();
+                    segment->getAabbLineBuffer().draw();
                 }
                 if (_drawWaypoints) {
-                    segment->waypointLineBuffer.draw();
+                    segment->getWaypointLineBuffer().draw();
                 }
             }
         }
@@ -446,7 +467,7 @@ private:
 
         double avgMarchDuration = 0;
         for (const auto& s : _segments) {
-            avgMarchDuration += s->lastMarchDurationSeconds;
+            avgMarchDuration += s->getLastMarchDurationSeconds();
         }
         avgMarchDuration /= _segments.size();
         ImGui::LabelText("march duration", "%.2fs", avgMarchDuration);
@@ -477,7 +498,7 @@ private:
             auto seg = std::move(_segments.front());
             _segments.pop_front();
 
-            seg->build(_segments.back()->idx + 1);
+            seg->build(_segments.back()->getIdx() + 1);
             seg->march();
 
             _segments.push_back(std::move(seg));
@@ -494,7 +515,7 @@ private:
                 bool found = false;
                 float dz = (i * _segmentSizeZ) - _distanceAlongZ;
                 const auto& segment = _segments[i];
-                for (const auto& waypoint : segment->waypoints) {
+                for (const auto& waypoint : segment->getWaypoints()) {
                     auto waypointWorld = vec3(waypoint.x, waypoint.y, waypoint.z + dz);
                     if (waypointWorld.z > 0) {
                         _nextWaypoint = waypointWorld;
@@ -579,7 +600,7 @@ private:
     int triangleCount()
     {
         return std::accumulate(_segments.begin(), _segments.end(), 0, [](int acc, const auto& seg) {
-            return acc + seg->triangleCount;
+            return acc + seg->getTriangleCount();
         });
     }
 
@@ -592,7 +613,7 @@ private:
     // app state
     GLFWwindow* _window;
     double _elapsedFrameTime = 0;
-    bool _running = true;
+    bool _running = false;
     ivec2 _contextSize { WIDTH, HEIGHT };
 
     // input state

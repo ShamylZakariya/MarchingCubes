@@ -7,8 +7,7 @@ layout(location = 1) in vec2 inTexCoord;
 out VS_OUT
 {
     vec2 texCoord;
-}
-vs_out;
+} vs_out;
 
 void main()
 {
@@ -22,8 +21,7 @@ fragment:
 in VS_OUT
 {
     vec2 texCoord;
-}
-fs_in;
+} fs_in;
 
 out vec4 fragColor;
 

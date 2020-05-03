@@ -50,23 +50,23 @@ private:
 
 public:
     TerrainSegment(int size, std::shared_ptr<mc::util::ThreadPool> threadPool, FastNoise& noise)
-        : idx(-1)
-        , size(size)
-        , threadPool(threadPool)
-        , noise(noise)
+        : _idx(-1)
+        , _size(size)
+        , _threadPool(threadPool)
+        , _noise(noise)
     {
         std::vector<mc::util::unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
         for (size_t i = 0, N = threadPool->size(); i < N; i++) {
-            triangles.push_back(std::make_unique<mc::TriangleConsumer<mc::Vertex>>());
-            unownedTriangleConsumers.push_back(triangles.back().get());
+            _triangles.push_back(std::make_unique<mc::TriangleConsumer<mc::Vertex>>());
+            unownedTriangleConsumers.push_back(_triangles.back().get());
         }
 
         const int minNodeSize = 4;
         const float fuzziness = 2.0F;
-        volume = std::make_unique<mc::OctreeVolume>(size, fuzziness, minNodeSize, threadPool, unownedTriangleConsumers);
+        _volume = std::make_unique<mc::OctreeVolume>(size, fuzziness, minNodeSize, threadPool, unownedTriangleConsumers);
 
         //  +1 gives us the edge case for marching
-        heightmap.resize((size + 1) * (size + 1));
+        _heightmap.resize((size + 1) * (size + 1));
     }
 
     ~TerrainSegment() = default;
@@ -78,17 +78,15 @@ public:
     {
         using namespace glm;
 
-        std::cout << "[TerrainSegment::build] idx " << idx << std::endl;
-
-        this->idx = idx;
-        volume->clear();
-        triangleCount = 0;
-        for (auto& tc : triangles) {
+        this->_idx = idx;
+        _volume->clear();
+        _triangleCount = 0;
+        for (auto& tc : _triangles) {
             tc->clear();
         }
 
-        waypoints.clear();
-        waypointLineBuffer.clear();
+        _waypoints.clear();
+        _waypointLineBuffer.clear();
 
         const auto segmentColor = rainbow(static_cast<float>(idx % 5) / 5.0F);
 
@@ -96,7 +94,7 @@ public:
         // build terrain sampler
         //
 
-        volume->add(std::make_unique<HeightmapSampler>(heightmap.data(), size, maxTerrainHeight, kFloorThreshold,
+        _volume->add(std::make_unique<HeightmapSampler>(_heightmap.data(), _size, kMaxTerrainHeight, kFloorThreshold,
             kFloorTerrainMaterial, kLowTerrainMaterial, kHighTerrainMaterial));
 
         //
@@ -109,8 +107,8 @@ public:
         // build arches
         //
 
-        const float zOffset = idx * size;
-        const auto size = vec3(volume->size());
+        const float zOffset = idx * _size;
+        const auto size = vec3(_volume->size());
         const auto center = size / 2.0F;
         const auto maxArches = 7;
         for (int i = 0; i < maxArches; i++) {
@@ -125,8 +123,8 @@ public:
             // reduce likelyhood of clipping
             // TODO: Use simplex to seed our arches too... this would prevent clipping
             // because arches would clone across segment boundaries
-            float archZ = 30 + (this->size - 60) * static_cast<float>(i) / maxArches;
-            float archX = center.x + noise.GetSimplex(archZ + zOffset, 0) * size.x * 0.125F;
+            float archZ = 30 + (_size - 60) * static_cast<float>(i) / maxArches;
+            float archX = center.x + _noise.GetSimplex(archZ + zOffset, 0) * size.x * 0.125F;
 
             Tube::Config arch;
             arch.axisOrigin = vec3 { archX, 0, archZ };
@@ -144,68 +142,74 @@ public:
             arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
             arch.material = kArchMaterial;
 
-            volume->add(std::make_unique<Tube>(arch));
+            _volume->add(std::make_unique<Tube>(arch));
 
             vec3 waypoint = arch.axisOrigin + arch.axisPerp * arch.innerRadius * rng.nextFloat(0.2F, 0.8F);
-            waypoint.y = std::max(waypoint.y, maxTerrainHeight + 2);
-            waypoints.push_back(waypoint);
-            waypointLineBuffer.addMarker(waypoint, 4, segmentColor);
+            waypoint.y = std::max(waypoint.y, kMaxTerrainHeight + 2);
+            _waypoints.push_back(waypoint);
+            _waypointLineBuffer.addMarker(waypoint, 4, segmentColor);
         }
 
         // all segments have to have at least 1 waypoint; if the dice roll
         // didn't give us any arches, make a default waypoint
-        if (waypoints.empty()) {
-            vec3 waypoint = vec3(center.x, maxTerrainHeight + rng.nextFloat(10), center.z);
-            waypoints.push_back(waypoint);
-            waypointLineBuffer.addMarker(waypoint, 4, vec4(1, 1, 0, 1));
+        if (_waypoints.empty()) {
+            vec3 waypoint = vec3(center.x, kMaxTerrainHeight + rng.nextFloat(10), center.z);
+            _waypoints.push_back(waypoint);
+            _waypointLineBuffer.addMarker(waypoint, 4, vec4(1, 1, 0, 1));
         }
 
         //
         //  Build a debug frame to show our volume
         //
 
-        boundingLineBuffer.clear();
-        boundingLineBuffer.add(AABB(vec3 { 0.0F }, size).inset(1), segmentColor);
+        _boundingLineBuffer.clear();
+        _boundingLineBuffer.add(AABB(vec3 { 0.0F }, size).inset(1), segmentColor);
     }
 
     void march()
     {
         const double startTime = glfwGetTime();
 
-        aabbLineBuffer.clear();
+        _aabbLineBuffer.clear();
 
         const auto nodeObserver = [this](mc::OctreeVolume::Node* node) {
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
                 bounds.inset(node->depth * 0.005F);
-                aabbLineBuffer.add(bounds, nodeColor(node->depth));
+                _aabbLineBuffer.add(bounds, nodeColor(node->depth));
             }
         };
 
         const auto onMarchComplete = [this, startTime]() {
-            lastMarchDurationSeconds = glfwGetTime() - startTime;
+            _lastMarchDurationSeconds = glfwGetTime() - startTime;
 
-            triangleCount = 0;
-            for (const auto& tc : triangles) {
-                triangleCount += tc->numTriangles();
+            _triangleCount = 0;
+            for (const auto& tc : _triangles) {
+                _triangleCount += tc->numTriangles();
             }
         };
 
         updateHeightmap();
-        volume->marchAsync(onMarchComplete, nodeObserver);
+        _volume->marchAsync(onMarchComplete, nodeObserver);
     }
+
+    /**
+     * Returns true if this segment is busy (generating heightmap, or marching the corresponding volume)
+     */
+    bool isWorking() const { return _isUpdatingHeightmap || _volume->isMarching(); }
 
     void updateHeightmap()
     {
-        const auto zOffset = idx * size;
-        const auto dim = size + 1;
+        _isUpdatingHeightmap = true;
+        const auto zOffset = _idx * _size;
+        const auto dim = _size + 1;
 
-        int slices = threadPool->size();
+        int slices = _threadPool->size();
         int sliceHeight = dim / slices;
         std::vector<std::future<void>> workers;
         for (int slice = 0; slice < slices; slice++) {
-            workers.push_back(threadPool->enqueue([=](int tIdx) {
+            workers.push_back(_threadPool->enqueue([=](int tIdx) {
                 int sliceStart = slice * sliceHeight;
                 int sliceEnd = sliceStart + sliceHeight;
                 if (slice == slices - 1) {
@@ -214,22 +218,22 @@ public:
 
                 for (int y = sliceStart; y < sliceEnd; y++) {
                     for (int x = 0; x < dim; x++) {
-                        float n = noise.GetSimplex(x, y + zOffset) * 0.5F + 0.5F;
+                        float n = _noise.GetSimplex(x, y + zOffset) * 0.5F + 0.5F;
 
                         // sand-dune like structures
                         float dune = n * 3;
                         dune = dune - floor(dune);
-                        dune = dune * dune * maxTerrainHeight;
+                        dune = dune * dune * kMaxTerrainHeight;
 
                         float dune2 = n * 2;
                         dune2 = dune2 - floor(dune2);
-                        dune2 = smoothstep(dune2) * maxTerrainHeight;
+                        dune2 = smoothstep(dune2) * kMaxTerrainHeight;
 
                         // floor
                         float f = smoothstep(n);
-                        float floor = maxTerrainHeight * f;
+                        float floor = kMaxTerrainHeight * f;
 
-                        heightmap[y * size + x] = (floor + dune + dune2) / 3.0F;
+                        _heightmap[y * _size + x] = (floor + dune + dune2) / 3.0F;
                     }
                 }
             }));
@@ -238,7 +242,39 @@ public:
         for (auto& w : workers) {
             w.wait();
         }
+        _isUpdatingHeightmap = false;
     }
+
+    int getIdx() const { return _idx; }
+    mc::util::unowned_ptr<mc::OctreeVolume> getVolume() const { return _volume.get(); }
+    const std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> &getGeometry() const { return _triangles; }
+    const std::vector<vec3> &getWaypoints() const { return _waypoints; }
+    mc::util::LineSegmentBuffer &getAabbLineBuffer() { return _aabbLineBuffer; }
+    mc::util::LineSegmentBuffer &getBoundingLineBuffer() { return _boundingLineBuffer; }
+    mc::util::LineSegmentBuffer &getWaypointLineBuffer() { return _waypointLineBuffer; }
+    double getLastMarchDurationSeconds() const { return _lastMarchDurationSeconds; }
+    int getTriangleCount() const { return _triangleCount; }
+
+
+
+private:
+    const float kMaxTerrainHeight = 8.0F;
+
+    int _idx = 0;
+    int _size = 0;
+    std::shared_ptr<mc::util::ThreadPool> _threadPool;
+    FastNoise& _noise;
+    int _triangleCount;
+    std::unique_ptr<mc::OctreeVolume> _volume;
+    std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangles;
+    mc::util::LineSegmentBuffer _aabbLineBuffer;
+    mc::util::LineSegmentBuffer _boundingLineBuffer;
+    mc::util::LineSegmentBuffer _waypointLineBuffer;
+    std::vector<vec3> _waypoints;
+    std::vector<float> _heightmap;
+    double _lastMarchDurationSeconds = 0;
+    bool _isUpdatingHeightmap = false;
+    std::vector<vec4> _nodeColors;
 
     static float smoothstep(float t)
     {
@@ -251,26 +287,7 @@ public:
         return t * t * (3 - 2 * t);
     }
 
-    const float maxTerrainHeight = 8.0F;
-
-    int idx = 0;
-    int size = 0;
-    std::shared_ptr<mc::util::ThreadPool> threadPool;
-    FastNoise& noise;
-    int triangleCount;
-    std::unique_ptr<mc::OctreeVolume> volume;
-    std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> triangles;
-    mc::util::LineSegmentBuffer aabbLineBuffer;
-    mc::util::LineSegmentBuffer boundingLineBuffer;
-    mc::util::LineSegmentBuffer waypointLineBuffer;
-    std::vector<vec3> waypoints;
-    std::vector<float> heightmap;
-    double lastMarchDurationSeconds = 0;
-
-private:
-    std::vector<vec4> _nodeColors;
-
-    vec4 rainbow(float dist) const
+    static vec4 rainbow(float dist)
     {
         using namespace mc::util::color;
         const hsv hC { 360 * dist, 0.6F, 1.0F };
@@ -282,7 +299,7 @@ private:
     {
         using namespace mc::util::color;
 
-        auto depth = volume->depth();
+        auto depth = _volume->depth();
         if (_nodeColors.size() < depth) {
             _nodeColors.clear();
             const float hueStep = 360.0F / depth;

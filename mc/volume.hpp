@@ -216,9 +216,8 @@ public:
      * March the volume in a non-blocking fashion; calls onReady on the
      * main thread when the work is done
      * NOTE:
-     * onReady will be called on the main thread, which requires use of
-     *  mc::util::MainThreadQueue
-     * marchedNodeObserver will be called on the calling thread
+     * onReady & marchedNodeObserver will be called on the main thread, which requires use of
+     *  mc::util::MainThreadQueue::drain()
      */
     void marchAsync(
         std::function<void()> onReady,
@@ -239,6 +238,11 @@ public:
     {
         return _treeDepth;
     }
+
+    /**
+     * Returns true if a march job is in process from marchAsync()
+     */
+    bool isMarching() const { return _marching; }
 
 protected:
     void marchSetup();
@@ -394,6 +398,7 @@ private:
     std::mutex _queuePopMutex;
 
     std::future<void> _asyncWaiter;
+    std::atomic_bool _marching;
 };
 
 } // namespace mc

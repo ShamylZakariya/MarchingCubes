@@ -55,6 +55,8 @@ void OctreeVolume::marchAsync(
     std::function<void()> onReady,
     std::function<void(OctreeVolume::Node*)> marchedNodeObserver)
 {
+    _marching = true;
+
     for (auto& tc : _triangleConsumers) {
         tc->start();
     }
@@ -80,6 +82,8 @@ void OctreeVolume::marchAsync(
             for (auto& j : jobs) {
                 j.wait();
             }
+
+            _marching = false;
 
             if (id != _asyncMarchId) {
                 // looks like a new march got queued before this one
