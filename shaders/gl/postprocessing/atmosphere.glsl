@@ -38,6 +38,7 @@ out vec4 fragColor;
 uniform sampler2D uColorSampler;
 uniform sampler2D uDepthSampler;
 uniform samplerCube uSkyboxSampler;
+uniform vec4 uAtmosphericTint;
 uniform float uNearRenderDistance;
 uniform float uFarRenderDistance;
 uniform float uNearPlane;
@@ -58,5 +59,7 @@ void main() {
     float sceneDepth = getSceneDepth();
 
     float s = smoothstep(uNearRenderDistance, uFarRenderDistance, sceneDepth);
-    fragColor = vec4(mix(sceneColor, skyboxColor, s), 1);
+    float s2 = smoothstep(0, uFarRenderDistance, sceneDepth);
+    vec3 distanceTintedSceneColor = mix(sceneColor, uAtmosphericTint.rgb, s2 * uAtmosphericTint.a);
+    fragColor = vec4(mix(distanceTintedSceneColor, skyboxColor, s), 1);
 }

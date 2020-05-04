@@ -138,6 +138,7 @@ public:
     AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef skybox)
         : Filter(name)
         , _skybox(skybox)
+        , _atmosphericTint(0.9, 0.95, 1, 0.5)
     {
         _program = mc::util::CreateProgramFromFile("shaders/gl/postprocessing/atmosphere.glsl");
 
@@ -151,6 +152,7 @@ public:
         _uFarRenderDistance = glGetUniformLocation(_program, "uFarRenderDistance");
         _uNearPlane = glGetUniformLocation(_program, "uNearPlane");
         _uFarPlane = glGetUniformLocation(_program, "uFarPlane");
+        _uAtmosphericTint = glGetUniformLocation(_program, "uAtmosphericTint");
     }
 
     void setCameraState(const glm::mat4& projection, const glm::mat4& view, float nearPlane, float farPlane)
@@ -161,9 +163,15 @@ public:
         _farPlane = farPlane;
     }
 
-    void setRenderDistance(float nearRenderDistance, float farRenderDistance) {
+    void setRenderDistance(float nearRenderDistance, float farRenderDistance)
+    {
         _nearRenderDistance = nearRenderDistance;
         _farRenderDistance = farRenderDistance;
+    }
+
+    void setAtmosphericTint(glm::vec4 color)
+    {
+        _atmosphericTint = color;
     }
 
 protected:
@@ -186,6 +194,7 @@ protected:
         glUniform1f(_uFarRenderDistance, _farRenderDistance);
         glUniform1f(_uNearPlane, _nearPlane);
         glUniform1f(_uFarPlane, _farPlane);
+        glUniform4fv(_uAtmosphericTint, 1, glm::value_ptr(_atmosphericTint));
 
         clipspaceQuad.draw();
         glUseProgram(0);
@@ -202,6 +211,7 @@ private:
     GLint _uFarRenderDistance = -1;
     GLint _uNearPlane = -1;
     GLint _uFarPlane = -1;
+    GLint _uAtmosphericTint = -1;
 
     mc::util::TextureHandleRef _skybox;
     glm::mat4 _projection;
@@ -210,6 +220,7 @@ private:
     float _farPlane = 0;
     float _nearRenderDistance = 0;
     float _farRenderDistance = 0;
+    glm::vec4 _atmosphericTint;
 };
 
 #endif
