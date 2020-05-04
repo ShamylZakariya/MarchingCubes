@@ -17,7 +17,11 @@ namespace util {
         std::ifstream in(filename.c_str());
         std::stringstream buffer;
         buffer << in.rdbuf();
-        return buffer.str();
+        auto contents = buffer.str();
+        if (contents.empty()) {
+            throw std::runtime_error("[ReadFile] - Unable to read contents of file \"" + filename + "\"");
+        }
+        return contents;
     }
 
     Image::Image(const std::string& filename)
@@ -298,10 +302,10 @@ namespace util {
         }
 
         if (vertex.empty()) {
-            throw std::runtime_error("GLSL file missing \"vertex:\" shader section");
+            throw std::runtime_error("GLSL file \"" + std::string(glslFile) + "\" missing \"vertex:\" shader section");
         }
         if (fragment.empty()) {
-            throw std::runtime_error("GLSL file missing \"vertex:\" shader section");
+            throw std::runtime_error("GLSL file \"" + std::string(glslFile) + "\" missing \"fragment:\" shader section");
         }
 
         apply_substitutions(vertex, substitutions);

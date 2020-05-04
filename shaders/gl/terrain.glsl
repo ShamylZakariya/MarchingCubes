@@ -66,8 +66,6 @@ uniform float uTexture0Scale;
 uniform sampler2D uTexture1Sampler;
 uniform float uTexture1Scale;
 
-uniform float uRenderDistance;
-
 out vec4 fragColor;
 
 /////////////////////////////////////////////
@@ -110,11 +108,5 @@ void main()
     color *= uAmbientLight + lightProbeLight;
     color = mix(color, reflectionColor, fs_in.shininess);
 
-    float distFactor = fs_in.worldDistance / uRenderDistance;
-    float recolorFactor = distFactor * distFactor;
-    float alpha = 1 - (recolorFactor * recolorFactor * recolorFactor);
-
-    color =mix(color, lightProbeLight, recolorFactor);
-
-    fragColor = vec4(color, alpha);
+    fragColor = vec4(color, 1);
 }

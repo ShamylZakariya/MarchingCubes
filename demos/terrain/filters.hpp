@@ -103,7 +103,8 @@ public:
         _uOutputSize = glGetUniformLocation(_program, "uOutputSize");
     }
 
-    void setPixelSize(int pixelSize) {
+    void setPixelSize(int pixelSize)
+    {
         _pixelSize = std::max(pixelSize, 1);
     }
 
@@ -130,6 +131,85 @@ private:
     GLuint _uPixelSize = 0;
     GLuint _uOutputSize = 0;
     int _pixelSize;
+};
+
+class AtmosphereFilter : public post_processing::Filter {
+public:
+    AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef skybox)
+        : Filter(name)
+        , _skybox(skybox)
+    {
+        _program = mc::util::CreateProgramFromFile("shaders/gl/postprocessing/atmosphere.glsl");
+
+        _uColorSampler = glGetUniformLocation(_program, "uColorSampler");
+        _uDepthSampler = glGetUniformLocation(_program, "uDepthSampler");
+        _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
+
+        _uProjectionInverse = glGetUniformLocation(_program, "uProjectionInverse");
+        _uViewInverse = glGetUniformLocation(_program, "uViewInverse");
+        _uNearRenderDistance = glGetUniformLocation(_program, "uNearRenderDistance");
+        _uFarRenderDistance = glGetUniformLocation(_program, "uFarRenderDistance");
+        _uNearPlane = glGetUniformLocation(_program, "uNearPlane");
+        _uFarPlane = glGetUniformLocation(_program, "uFarPlane");
+    }
+
+    void setCameraState(const glm::mat4& projection, const glm::mat4& view, float nearPlane, float farPlane)
+    {
+        _projection = projection;
+        _view = view;
+        _nearPlane = nearPlane;
+        _farPlane = farPlane;
+    }
+
+    void setRenderDistance(float nearRenderDistance, float farRenderDistance) {
+        _nearRenderDistance = nearRenderDistance;
+        _farRenderDistance = farRenderDistance;
+    }
+
+protected:
+    void _render(const glm::ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<post_processing::detail::VertexP2T2>& clipspaceQuad) override
+    {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorTex);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, depthTex);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _skybox->id());
+
+        glUseProgram(_program);
+        glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_projection)));
+        glUniformMatrix4fv(_uViewInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_view)));
+        glUniform1i(_uColorSampler, 0);
+        glUniform1i(_uDepthSampler, 1);
+        glUniform1i(_uSkyboxSampler, 2);
+        glUniform1f(_uNearRenderDistance, _nearRenderDistance);
+        glUniform1f(_uFarRenderDistance, _farRenderDistance);
+        glUniform1f(_uNearPlane, _nearPlane);
+        glUniform1f(_uFarPlane, _farPlane);
+
+        clipspaceQuad.draw();
+        glUseProgram(0);
+    }
+
+private:
+    GLuint _program = 0;
+    GLint _uColorSampler = -1;
+    GLint _uDepthSampler = -1;
+    GLint _uSkyboxSampler = -1;
+    GLint _uProjectionInverse = -1;
+    GLint _uViewInverse = -1;
+    GLint _uNearRenderDistance = -1;
+    GLint _uFarRenderDistance = -1;
+    GLint _uNearPlane = -1;
+    GLint _uFarPlane = -1;
+
+    mc::util::TextureHandleRef _skybox;
+    glm::mat4 _projection;
+    glm::mat4 _view;
+    float _nearPlane = 0;
+    float _farPlane = 0;
+    float _nearRenderDistance = 0;
+    float _farRenderDistance = 0;
 };
 
 #endif

@@ -87,14 +87,19 @@ public:
     FilterStack();
     ~FilterStack();
 
-    void push(std::unique_ptr<Filter>&& filter)
+    template<class T>
+    mc::util::unowned_ptr<T> push(std::unique_ptr<T>&& filter)
     {
+        auto ptr = filter.get();
         _filters.push_back(std::move(filter));
+        return ptr;
     }
+
     void pop()
     {
         _filters.pop_back();
     }
+
     void remove(const std::string& name)
     {
         _filters.erase(std::remove_if(
@@ -102,6 +107,7 @@ public:
                            [&name](const std::unique_ptr<Filter>& f) { return f->getName() == name; }),
             _filters.end());
     }
+
     void remove(unowned_ptr<Filter> filter)
     {
         _filters.erase(std::remove_if(
@@ -109,10 +115,12 @@ public:
                            [&filter](const std::unique_ptr<Filter>& f) { return f.get() == filter.get(); }),
             _filters.end());
     }
+
     void clear()
     {
         _filters.clear();
     }
+
     bool isEmpty() const
     {
         return _filters.empty();

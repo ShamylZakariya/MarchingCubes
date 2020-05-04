@@ -242,11 +242,9 @@ private:
             ambientLight,
             lightprobeTex, skyboxTexture,
             terrainTexture0, terrainTexture0Scale,
-            terrainTexture1, terrainTexture1Scale,
-            renderDistance);
+            terrainTexture1, terrainTexture1Scale);
 
         _lineMaterial = std::make_unique<LineMaterial>();
-        _skydomeMaterial = std::make_unique<SkydomeMaterial>(skyboxTexture);
 
         //
         // some constant GL state
@@ -256,7 +254,6 @@ private:
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
-        glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS); // required for cubemap miplevels
 
@@ -273,38 +270,27 @@ private:
         // Build static geometry
         //
 
-        {
-            using V = decltype(_skydomeQuad)::vertex_type;
-            _skydomeQuad.start();
-            _skydomeQuad.addTriangle(mc::Triangle {
-                V { vec3(-1, -1, 1), vec4(1, 0, 0, 1) },
-                V { vec3(+1, -1, 1), vec4(0, 1, 0, 1) },
-                V { vec3(+1, +1, 1), vec4(0, 0, 1, 1) } });
-            _skydomeQuad.addTriangle(mc::Triangle {
-                V { vec3(-1, -1, 1), vec4(0, 1, 1, 1) },
-                V { vec3(+1, +1, 1), vec4(1, 0, 1, 1) },
-                V { vec3(-1, +1, 1), vec4(1, 1, 0, 1) } });
-            _skydomeQuad.finish();
-
-            _axisMarker.addAxis(mat4 { 1 }, 64);
-        }
+        _axisMarker.addAxis(mat4 { 1 }, 64);
 
         //
         //  Build a post-processing stack
         //
 
         _postProcessingFilters = std::make_unique<post_processing::FilterStack>();
+        _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture));
+        _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
+        _atmosphere->setAlpha(1);
 
-        auto palettizer = std::make_unique<PalettizeFilter>(
-            "Palettizer",
-            ivec3(16,16,16),
-            PalettizeFilter::ColorSpace::YUV);
-        palettizer->setAlpha(1);
-        _postProcessingFilters->push(std::move(palettizer));
+        // auto palettizer = std::make_unique<PalettizeFilter>(
+        //     "Palettizer",
+        //     ivec3(16,16,16),
+        //     PalettizeFilter::ColorSpace::YUV);
+        // palettizer->setAlpha(1);
+        // _postProcessingFilters->push(std::move(palettizer));
 
-        auto pixelate = std::make_unique<PixelateFilter>("Pixelator", 8);
-        pixelate->setAlpha(1);
-        _postProcessingFilters->push(std::move(pixelate));
+        // auto pixelate = std::make_unique<PixelateFilter>("Pixelator", 8);
+        // pixelate->setAlpha(1);
+        // _postProcessingFilters->push(std::move(pixelate));
 
 
         //
@@ -406,14 +392,15 @@ private:
         mat4 view = _camera.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
+        _atmosphere->setCameraState(projection, view, NEAR_PLANE, FAR_PLANE);
+
         _postProcessingFilters->execute(_contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // draw volumes
+            glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
-            _skydomeMaterial->bind(projection, view);
-            _skydomeQuad.draw();
 
             for (size_t i = 0, N = _segments.size(); i < N; i++) {
                 const auto& segment = _segments[i];
@@ -425,6 +412,7 @@ private:
             }
         });
 
+        glEnable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_TRUE);
 
@@ -624,11 +612,10 @@ private:
     // render state
     std::unique_ptr<TerrainMaterial> _terrainMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
-    std::unique_ptr<SkydomeMaterial> _skydomeMaterial;
-    mc::TriangleConsumer<mc::util::VertexP3C4> _skydomeQuad;
     mc::util::LineSegmentBuffer _axisMarker;
     mc::util::LineSegmentBuffer _autopilotCameraAxis;
     float _aspect = 1;
+    mc::util::unowned_ptr<AtmosphereFilter> _atmosphere;
 
     Camera _camera;
     std::unique_ptr<post_processing::FilterStack> _postProcessingFilters;

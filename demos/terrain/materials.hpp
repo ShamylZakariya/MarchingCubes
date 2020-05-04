@@ -61,13 +61,11 @@ private:
     GLint _uAmbientLight;
     GLint _uReflectionMapSampler = -1;
     GLint _uReflectionMapMipLevels = -1;
-    GLint _uRenderDistance = -1;
 
     mc::util::TextureHandleRef _lightprobe, _reflectionMap, _texture0, _texture1;
     vec3 _ambientLight;
     float _texture0Scale = 1;
     float _texture1Scale = 1;
-    float _renderDistance = 0;
 
 public:
     TerrainMaterial(
@@ -75,8 +73,7 @@ public:
         mc::util::TextureHandleRef lightProbe,
         mc::util::TextureHandleRef reflectionMap,
         mc::util::TextureHandleRef texture0, float tex0Scale,
-        mc::util::TextureHandleRef texture1, float tex1Scale,
-        float renderDistance)
+        mc::util::TextureHandleRef texture1, float tex1Scale)
         : _lightprobe(lightProbe)
         , _reflectionMap(reflectionMap)
         , _texture0(texture0)
@@ -84,7 +81,6 @@ public:
         , _ambientLight(ambientLight)
         , _texture0Scale(tex0Scale)
         , _texture1Scale(tex1Scale)
-        , _renderDistance(renderDistance)
     {
         using namespace mc::util;
         _program = CreateProgramFromFile("shaders/gl/terrain.glsl");
@@ -99,7 +95,6 @@ public:
         _uTexture0Scale = glGetUniformLocation(_program, "uTexture0Scale");
         _uTexture1Sampler = glGetUniformLocation(_program, "uTexture1Sampler");
         _uTexture1Scale = glGetUniformLocation(_program, "uTexture1Scale");
-        _uRenderDistance = glGetUniformLocation(_program, "uRenderDistance");
     }
 
     TerrainMaterial(const TerrainMaterial& other) = delete;
@@ -138,7 +133,6 @@ public:
         glUniform1i(_uTexture1Sampler, 3);
         glUniform1f(_uTexture0Scale, _texture0Scale);
         glUniform1f(_uTexture1Scale, _texture1Scale);
-        glUniform1f(_uRenderDistance, _renderDistance);
     }
 };
 
