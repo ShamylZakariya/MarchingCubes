@@ -11,14 +11,11 @@ Marching Cubes depends on [libepoxy](https://github.com/anholt/libepoxy), [glfw3
 #linux
 sudo apt-get install libepoxy-dev libglfw3-dev libglm-dev
 
-# macOS
-brew install libepoxy glm glfw
-
 ```
 
 The VSCode project depends on meson building into `build`
 ```bash
-meson setup --layout flat build
+CC=clang CXX=clang++ meson setup --layout flat build
 ```
 
 Then you can open the project in VSCode

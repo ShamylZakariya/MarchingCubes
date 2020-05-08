@@ -80,7 +80,7 @@ namespace {
         Vertex v;
 
         if (std::abs(isolevel - cell.val[idxA]) < EPSILON
-            || abs(cell.val[idxA] - cell.val[idxB]) < EPSILON) {
+            || std::abs(cell.val[idxA] - cell.val[idxB]) < EPSILON) {
             v.pos = cell.pos[idxA];
             v.color = cell.material[idxA].color;
             v.shininess = cell.material[idxA].shininess;

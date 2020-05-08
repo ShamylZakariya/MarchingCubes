@@ -5,21 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "hello_mc (CodeLLDB)",
+            "name": "hello_mc (clang/lldb)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/hello_mc",
             "preLaunchTask": "Build"
         },
         {
-            "name": "terrain (CodeLLDB)",
+            "name": "terrain (clang/lldb)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/terrain",
             "preLaunchTask": "Build"
         },
         {
-            "name": "hello_mc (gdb)",
+            "name": "hello_mc (gcc/gdb)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/hello_mc",
@@ -39,7 +39,7 @@
             "preLaunchTask": "Build"
         },
         {
-            "name": "terrain (gdb)",
+            "name": "terrain (gcc/gdb)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/meson-out/terrain",

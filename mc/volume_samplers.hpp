@@ -307,7 +307,7 @@ public:
     float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const override
     {
         // distance of p from plane
-        float dist = abs(glm::dot(_normal, p - _origin));
+        float dist = glm::abs(glm::dot(_normal, p - _origin));
         float outerDist = _thickness * 0.5F;
         float innerDist = outerDist - fuzziness;
 

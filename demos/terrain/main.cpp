@@ -45,7 +45,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = false;
+constexpr bool AUTOPILOT = true;
 constexpr int WIDTH = 1440;
 constexpr int HEIGHT = 1100;
 constexpr float NEAR_PLANE = 0.1f;
@@ -280,17 +280,17 @@ private:
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setAlpha(1);
+        _atmosphere->setAtmosphericTint(vec4(1,0,1,1));
+        _atmosphere->setGroundPlane(16, 80, vec4(0.7,0.72,0.74,0.5));
 
-        // auto palettizer = std::make_unique<PalettizeFilter>(
+        // auto palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
         //     "Palettizer",
-        //     ivec3(16,16,16),
-        //     PalettizeFilter::ColorSpace::YUV);
+        //     ivec3(32,32,32),
+        //     PalettizeFilter::ColorSpace::YUV));
         // palettizer->setAlpha(1);
-        // _postProcessingFilters->push(std::move(palettizer));
 
-        // auto pixelate = std::make_unique<PixelateFilter>("Pixelator", 8);
+        // auto pixelate = _postProcessingFilters->push(std::make_unique<PixelateFilter>("Pixelator", 4));
         // pixelate->setAlpha(1);
-        // _postProcessingFilters->push(std::move(pixelate));
 
 
         //
@@ -326,7 +326,9 @@ private:
         if (AUTOPILOT) {
             updateCamera(0);
         } else {
-            _camera.lookAt(vec3(center.x, center.y, 0), center);
+            auto pos = vec3(center.x, size.y * 0.2F, 0);
+            auto lookTarget = pos + vec3(0,0,1);
+            _camera.lookAt(pos, lookTarget);
         }
 
     }
@@ -392,7 +394,7 @@ private:
         mat4 view = _camera.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
-        _atmosphere->setCameraState(projection, view, NEAR_PLANE, FAR_PLANE);
+        _atmosphere->setCameraState(_camera.position, projection, view, NEAR_PLANE, FAR_PLANE);
 
         _postProcessingFilters->execute(_contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -568,11 +570,11 @@ private:
             }
 
             if (isKeyDown(GLFW_KEY_UP)) {
-                _camera.rotateBy(0, -lookSpeed);
+                _camera.rotateBy(0, +lookSpeed);
             }
 
             if (isKeyDown(GLFW_KEY_DOWN)) {
-                _camera.rotateBy(0, lookSpeed);
+                _camera.rotateBy(0, -lookSpeed);
             }
 
             if (isKeyDown(GLFW_KEY_LEFT)) {
