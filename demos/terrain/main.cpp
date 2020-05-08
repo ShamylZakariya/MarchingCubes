@@ -45,7 +45,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = true;
+constexpr bool AUTOPILOT = false;
 constexpr int WIDTH = 1440;
 constexpr int HEIGHT = 1100;
 constexpr float NEAR_PLANE = 0.1f;
@@ -396,7 +396,7 @@ private:
 
         _atmosphere->setCameraState(_camera.position, projection, view, NEAR_PLANE, FAR_PLANE);
 
-        _postProcessingFilters->execute(_contextSize, [=]() {
+        _postProcessingFilters->execute(_contextSize, _contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // draw volumes
@@ -413,6 +413,8 @@ private:
                 }
             }
         });
+
+        glViewport(0,0,_contextSize.x, _contextSize.y);
 
         glEnable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);

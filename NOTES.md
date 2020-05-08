@@ -1,7 +1,3 @@
-# TODO:
-1) Fix the crashes on shutdown
-2) Make error handling (glsl compiler errors, etc) NOT blow up the job queues
-
 # POST PROCESSING
 - look into a raymarched cloud/fog https://www.shadertoy.com/view/Msf3zX
     - start with a static fog plane, this will help me learn the basics... just needs two plane equations, upper and lower bounds. Trace ray in worldspace through these two planes.

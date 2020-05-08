@@ -157,11 +157,17 @@ public:
 
     /// Capture the render output of renderFunc, execute the installed filters,
     /// and then draw the result to the active framebuffer
-    void execute(glm::ivec2 size, std::function<void()> renderFunc);
+    void execute(glm::ivec2 captureSize, std::function<void()> renderFunc) {
+        execute(captureSize, captureSize, renderFunc);
+    }
+
+    /// Capture the render output of renderFunc, execute the installed filters,
+    /// and then draw the result to the active framebuffer
+    void execute(glm::ivec2 captureSize, glm::ivec2 displaySize, std::function<void()> renderFunc);
 
 protected:
     /// blits colorTex and depthTex to default framebuffer (e.g., display)
-    void blit(GLuint colorTex, GLuint depthTex);
+    void blit(glm::ivec2 captureSize, glm::ivec2 displaySize, GLuint colorTex, GLuint depthTex);
     void destroyAttachments();
     void createAttachments(glm::ivec2 size);
 

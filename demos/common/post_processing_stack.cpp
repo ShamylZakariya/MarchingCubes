@@ -45,7 +45,7 @@ namespace detail {
 // Filter
 //
 
-void Filter::_execute(const glm::ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
+void Filter::_execute(const ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
 {
     if (_clearsColorBuffer) {
         glClearColor(_clearColor.r, _clearColor.g, _clearColor.b, _clearColor.a);
@@ -83,7 +83,7 @@ FilterStack::~FilterStack()
     glDeleteFramebuffers(1, &_fbo);
 }
 
-void FilterStack::execute(glm::ivec2 captureSize, std::function<void()> renderFunc)
+void FilterStack::execute(ivec2 captureSize, ivec2 displaySize, std::function<void()> renderFunc)
 {
     CHECK_GL_ERROR("FilterStack::capture");
     if (captureSize != _size) {
@@ -133,10 +133,10 @@ void FilterStack::execute(glm::ivec2 captureSize, std::function<void()> renderFu
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    blit(colorTexDst, _depthTex);
+    blit(captureSize, displaySize, colorTexDst, _depthTex);
 }
 
-void FilterStack::blit(GLuint colorTex, GLuint depthTex)
+void FilterStack::blit(ivec2 captureSize, ivec2 displaySize, GLuint colorTex, GLuint depthTex)
 {
     CHECK_GL_ERROR("FilterStack::blit - Start");
 
@@ -148,8 +148,8 @@ void FilterStack::blit(GLuint colorTex, GLuint depthTex)
     glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, _fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER_EXT, 0);
     glBlitFramebuffer(
-        0, 0, _size.x, _size.y,
-        0, 0, _size.x, _size.y,
+        0, 0, captureSize.x, captureSize.y,
+        0, 0, displaySize.x, displaySize.y,
         GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
         GL_NEAREST);
 
@@ -167,7 +167,7 @@ void FilterStack::destroyAttachments()
     _colorTexSrc = _colorTexDst = _depthTex = 0;
 }
 
-void FilterStack::createAttachments(glm::ivec2 size)
+void FilterStack::createAttachments(ivec2 size)
 {
     destroyAttachments();
 
