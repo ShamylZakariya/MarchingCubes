@@ -119,15 +119,18 @@ void main()
     // float distanceContribution = smoothstep(0, uFarRenderDistance, sceneDepth);
     // sceneColor = mix(sceneColor, uAtmosphericTint.rgb, distanceContribution * uAtmosphericTint.a);
 
-
-    // appply ground fog to the scene color
-    float groundFogContribution = calcFogContribution(sceneDepth, rayDir);
-    sceneColor = mix(sceneColor, uGroundFogPlaneColor.rgb, uGroundFogPlaneColor.a * groundFogContribution);
-
     // prevent "popping" by fading in from skybox color to scene color
     float distanceFogContribution = smoothstep(uNearRenderDistance, uFarRenderDistance, sceneDepth);
     sceneColor = mix(sceneColor, skyboxColor, distanceFogContribution);
 
+    // appply ground fog to the scene color
+    float groundFogContribution = calcFogContribution(sceneDepth, rayDir);
+    float rayHorizonContribution = 1-abs(rayDir.y);
+    float localDistanceFogColorMix = distanceFogContribution * rayHorizonContribution;
+    vec3 groundFogColor = mix(uGroundFogPlaneColor.rgb, skyboxColor, localDistanceFogColorMix);
+    float groundFogAlpha = mix(uGroundFogPlaneColor.a, 1, localDistanceFogColorMix);
+
+    sceneColor = mix(sceneColor, groundFogColor.rgb, groundFogAlpha * groundFogContribution);
 
     fragColor = vec4(sceneColor, 1);
 }
