@@ -137,12 +137,14 @@ private:
 
 class AtmosphereFilter : public post_processing::Filter {
 public:
-    AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef skybox)
+    AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef skybox, mc::util::TextureHandleRef noise)
         : Filter(name)
         , _skybox(skybox)
+        , _noise(noise)
     {
         _program = mc::util::CreateProgramFromFile("shaders/gl/postprocessing/atmosphere.glsl");
 
+        _uNoiseSampler = glGetUniformLocation(_program, "uNoiseSampler");
         _uColorSampler = glGetUniformLocation(_program, "uColorSampler");
         _uDepthSampler = glGetUniformLocation(_program, "uDepthSampler");
         _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
@@ -157,7 +159,7 @@ public:
         _uAtmosphericTint = glGetUniformLocation(_program, "uAtmosphericTint");
 
         _uGroundFogPlaneY = glGetUniformLocation(_program, "uGroundFogPlaneY");
-        _uGroundFogDistanceUntilOpaque = glGetUniformLocation(_program, "uGroundFogDistanceUntilOpaque");
+        _uGroundFogPlaneDensityIncreasePerMeter = glGetUniformLocation(_program, "uGroundFogPlaneDensityIncreasePerMeter");
         _uGroundFogPlaneColor = glGetUniformLocation(_program, "uGroundFogPlaneColor");
     }
 
@@ -181,9 +183,10 @@ public:
         _atmosphericTint = color;
     }
 
-    void setGroundPlane(float groundPlaneY, float distanceUntilOpaque, glm::vec4 color) {
-        _groundFogPlaneY = groundPlaneY;
-        _groundFogDistanceUntilOpaque = distanceUntilOpaque;
+    void setGroundFog(float yTop, float densityIncreasePerMeter, glm::vec4 color)
+    {
+        _groundFogPlaneY = yTop;
+        _groundFogPlaneDensityIncreasePerMeter = densityIncreasePerMeter;
         _groundFogPlaneColor = color;
     }
 
@@ -197,6 +200,8 @@ protected:
         glBindTexture(GL_TEXTURE_2D, depthTex);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_CUBE_MAP, _skybox->id());
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, _noise->id());
 
         glUseProgram(_program);
 
@@ -208,6 +213,7 @@ protected:
         glUniform1i(_uColorSampler, 0);
         glUniform1i(_uDepthSampler, 1);
         glUniform1i(_uSkyboxSampler, 2);
+        glUniform1i(_uNoiseSampler, 3);
         glUniform1f(_uNearRenderDistance, _nearRenderDistance);
         glUniform1f(_uFarRenderDistance, _farRenderDistance);
         glUniform1f(_uNearPlane, _nearPlane);
@@ -216,7 +222,7 @@ protected:
         CHECK_GL_ERROR("_render 3");
 
         glUniform1f(_uGroundFogPlaneY, _groundFogPlaneY);
-        glUniform1f(_uGroundFogDistanceUntilOpaque, _groundFogDistanceUntilOpaque);
+        glUniform1f(_uGroundFogPlaneDensityIncreasePerMeter, _groundFogPlaneDensityIncreasePerMeter);
         glUniform4fv(_uGroundFogPlaneColor, 1, glm::value_ptr(_groundFogPlaneColor));
         CHECK_GL_ERROR("_render 4");
 
@@ -230,6 +236,7 @@ private:
     GLuint _program = 0;
 
     // TODO: Transition to Uniform Buffer Object to make this one struct
+    GLint _uNoiseSampler = -1;
     GLint _uColorSampler = -1;
     GLint _uDepthSampler = -1;
     GLint _uSkyboxSampler = -1;
@@ -241,11 +248,12 @@ private:
     GLint _uFarPlane = -1;
     GLint _uAtmosphericTint = -1;
     GLint _uGroundFogPlaneY = -1;
-    GLint _uGroundFogDistanceUntilOpaque = -1;
+    GLint _uGroundFogPlaneDensityIncreasePerMeter = -1;
     GLint _uGroundFogPlaneColor = -1;
     GLint _uCameraPosition;
 
     mc::util::TextureHandleRef _skybox;
+    mc::util::TextureHandleRef _noise;
     glm::mat4 _projection;
     glm::mat4 _view;
     glm::vec3 _cameraPosition;
@@ -255,7 +263,7 @@ private:
     float _farRenderDistance = 0;
     glm::vec4 _atmosphericTint;
     float _groundFogPlaneY = 0;
-    float _groundFogDistanceUntilOpaque = 0;
+    float _groundFogPlaneDensityIncreasePerMeter = 0;
     glm::vec4 _groundFogPlaneColor { 1, 1, 1, 0.5 };
 };
 

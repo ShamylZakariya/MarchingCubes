@@ -45,7 +45,7 @@ namespace detail {
 // Filter
 //
 
-void Filter::_execute(const ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
+void Filter::_execute(const ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad)
 {
     if (_clearsColorBuffer) {
         glClearColor(_clearColor.r, _clearColor.g, _clearColor.b, _clearColor.a);

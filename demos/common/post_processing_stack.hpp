@@ -67,10 +67,10 @@ protected:
     virtual void _update(double time) { }
 
     /// Called by FilterStack to prepare render state; you should most-likely implement _render() and leave this alone
-    virtual void _execute(const glm::ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad);
+    virtual void _execute(const glm::ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad);
 
     /// Perform your filtered render using input as your source texture data.
-    virtual void _render(const glm::ivec2 &size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad) = 0;
+    virtual void _render(const glm::ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<detail::VertexP2T2>& clipspaceQuad) = 0;
 
 private:
     friend class FilterStack;
@@ -87,7 +87,7 @@ public:
     FilterStack();
     ~FilterStack();
 
-    template<class T>
+    template <class T>
     mc::util::unowned_ptr<T> push(std::unique_ptr<T>&& filter)
     {
         auto ptr = filter.get();
@@ -157,7 +157,8 @@ public:
 
     /// Capture the render output of renderFunc, execute the installed filters,
     /// and then draw the result to the active framebuffer
-    void execute(glm::ivec2 captureSize, std::function<void()> renderFunc) {
+    void execute(glm::ivec2 captureSize, std::function<void()> renderFunc)
+    {
         execute(captureSize, captureSize, renderFunc);
     }
 

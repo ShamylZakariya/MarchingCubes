@@ -53,6 +53,9 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr double UI_SCALE = 1.5;
 
+constexpr int PIXEL_SCALE = 1;
+constexpr bool PALETTIZE = false;
+
 //
 // App
 //
@@ -126,15 +129,15 @@ public:
     }
 
 private:
-
-    bool isRunning() {
+    bool isRunning()
+    {
         if (_running && !glfwWindowShouldClose(_window)) {
             return true;
         }
 
         // looks like we should terminate; but check first that
         // we don't have any active march jobs running
-        for (const auto &seg : _segments) {
+        for (const auto& seg : _segments) {
             if (seg->isWorking()) {
                 return true;
             }
@@ -277,21 +280,21 @@ private:
         //
 
         _postProcessingFilters = std::make_unique<post_processing::FilterStack>();
-        _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture));
+
+        const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png");
+        _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setAlpha(1);
-        _atmosphere->setAtmosphericTint(vec4(1,0,1,1));
-        _atmosphere->setGroundPlane(16, 80, vec4(0.7,0.72,0.74,0.5));
+        _atmosphere->setAtmosphericTint(vec4(1, 0.85, 1, 1));
+        _atmosphere->setGroundFog(30, 0.00025, vec4(1, 0.63, 0.46, 1));
 
-        // auto palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
-        //     "Palettizer",
-        //     ivec3(32,32,32),
-        //     PalettizeFilter::ColorSpace::YUV));
-        // palettizer->setAlpha(1);
-
-        // auto pixelate = _postProcessingFilters->push(std::make_unique<PixelateFilter>("Pixelator", 4));
-        // pixelate->setAlpha(1);
-
+        if (PALETTIZE) {
+            auto palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
+                "Palettizer",
+                ivec3(32, 32, 32),
+                PalettizeFilter::ColorSpace::YUV));
+            palettizer->setAlpha(1);
+        }
 
         //
         // build a volume
@@ -327,10 +330,9 @@ private:
             updateCamera(0);
         } else {
             auto pos = vec3(center.x, size.y * 0.2F, 0);
-            auto lookTarget = pos + vec3(0,0,1);
+            auto lookTarget = pos + vec3(0, 0, 1);
             _camera.lookAt(pos, lookTarget);
         }
-
     }
 
     void onResize(int width, int height)
@@ -396,7 +398,7 @@ private:
 
         _atmosphere->setCameraState(_camera.position, projection, view, NEAR_PLANE, FAR_PLANE);
 
-        _postProcessingFilters->execute(_contextSize, _contextSize, [=]() {
+        _postProcessingFilters->execute(_contextSize / PIXEL_SCALE, _contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // draw volumes
@@ -414,7 +416,7 @@ private:
             }
         });
 
-        glViewport(0,0,_contextSize.x, _contextSize.y);
+        glViewport(0, 0, _contextSize.x, _contextSize.y);
 
         glEnable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);

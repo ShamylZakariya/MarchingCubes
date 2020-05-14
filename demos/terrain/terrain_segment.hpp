@@ -247,15 +247,13 @@ public:
 
     int getIdx() const { return _idx; }
     mc::util::unowned_ptr<mc::OctreeVolume> getVolume() const { return _volume.get(); }
-    const std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> &getGeometry() const { return _triangles; }
-    const std::vector<vec3> &getWaypoints() const { return _waypoints; }
-    mc::util::LineSegmentBuffer &getAabbLineBuffer() { return _aabbLineBuffer; }
-    mc::util::LineSegmentBuffer &getBoundingLineBuffer() { return _boundingLineBuffer; }
-    mc::util::LineSegmentBuffer &getWaypointLineBuffer() { return _waypointLineBuffer; }
+    const std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>>& getGeometry() const { return _triangles; }
+    const std::vector<vec3>& getWaypoints() const { return _waypoints; }
+    mc::util::LineSegmentBuffer& getAabbLineBuffer() { return _aabbLineBuffer; }
+    mc::util::LineSegmentBuffer& getBoundingLineBuffer() { return _boundingLineBuffer; }
+    mc::util::LineSegmentBuffer& getWaypointLineBuffer() { return _waypointLineBuffer; }
     double getLastMarchDurationSeconds() const { return _lastMarchDurationSeconds; }
     int getTriangleCount() const { return _triangleCount; }
-
-
 
 private:
     const float kMaxTerrainHeight = 8.0F;
