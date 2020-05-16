@@ -86,7 +86,7 @@ float calcFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 ray
     float distanceToTop = rayPlaneDistance(fogPlaneTopOrigin, fogPlaneNormal, uCameraPosition, rayDir);
 
     float rayStartDensity = 0;
-    float rayEndDensity = 0;
+    float rayEndDensity = uGroundFogPlaneDensityIncreasePerMeter * max((uGroundFogPlaneY - fragmentWorldPosition.y), 0.0);
     float rayTraversalDistance = 0;
 
     // we know the fog plane is horizontal so we can test if camera is in the fog volume
@@ -96,10 +96,10 @@ float calcFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 ray
         // camera above the fog halfspace
         if (rayDir.y >= 0) {
             // ray looking up, will never intersect the fog volume
+            rayEndDensity = 0;
         } else {
             // ray looking down, transits through fog volume top
             rayTraversalDistance = sceneDepth - distanceToTop;
-            rayEndDensity = uGroundFogPlaneDensityIncreasePerMeter * max((uGroundFogPlaneY - fragmentWorldPosition.y), 0.0);
         }
     } else {
         // camera inside the fog halfspace
@@ -107,15 +107,14 @@ float calcFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 ray
         if (rayDir.y > 0) {
             // ray looking up, will intersect fog plane
             rayTraversalDistance = min(sceneDepth, distanceToTop);
-            rayEndDensity = uGroundFogPlaneDensityIncreasePerMeter * max((uGroundFogPlaneY - fragmentWorldPosition.y), 0.0);
         } else {
             // ray looking down, will never intersect fog plane
             rayTraversalDistance = sceneDepth;
-            rayEndDensity = uGroundFogPlaneDensityIncreasePerMeter * max((uGroundFogPlaneY - fragmentWorldPosition.y), 0.0);
         }
     }
 
-    return clamp(0.5 * rayTraversalDistance * (rayEndDensity + rayStartDensity), 0.0, 1.0);
+    float c = (0.5 * rayTraversalDistance * (rayEndDensity - rayStartDensity)) + (rayTraversalDistance * rayStartDensity);
+    return clamp(c, 0.0, 1.0);
 }
 
 void main()
