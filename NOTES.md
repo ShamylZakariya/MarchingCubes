@@ -1,4 +1,4 @@
-# POST PROCESSING
+# Post Processing
 - look into a raymarched cloud/fog https://www.shadertoy.com/view/Msf3zX
     - start with a static fog plane, this will help me learn the basics... just needs two plane equations, upper and lower bounds. Trace ray in worldspace through these two planes.
     - drop the "fade in" in terrain.glsl and do that in the atmosphere shader
@@ -9,7 +9,14 @@
     - color grades/paletizes
     - renders raymarched clouds
 
-- for the ffect to look more legit i need to palettize texture sampling too... need to use nearest interpolation, palettize colors, etc.
+- for the low-fi effect to look more legit i need to palettize texture sampling too... need to use nearest interpolation, palettize colors, etc.
 
-# ROUND WORLD
+# Round World
 Implement an animal crossing-style spherical world. Easily done in terain.glsl shader. Does of course break the fog "plane" post-processing shader, since that will have to become a fog sphere.
+
+# Volumetric Noise-based Fog
+This is going to be expensive, so I will need some way to work on a downsampled depth channel, and then linearly upscale the computed fog.
+
+We have a distance color and a near color. So should fog march backwards, from back to front?
+
+Make the simple approach first (no downscaling) verify it works and looks decent. Then worry about how to get performance.
