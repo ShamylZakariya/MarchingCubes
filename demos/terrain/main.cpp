@@ -93,6 +93,7 @@ public:
 
         // enter run loop
         double lastTime = glfwGetTime();
+        _elapsedFrameTime = 0;
         while (isRunning()) {
             glfwPollEvents();
 
@@ -102,9 +103,9 @@ public:
             // compute time delta and step simulation
             double now = glfwGetTime();
             double elapsed = now - lastTime;
+            _elapsedFrameTime += elapsed;
             lastTime = now;
             step(static_cast<float>(now), static_cast<float>(elapsed));
-            _elapsedFrameTime = (_elapsedFrameTime + elapsed) / 2;
 
             // draw scene
             drawFrame();
@@ -120,6 +121,13 @@ public:
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             glfwSwapBuffers(_window);
+
+            _framesRendered++;
+            if (_framesRendered >= 60) {
+                _currentFps = _framesRendered / _elapsedFrameTime;
+                _framesRendered = 0;
+                _elapsedFrameTime = 0;
+            }
         }
 
         // shutdown imgui
@@ -455,8 +463,7 @@ private:
     {
         ImGui::Begin("Demo window");
 
-        float fps = _elapsedFrameTime > 0 ? static_cast<float>(1 / _elapsedFrameTime) : 0;
-        ImGui::LabelText("FPS", "%03.0f", fps);
+        ImGui::LabelText("FPS", "%03.0f", _currentFps);
         ImGui::LabelText("triangles", "%d", triangleCount());
 
         double avgMarchDuration = 0;
@@ -607,6 +614,8 @@ private:
     // app state
     GLFWwindow* _window;
     double _elapsedFrameTime = 0;
+    int _framesRendered = 0;
+    double _currentFps = 0;
     bool _running = false;
     ivec2 _contextSize { WIDTH, HEIGHT };
 
