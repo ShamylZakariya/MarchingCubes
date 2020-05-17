@@ -90,11 +90,10 @@ vec3 getFragmentWorldPosition()
 
 vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDir, vec3 skyboxColor)
 {
-    // march backwards from distant to close
-    float dist = uFarRenderDistance;
-    //float dist = min(uFarRenderDistance, sceneDepth);
+    // March the volume defined by noises(), from back to front
 
-
+    float dist = min(uFarRenderDistance, sceneDepth);
+    float density = dist / uFarRenderDistance;
     vec3 marchPosition = uCameraPosition + rayDir * dist;
     int steps = 30;
     vec3 marchDir = uCameraPosition - marchPosition;
@@ -111,6 +110,7 @@ vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDi
             float c = noises(samplePosition * 0.00025);
             c = (c + 1) * 0.5; // remap from [-1,1] to [0,1]
             c = smoothstep(0.35, 1, c);
+            c *= density;
 
             // fade out as it approaches the fog plane top
             float dy = clamp((uGroundFogMaxY - samplePosition.y) / uGroundFogMaxY, 0, 1);
@@ -137,27 +137,11 @@ void main()
     vec3 fragmentWorldPosition = getFragmentWorldPosition();
     float sceneDepth = distance(uCameraPosition, fragmentWorldPosition);
 
-
-    vec4 fog = getFogContribution(sceneDepth, fragmentWorldPosition, rayDir, skyboxColor);
-
-    // // apply distance-based atmospheric tint
-    // float distanceContribution = smoothstep(0, uFarRenderDistance, sceneDepth);
-    // vec3 groundFogColor = mix(uGroundFogColor.rgb, uDistanceFogColor.rgb, distanceContribution * uDistanceFogColor.a);
-
     // prevent "popping" by fading in from skybox color to scene color
     float distanceFogContribution = smoothstep(uNearRenderDistance, uFarRenderDistance, sceneDepth);
     sceneColor = mix(sceneColor, skyboxColor, distanceFogContribution);
 
+    vec4 fog = getFogContribution(sceneDepth, fragmentWorldPosition, rayDir, skyboxColor);
     sceneColor = mix(sceneColor, fog.rgb, fog.a);
     fragColor = vec4(sceneColor, 1);
-
-    // // appply ground fog to the scene color
-    // float groundFogContribution = getFogPlaneContribution(sceneDepth, fragmentWorldPosition, rayDir);
-    // float rayHorizonContribution = 1 - abs(rayDir.y);
-    // float localDistanceFogColorMix = distanceFogContribution * rayHorizonContribution;
-    // groundFogColor = mix(groundFogColor, skyboxColor, localDistanceFogColorMix);
-    // float groundFogAlpha = mix(uGroundFogColor.a, 1, localDistanceFogColorMix);
-
-    // sceneColor = mix(sceneColor, groundFogColor.rgb, groundFogAlpha * groundFogContribution);
-    // fragColor = vec4(sceneColor, 1);
 }
