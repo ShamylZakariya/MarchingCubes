@@ -294,7 +294,8 @@ private:
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setAlpha(1);
         _atmosphere->setAtmosphericTint(vec4(1, 0.85, 1, 1));
-        _atmosphere->setGroundFog(30, 0.00025, vec4(1, 0.63, 0.46, 1));
+        //_atmosphere->setGroundFog(30, 0.00025, vec4(1, 0.63, 0.46, 1));
+        _atmosphere->setGroundFog(30, 0.00025, vec4(0.9, 0.9, 0.92, 0.25));
 
         if (PALETTIZE) {
             auto palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
@@ -395,6 +396,7 @@ private:
 
     void step(float now, float deltaT)
     {
+        _postProcessingFilters->update(deltaT);
         updateScroll(deltaT);
         updateCamera(deltaT);
     }

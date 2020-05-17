@@ -161,6 +161,7 @@ public:
         _uGroundFogPlaneY = glGetUniformLocation(_program, "uGroundFogPlaneY");
         _uGroundFogPlaneDensityIncreasePerMeter = glGetUniformLocation(_program, "uGroundFogPlaneDensityIncreasePerMeter");
         _uGroundFogPlaneColor = glGetUniformLocation(_program, "uGroundFogPlaneColor");
+        _uFogWorldOffset = glGetUniformLocation(_program, "uFogWorldOffset");
     }
 
     void setCameraState(const glm::vec3 position, const glm::mat4& projection, const glm::mat4& view, float nearPlane, float farPlane)
@@ -191,6 +192,11 @@ public:
     }
 
 protected:
+    void _update(double time) override
+    {
+        _fogWorldOffset += time * glm::vec3(50,0,20);
+    }
+
     void _render(const glm::ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<post_processing::detail::VertexP2T2>& clipspaceQuad) override
     {
         CHECK_GL_ERROR("_render START");
@@ -224,6 +230,7 @@ protected:
         glUniform1f(_uGroundFogPlaneY, _groundFogPlaneY);
         glUniform1f(_uGroundFogPlaneDensityIncreasePerMeter, _groundFogPlaneDensityIncreasePerMeter);
         glUniform4fv(_uGroundFogPlaneColor, 1, glm::value_ptr(_groundFogPlaneColor));
+        glUniform3fv(_uFogWorldOffset, 1, glm::value_ptr(_fogWorldOffset));
         CHECK_GL_ERROR("_render 4");
 
         clipspaceQuad.draw();
@@ -250,7 +257,8 @@ private:
     GLint _uGroundFogPlaneY = -1;
     GLint _uGroundFogPlaneDensityIncreasePerMeter = -1;
     GLint _uGroundFogPlaneColor = -1;
-    GLint _uCameraPosition;
+    GLint _uCameraPosition = -1;
+    GLint _uFogWorldOffset = -1;
 
     mc::util::TextureHandleRef _skybox;
     mc::util::TextureHandleRef _noise;
@@ -265,6 +273,7 @@ private:
     float _groundFogPlaneY = 0;
     float _groundFogPlaneDensityIncreasePerMeter = 0;
     glm::vec4 _groundFogPlaneColor { 1, 1, 1, 0.5 };
+    glm::vec3 _fogWorldOffset;
 };
 
 #endif
