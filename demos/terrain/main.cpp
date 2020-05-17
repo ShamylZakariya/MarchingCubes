@@ -292,10 +292,9 @@ private:
         const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png");
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
+        _atmosphere->setFog(30, vec4(0.9, 0.9, 0.92, 0.5));
+        _atmosphere->setFogWindSpeed(vec3(20, 0, 5));
         _atmosphere->setAlpha(1);
-        _atmosphere->setAtmosphericTint(vec4(1, 0.85, 1, 1));
-        //_atmosphere->setGroundFog(30, 0.00025, vec4(1, 0.63, 0.46, 1));
-        _atmosphere->setGroundFog(30, 0.00025, vec4(0.9, 0.9, 0.92, 0.25));
 
         if (PALETTIZE) {
             auto palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
