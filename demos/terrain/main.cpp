@@ -45,7 +45,7 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = false;
+constexpr bool AUTOPILOT = true;
 constexpr int WIDTH = 1440;
 constexpr int HEIGHT = 1100;
 constexpr float NEAR_PLANE = 0.1f;

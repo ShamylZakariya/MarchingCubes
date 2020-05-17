@@ -1,7 +1,7 @@
 # MarchingCubes
 Just a simple marching cubes experiment
 
-![example animation](example.gif)
+![example animation](README_assets/terrain.gif)
 
 ## Linux
 
