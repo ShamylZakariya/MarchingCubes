@@ -15,7 +15,11 @@ sudo apt-get install libepoxy-dev libglfw3-dev libglm-dev
 
 The VSCode project depends on meson building into `build`
 ```bash
+# manually
 CC=clang CXX=clang++ meson setup --layout flat build
+
+# or alternately
+./setup.sh
 ```
 
 Then you can open the project in VSCode
