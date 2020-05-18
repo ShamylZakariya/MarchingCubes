@@ -60,9 +60,6 @@ void TerrainChunk::build(int idx)
         tc->clear();
     }
 
-    _waypoints.clear();
-    _waypointLineBuffer.clear();
-
     const auto segmentColor = rainbow(static_cast<float>(idx % 5) / 5.0F);
 
     //
@@ -118,19 +115,6 @@ void TerrainChunk::build(int idx)
         arch.material = kArchMaterial;
 
         _volume->add(std::make_unique<Tube>(arch));
-
-        vec3 waypoint = arch.axisOrigin + arch.axisPerp * arch.innerRadius * rng.nextFloat(0.2F, 0.8F);
-        waypoint.y = std::max(waypoint.y, kMaxTerrainHeight + 2);
-        _waypoints.push_back(waypoint);
-        _waypointLineBuffer.addMarker(waypoint, 4, segmentColor);
-    }
-
-    // all segments have to have at least 1 waypoint; if the dice roll
-    // didn't give us any arches, make a default waypoint
-    if (_waypoints.empty()) {
-        vec3 waypoint = vec3(center.x, kMaxTerrainHeight + rng.nextFloat(10), center.z);
-        _waypoints.push_back(waypoint);
-        _waypointLineBuffer.addMarker(waypoint, 4, vec4(1, 1, 0, 1));
     }
 
     //

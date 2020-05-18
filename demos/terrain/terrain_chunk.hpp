@@ -65,10 +65,8 @@ public:
     int getIdx() const { return _idx; }
     mc::util::unowned_ptr<mc::OctreeVolume> getVolume() const { return _volume.get(); }
     const std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>>& getGeometry() const { return _triangles; }
-    const std::vector<glm::vec3>& getWaypoints() const { return _waypoints; }
     mc::util::LineSegmentBuffer& getAabbLineBuffer() { return _aabbLineBuffer; }
     mc::util::LineSegmentBuffer& getBoundingLineBuffer() { return _boundingLineBuffer; }
-    mc::util::LineSegmentBuffer& getWaypointLineBuffer() { return _waypointLineBuffer; }
     double getLastMarchDurationSeconds() const { return _lastMarchDurationSeconds; }
     int getTriangleCount() const { return _triangleCount; }
 
@@ -85,8 +83,6 @@ private:
     std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangles;
     mc::util::LineSegmentBuffer _aabbLineBuffer;
     mc::util::LineSegmentBuffer _boundingLineBuffer;
-    mc::util::LineSegmentBuffer _waypointLineBuffer;
-    std::vector<glm::vec3> _waypoints;
     std::vector<float> _heightmap;
     double _lastMarchDurationSeconds = 0;
     bool _isUpdatingHeightmap = false;

@@ -44,7 +44,6 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr bool AUTOPILOT = true;
 constexpr int WIDTH = 1440;
 constexpr int HEIGHT = 1100;
 constexpr float NEAR_PLANE = 0.1f;
@@ -330,16 +329,9 @@ private:
         const auto size = vec3(_chunks.front()->getVolume()->size());
         const auto center = size / 2.0F;
 
-        _lastWaypoint = vec3 { center.x, center.y, 0 };
-        _nextWaypoint = _chunks.front()->getWaypoints().front();
-
-        if (AUTOPILOT) {
-            updateCamera(0);
-        } else {
-            auto pos = vec3(center.x, size.y * 0.2F, 0);
-            auto lookTarget = pos + vec3(0, 0, 1);
-            _camera.lookAt(pos, lookTarget);
-        }
+        auto pos = vec3(center.x, size.y * 0.2F, 0);
+        auto lookTarget = pos + vec3(0, 0, 1);
+        _camera.lookAt(pos, lookTarget);
     }
 
     void onResize(int width, int height)
@@ -354,9 +346,6 @@ private:
         if (scancode == glfwGetKeyScancode(GLFW_KEY_ESCAPE)) {
             _running = false;
         }
-        if (scancode == glfwGetKeyScancode(GLFW_KEY_SPACE)) {
-            _scrolling = !_scrolling;
-        }
     }
 
     void onKeyRelease(int key, int scancode, int mods)
@@ -365,7 +354,7 @@ private:
 
     void onMouseMove(const vec2& pos, const vec2& delta)
     {
-        if (_mouseButtonState[0] && !AUTOPILOT) {
+        if (_mouseButtonState[0]) {
             // simple x/y trackball
             float trackballSpeed = 0.004F * pi<float>();
             float deltaPitch = -delta.y * trackballSpeed;
@@ -395,7 +384,6 @@ private:
     void step(float now, float deltaT)
     {
         _postProcessingFilters->update(deltaT);
-        updateScroll(deltaT);
         updateCamera(deltaT);
     }
 
@@ -434,12 +422,8 @@ private:
         _lineMaterial->bind(projection * view * mat4 { 1 });
         _axisMarker.draw();
 
-        if (!AUTOPILOT) {
-            _autopilotCameraAxis.draw();
-        }
-
         // draw optional markers, aabbs, etc
-        if (_drawOctreeAABBs || _drawWaypoints || _drawSegmentBounds) {
+        if (_drawOctreeAABBs || _drawSegmentBounds) {
             for (size_t i = 0, N = _chunks.size(); i < N; i++) {
                 const auto& segment = _chunks[i];
                 const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
@@ -449,9 +433,6 @@ private:
                 }
                 if (_drawOctreeAABBs) {
                     segment->getAabbLineBuffer().draw();
-                }
-                if (_drawWaypoints) {
-                    segment->getWaypointLineBuffer().draw();
                 }
             }
         }
@@ -475,126 +456,55 @@ private:
 
         ImGui::Separator();
         ImGui::Checkbox("Draw AABBs", &_drawOctreeAABBs);
-        ImGui::Checkbox("Draw Waypoints", &_drawWaypoints);
         ImGui::Checkbox("Draw Segment Bounds", &_drawSegmentBounds);
 
         ImGui::End();
     }
 
-    void updateScroll(float deltaT)
-    {
-        const float scrollDelta = _scrolling || isKeyDown(GLFW_KEY_RIGHT_BRACKET)
-            ? 100 * deltaT
-            : 0;
-
-        _distanceAlongZ += scrollDelta;
-
-        if (_distanceAlongZ > _segmentSizeZ) {
-            _distanceAlongZ -= _segmentSizeZ;
-
-            // we moved forward enough to hide first segment,
-            // it can be repurposed. pop front segment, generate
-            // a new end segment, and push it back
-
-            auto seg = std::move(_chunks.front());
-            _chunks.pop_front();
-
-            seg->build(_chunks.back()->getIdx() + 1);
-            seg->march();
-
-            _chunks.push_back(std::move(seg));
-        }
-
-        _lastWaypoint.z -= scrollDelta;
-        _nextWaypoint.z -= scrollDelta;
-
-        if (_nextWaypoint.z <= 0) {
-            _lastWaypoint = _nextWaypoint;
-
-            // find the next waypoint
-            for (size_t i = 0, N = _chunks.size(); i < N; i++) {
-                bool found = false;
-                float dz = (i * _segmentSizeZ) - _distanceAlongZ;
-                const auto& segment = _chunks[i];
-                for (const auto& waypoint : segment->getWaypoints()) {
-                    auto waypointWorld = vec3(waypoint.x, waypoint.y, waypoint.z + dz);
-                    if (waypointWorld.z > 0) {
-                        _nextWaypoint = waypointWorld;
-                        found = true;
-                        break;
-                    }
-                }
-                if (found) {
-                    break;
-                }
-            }
-        }
-    }
-
     void updateCamera(float deltaT)
     {
-        float t = (0 - _lastWaypoint.z) / (_nextWaypoint.z - _lastWaypoint.z);
-        vec3 autoPilotPosition = mix(_lastWaypoint, _nextWaypoint, t);
+        // WASD
+        const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
+        const float lookSpeed = radians<float>(90) * deltaT;
 
-        _autopilotPositionSpring.setTarget(autoPilotPosition);
-        _autopilotTargetSpring.setTarget(_nextWaypoint);
+        if (isKeyDown(GLFW_KEY_A)) {
+            _camera.moveBy(movementSpeed * vec3(+1, 0, 0));
+        }
 
-        autoPilotPosition = _autopilotPositionSpring.step(deltaT);
-        vec3 autoPilotTargetPosition = _autopilotTargetSpring.step(deltaT);
+        if (isKeyDown(GLFW_KEY_D)) {
+            _camera.moveBy(movementSpeed * vec3(-1, 0, 0));
+        }
 
-        if (AUTOPILOT) {
+        if (isKeyDown(GLFW_KEY_W)) {
+            _camera.moveBy(movementSpeed * vec3(0, 0, +1));
+        }
 
-            _camera.lookAt(autoPilotPosition, autoPilotTargetPosition);
+        if (isKeyDown(GLFW_KEY_S)) {
+            _camera.moveBy(movementSpeed * vec3(0, 0, -1));
+        }
 
-        } else {
+        if (isKeyDown(GLFW_KEY_Q)) {
+            _camera.moveBy(movementSpeed * vec3(0, -1, 0));
+        }
 
-            _autopilotCameraAxis.clear();
-            _autopilotCameraAxis.addMarker(autoPilotPosition, 6, vec4(1, 1, 1, 1));
-            _autopilotCameraAxis.addMarker(autoPilotTargetPosition, 6, vec4(1, 1, 0, 1));
+        if (isKeyDown(GLFW_KEY_E)) {
+            _camera.moveBy(movementSpeed * vec3(0, +1, 0));
+        }
 
-            // WASD
-            const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
-            const float lookSpeed = radians<float>(90) * deltaT;
+        if (isKeyDown(GLFW_KEY_UP)) {
+            _camera.rotateBy(0, +lookSpeed);
+        }
 
-            if (isKeyDown(GLFW_KEY_A)) {
-                _camera.moveBy(movementSpeed * vec3(+1, 0, 0));
-            }
+        if (isKeyDown(GLFW_KEY_DOWN)) {
+            _camera.rotateBy(0, -lookSpeed);
+        }
 
-            if (isKeyDown(GLFW_KEY_D)) {
-                _camera.moveBy(movementSpeed * vec3(-1, 0, 0));
-            }
+        if (isKeyDown(GLFW_KEY_LEFT)) {
+            _camera.rotateBy(-lookSpeed, 0);
+        }
 
-            if (isKeyDown(GLFW_KEY_W)) {
-                _camera.moveBy(movementSpeed * vec3(0, 0, +1));
-            }
-
-            if (isKeyDown(GLFW_KEY_S)) {
-                _camera.moveBy(movementSpeed * vec3(0, 0, -1));
-            }
-
-            if (isKeyDown(GLFW_KEY_Q)) {
-                _camera.moveBy(movementSpeed * vec3(0, -1, 0));
-            }
-
-            if (isKeyDown(GLFW_KEY_E)) {
-                _camera.moveBy(movementSpeed * vec3(0, +1, 0));
-            }
-
-            if (isKeyDown(GLFW_KEY_UP)) {
-                _camera.rotateBy(0, +lookSpeed);
-            }
-
-            if (isKeyDown(GLFW_KEY_DOWN)) {
-                _camera.rotateBy(0, -lookSpeed);
-            }
-
-            if (isKeyDown(GLFW_KEY_LEFT)) {
-                _camera.rotateBy(-lookSpeed, 0);
-            }
-
-            if (isKeyDown(GLFW_KEY_RIGHT)) {
-                _camera.rotateBy(+lookSpeed, 0);
-            }
+        if (isKeyDown(GLFW_KEY_RIGHT)) {
+            _camera.rotateBy(+lookSpeed, 0);
         }
     }
 
@@ -625,21 +535,17 @@ private:
     vec2 _lastMousePosition { -1 };
 
     // render state
+    float _aspect = 1;
+    Camera _camera;
     std::unique_ptr<TerrainMaterial> _terrainMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
     mc::util::LineSegmentBuffer _axisMarker;
-    mc::util::LineSegmentBuffer _autopilotCameraAxis;
-    float _aspect = 1;
-    mc::util::unowned_ptr<AtmosphereFilter> _atmosphere;
-
-    Camera _camera;
     std::unique_ptr<post_processing::FilterStack> _postProcessingFilters;
+    mc::util::unowned_ptr<AtmosphereFilter> _atmosphere;
 
     // user input state
     bool _drawOctreeAABBs = false;
-    bool _drawWaypoints = !AUTOPILOT;
     bool _drawSegmentBounds = true;
-    bool _scrolling = AUTOPILOT;
 
     // demo state
     std::shared_ptr<mc::util::ThreadPool> _threadPool;
@@ -647,9 +553,6 @@ private:
     int _segmentSizeZ = 0;
     std::deque<std::unique_ptr<TerrainChunk>> _chunks;
     FastNoise _fastNoise;
-    vec3 _lastWaypoint, _nextWaypoint;
-    spring3 _autopilotPositionSpring { 5, 40, 20 };
-    spring3 _autopilotTargetSpring { 5, 20, 10 };
 };
 
 //
