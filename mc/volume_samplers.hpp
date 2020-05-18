@@ -22,7 +22,7 @@ namespace volume_samplers_helpers {
     that the volume defined by vertices is a rectangular prism. It may not be
     strictly necessary, but it's only been tested as such.
     */
-    IVolumeSampler::AABBIntersection
+    inline IVolumeSampler::AABBIntersection
     boundedPlaneIntersection(
         glm::vec3 origin,
         glm::vec3 normal,
@@ -66,7 +66,7 @@ namespace volume_samplers_helpers {
     defined by the negative side of two planes. This is like boundedPlaneIntersection
     but allows for two planes with different normals
     */
-    IVolumeSampler::AABBIntersection
+    inline IVolumeSampler::AABBIntersection
     boundedSpaceIntersection(
         glm::vec3 frontFaceOrigin,
         glm::vec3 frontFaceNormal,
@@ -107,7 +107,7 @@ namespace volume_samplers_helpers {
         }
     }
 
-    IVolumeSampler::AABBIntersection
+    inline IVolumeSampler::AABBIntersection
     boundedPlaneIntersection(
         glm::vec3 origin,
         glm::vec3 normal,

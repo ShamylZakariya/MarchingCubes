@@ -20,3 +20,7 @@ This is going to be expensive, so I will need some way to work on a downsampled 
 We have a distance color and a near color. So should fog march backwards, from back to front?
 
 Make the simple approach first (no downscaling) verify it works and looks decent. Then worry about how to get performance.
+
+# Continous Terrain
+- 3x3 (or 5x5) grid, with viewer always in center patch
+- on transit across path boundaries, recycle the old patches into new positions, with a unique id based on grid position to seed the rng

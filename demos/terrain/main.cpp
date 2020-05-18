@@ -23,16 +23,15 @@
 
 #include <mc/util/op_queue.hpp>
 #include <mc/util/util.hpp>
-#include <mc/volume.hpp>
-#include <mc/volume_samplers.hpp>
 
 #include "../common/cubemap_blur.hpp"
 #include "../common/post_processing_stack.hpp"
 #include "FastNoise.h"
 #include "camera.hpp"
 #include "filters.hpp"
+#include "materials.hpp"
 #include "spring.hpp"
-#include "terrain_segment.hpp"
+#include "terrain_chunk.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -53,8 +52,8 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr double UI_SCALE = 1.5;
 
-constexpr int PIXEL_SCALE = 1;
-constexpr bool PALETTIZE = false;
+constexpr int PIXEL_SCALE = 8;
+constexpr bool PALETTIZE = true;
 
 //
 // App
@@ -145,7 +144,7 @@ private:
 
         // looks like we should terminate; but check first that
         // we don't have any active march jobs running
-        for (const auto& seg : _segments) {
+        for (const auto& seg : _chunks) {
             if (seg->isWorking()) {
                 return true;
             }
@@ -292,7 +291,7 @@ private:
         const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png");
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
-        _atmosphere->setFog(30, vec4(0.9, 0.9, 0.92, 0.5));
+        _atmosphere->setFog(30, vec4(0.9, 0.9, 0.92, 0.75));
         _atmosphere->setFogWindSpeed(vec3(20, 0, 5));
         _atmosphere->setAlpha(1);
 
@@ -323,16 +322,16 @@ private:
 
         constexpr auto COUNT = 3;
         for (int i = 0; i < COUNT; i++) {
-            _segments.emplace_back(std::make_unique<TerrainSegment>(_segmentSizeZ, _threadPool, _fastNoise));
-            _segments.back()->build(i);
-            _segments.back()->march();
+            _chunks.emplace_back(std::make_unique<TerrainChunk>(_segmentSizeZ, _threadPool, _fastNoise));
+            _chunks.back()->build(i);
+            _chunks.back()->march();
         }
 
-        const auto size = vec3(_segments.front()->getVolume()->size());
+        const auto size = vec3(_chunks.front()->getVolume()->size());
         const auto center = size / 2.0F;
 
         _lastWaypoint = vec3 { center.x, center.y, 0 };
-        _nextWaypoint = _segments.front()->getWaypoints().front();
+        _nextWaypoint = _chunks.front()->getWaypoints().front();
 
         if (AUTOPILOT) {
             updateCamera(0);
@@ -415,8 +414,8 @@ private:
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
 
-            for (size_t i = 0, N = _segments.size(); i < N; i++) {
-                const auto& segment = _segments[i];
+            for (size_t i = 0, N = _chunks.size(); i < N; i++) {
+                const auto& segment = _chunks[i];
                 const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
                 _terrainMaterial->bind(model, view, projection, _camera.position);
                 for (auto& buffer : segment->getGeometry()) {
@@ -441,8 +440,8 @@ private:
 
         // draw optional markers, aabbs, etc
         if (_drawOctreeAABBs || _drawWaypoints || _drawSegmentBounds) {
-            for (size_t i = 0, N = _segments.size(); i < N; i++) {
-                const auto& segment = _segments[i];
+            for (size_t i = 0, N = _chunks.size(); i < N; i++) {
+                const auto& segment = _chunks[i];
                 const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
                 _lineMaterial->bind(projection * view * model);
                 if (_drawSegmentBounds) {
@@ -468,10 +467,10 @@ private:
         ImGui::LabelText("triangles", "%d", triangleCount());
 
         double avgMarchDuration = 0;
-        for (const auto& s : _segments) {
+        for (const auto& s : _chunks) {
             avgMarchDuration += s->getLastMarchDurationSeconds();
         }
-        avgMarchDuration /= _segments.size();
+        avgMarchDuration /= _chunks.size();
         ImGui::LabelText("march duration", "%.2fs", avgMarchDuration);
 
         ImGui::Separator();
@@ -497,13 +496,13 @@ private:
             // it can be repurposed. pop front segment, generate
             // a new end segment, and push it back
 
-            auto seg = std::move(_segments.front());
-            _segments.pop_front();
+            auto seg = std::move(_chunks.front());
+            _chunks.pop_front();
 
-            seg->build(_segments.back()->getIdx() + 1);
+            seg->build(_chunks.back()->getIdx() + 1);
             seg->march();
 
-            _segments.push_back(std::move(seg));
+            _chunks.push_back(std::move(seg));
         }
 
         _lastWaypoint.z -= scrollDelta;
@@ -513,10 +512,10 @@ private:
             _lastWaypoint = _nextWaypoint;
 
             // find the next waypoint
-            for (size_t i = 0, N = _segments.size(); i < N; i++) {
+            for (size_t i = 0, N = _chunks.size(); i < N; i++) {
                 bool found = false;
                 float dz = (i * _segmentSizeZ) - _distanceAlongZ;
-                const auto& segment = _segments[i];
+                const auto& segment = _chunks[i];
                 for (const auto& waypoint : segment->getWaypoints()) {
                     auto waypointWorld = vec3(waypoint.x, waypoint.y, waypoint.z + dz);
                     if (waypointWorld.z > 0) {
@@ -601,7 +600,7 @@ private:
 
     int triangleCount()
     {
-        return std::accumulate(_segments.begin(), _segments.end(), 0, [](int acc, const auto& seg) {
+        return std::accumulate(_chunks.begin(), _chunks.end(), 0, [](int acc, const auto& seg) {
             return acc + seg->getTriangleCount();
         });
     }
@@ -646,7 +645,7 @@ private:
     std::shared_ptr<mc::util::ThreadPool> _threadPool;
     float _distanceAlongZ = 0;
     int _segmentSizeZ = 0;
-    std::deque<std::unique_ptr<TerrainSegment>> _segments;
+    std::deque<std::unique_ptr<TerrainChunk>> _chunks;
     FastNoise _fastNoise;
     vec3 _lastWaypoint, _nextWaypoint;
     spring3 _autopilotPositionSpring { 5, 40, 20 };
