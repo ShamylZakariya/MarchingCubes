@@ -24,3 +24,5 @@ Make the simple approach first (no downscaling) verify it works and looks decent
 # Continous Terrain
 - 3x3 (or 5x5) grid, with viewer always in center patch
 - on transit across path boundaries, recycle the old patches into new positions, with a unique id based on grid position to seed the rng
+- need to do view frustum culling -- attempting to draw too many chunks
+- need a priority queue to serialize the marching of volumes. sort by dot product of aabb.center against look dir.

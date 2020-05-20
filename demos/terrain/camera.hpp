@@ -47,6 +47,14 @@ struct Camera {
         look[1][2] = forward.y;
         look[2][2] = forward.z;
     }
+
+    glm::vec3 forward() const {
+        return glm::vec3(
+            look[0][2],
+            look[1][2],
+            look[2][2]
+        );
+    }
 };
 
 #endif

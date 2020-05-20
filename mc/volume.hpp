@@ -166,7 +166,7 @@ public:
 
 public:
     OctreeVolume(int size, float fuzziness, int minNodeSize,
-        const std::shared_ptr<util::ThreadPool> threadPool,
+        const mc::util::unowned_ptr<util::ThreadPool> threadPool,
         const std::vector<util::unowned_ptr<TriangleConsumer<Vertex>>>& triangleConsumers)
         : BaseCompositeVolume(glm::ivec3 { size, size, size }, fuzziness)
         , _bounds(util::AABB(glm::ivec3(0, 0, 0), glm::ivec3(size, size, size)))
@@ -392,7 +392,7 @@ private:
     size_t _treeDepth = 0;
     std::unique_ptr<Node> _root;
     std::vector<Node*> _nodesToMarch, _marchedNodes;
-    std::shared_ptr<util::ThreadPool> _threadPool;
+    mc::util::unowned_ptr<util::ThreadPool> _threadPool;
     std::vector<util::unowned_ptr<TriangleConsumer<Vertex>>> _triangleConsumers;
     std::size_t _asyncMarchId { 0 };
     std::mutex _queuePopMutex;

@@ -31,7 +31,7 @@
 #include "filters.hpp"
 #include "materials.hpp"
 #include "spring.hpp"
-#include "terrain_chunk.hpp"
+#include "terrain.hpp"
 
 using namespace glm;
 using mc::util::AABB;
@@ -51,8 +51,8 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr double UI_SCALE = 1.5;
 
-constexpr int PIXEL_SCALE = 8;
-constexpr bool PALETTIZE = true;
+constexpr int PIXEL_SCALE = 1;
+constexpr bool PALETTIZE = false;
 
 //
 // App
@@ -143,14 +143,14 @@ private:
 
         // looks like we should terminate; but check first that
         // we don't have any active march jobs running
-        for (const auto& seg : _chunks) {
-            if (seg->isWorking()) {
-                return true;
+        bool working = false;
+        _terrainGrid->forEach([&working](mc::util::unowned_ptr<TerrainChunk> chunk) {
+            if (chunk->isWorking()) {
+                working = true;
             }
-        }
+        });
 
-        // looks like we can safely terminate
-        return false;
+        return working;
     }
 
     void initWindow()
@@ -232,7 +232,7 @@ private:
 
     void initApp()
     {
-        _segmentSizeZ = 256;
+        _terrainChunkSize = 256;
 
         //
         // load materials
@@ -245,7 +245,7 @@ private:
         const auto terrainTexture0Scale = 30;
         const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
         const auto terrainTexture1Scale = 30;
-        const auto renderDistance = _segmentSizeZ * 2;
+        const auto renderDistance = _terrainChunkSize * 2;
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
             ambientLight,
@@ -306,32 +306,27 @@ private:
         // build a volume
         //
 
-        const auto frequency = 1.0F / _segmentSizeZ;
+        const auto frequency = 1.0F / _terrainChunkSize;
         _fastNoise.SetNoiseType(FastNoise::Simplex);
         _fastNoise.SetFrequency(frequency);
 
-        const auto nThreads = std::thread::hardware_concurrency();
-        std::cout << "Using " << nThreads << " threads to march volumes" << std::endl;
-        _threadPool = std::make_shared<mc::util::ThreadPool>(nThreads, true);
-
         //
-        // build our terrain segments;
-        // TODO: Decide how many segments we need
+        // build the terrain grid
         //
 
-        constexpr auto COUNT = 3;
-        for (int i = 0; i < COUNT; i++) {
-            _chunks.emplace_back(std::make_unique<TerrainChunk>(_segmentSizeZ, _threadPool, _fastNoise));
-            _chunks.back()->build(i);
-            _chunks.back()->march();
-        }
+        _terrainGrid = std::make_unique<TerrainGrid>(3, _terrainChunkSize, _fastNoise);
+        _terrainGrid->print();
 
-        const auto size = vec3(_chunks.front()->getVolume()->size());
+        const auto size = vec3(_terrainChunkSize);
         const auto center = size / 2.0F;
 
         auto pos = vec3(center.x, size.y * 0.2F, 0);
         auto lookTarget = pos + vec3(0, 0, 1);
         _camera.lookAt(pos, lookTarget);
+
+        _terrainGrid->march(_camera.position, _camera.forward());
+
+        std::cout << "initApp - Done" << std::endl;
     }
 
     void onResize(int width, int height)
@@ -402,14 +397,13 @@ private:
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
 
-            for (size_t i = 0, N = _chunks.size(); i < N; i++) {
-                const auto& segment = _chunks[i];
-                const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
+            _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk) {
+                const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
                 _terrainMaterial->bind(model, view, projection, _camera.position);
-                for (auto& buffer : segment->getGeometry()) {
+                for (auto& buffer : chunk->getGeometry()) {
                     buffer->draw();
                 }
-            }
+            });
         });
 
         glViewport(0, 0, _contextSize.x, _contextSize.y);
@@ -424,17 +418,16 @@ private:
 
         // draw optional markers, aabbs, etc
         if (_drawOctreeAABBs || _drawSegmentBounds) {
-            for (size_t i = 0, N = _chunks.size(); i < N; i++) {
-                const auto& segment = _chunks[i];
-                const auto model = translate(mat4 { 1 }, vec3(0, 0, (i * _segmentSizeZ) - _distanceAlongZ));
+            _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk){
+                const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
                 _lineMaterial->bind(projection * view * model);
                 if (_drawSegmentBounds) {
-                    segment->getBoundingLineBuffer().draw();
+                    chunk->getBoundingLineBuffer().draw();
                 }
                 if (_drawOctreeAABBs) {
-                    segment->getAabbLineBuffer().draw();
+                    chunk->getAabbLineBuffer().draw();
                 }
-            }
+            });
         }
 
         glDepthMask(GL_TRUE);
@@ -448,10 +441,10 @@ private:
         ImGui::LabelText("triangles", "%d", triangleCount());
 
         double avgMarchDuration = 0;
-        for (const auto& s : _chunks) {
-            avgMarchDuration += s->getLastMarchDurationSeconds();
-        }
-        avgMarchDuration /= _chunks.size();
+        _terrainGrid->forEach([&avgMarchDuration](mc::util::unowned_ptr<TerrainChunk> chunk) {
+            avgMarchDuration += chunk->getLastMarchDurationSeconds();
+        });
+        avgMarchDuration /= _terrainGrid->getCount();
         ImGui::LabelText("march duration", "%.2fs", avgMarchDuration);
 
         ImGui::Separator();
@@ -510,9 +503,11 @@ private:
 
     int triangleCount()
     {
-        return std::accumulate(_chunks.begin(), _chunks.end(), 0, [](int acc, const auto& seg) {
-            return acc + seg->getTriangleCount();
+        int count = 0;
+        _terrainGrid->forEach([&count](mc::util::unowned_ptr<TerrainChunk> chunk) {
+            count += chunk->getTriangleCount();
         });
+        return count;
     }
 
     bool isKeyDown(int scancode) const
@@ -548,10 +543,8 @@ private:
     bool _drawSegmentBounds = true;
 
     // demo state
-    std::shared_ptr<mc::util::ThreadPool> _threadPool;
-    float _distanceAlongZ = 0;
-    int _segmentSizeZ = 0;
-    std::deque<std::unique_ptr<TerrainChunk>> _chunks;
+    int _terrainChunkSize = 0;
+    std::unique_ptr<TerrainGrid> _terrainGrid;
     FastNoise _fastNoise;
 };
 

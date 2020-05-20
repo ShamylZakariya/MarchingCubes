@@ -141,7 +141,7 @@ public:
     AABBIntersection intersection(AABB bounds) const override
     {
         // This is only meaningful for subtractive samplers
-        throw std::runtime_error("intersection only meanignful for subtractive volumes");
+        throw std::runtime_error("intersection only meaningful for subtractive volumes");
     }
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override

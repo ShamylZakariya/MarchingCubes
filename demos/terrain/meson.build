@@ -2,7 +2,7 @@
 terrain_app_sources = [
     'main.cpp',
     'FastNoise.cpp',
-    'terrain_chunk.cpp',
+    'terrain.cpp',
     '../common/cubemap_blur.cpp',
     '../common/post_processing_stack.cpp',
     '../../include/imgui/imgui.cpp',
