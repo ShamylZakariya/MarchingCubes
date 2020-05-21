@@ -324,7 +324,7 @@ private:
         auto lookTarget = pos + vec3(0, 0, 1);
         _camera.lookAt(pos, lookTarget);
 
-        _terrainGrid->march(_camera.position, _camera.forward());
+        _terrainGrid->march(_camera.getPosition(), _camera.getForward());
 
         std::cout << "initApp - Done" << std::endl;
     }
@@ -387,7 +387,7 @@ private:
         mat4 view = _camera.view();
         mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
 
-        _atmosphere->setCameraState(_camera.position, projection, view, NEAR_PLANE, FAR_PLANE);
+        _atmosphere->setCameraState(_camera.getPosition(), projection, view, NEAR_PLANE, FAR_PLANE);
 
         _postProcessingFilters->execute(_contextSize / PIXEL_SCALE, _contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -399,7 +399,7 @@ private:
 
             _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk) {
                 const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
-                _terrainMaterial->bind(model, view, projection, _camera.position);
+                _terrainMaterial->bind(model, view, projection, _camera.getPosition());
                 for (auto& buffer : chunk->getGeometry()) {
                     buffer->draw();
                 }
