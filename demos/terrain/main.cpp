@@ -386,6 +386,7 @@ private:
     {
         const auto view = _camera.getView();
         const auto projection = _camera.getProjection();
+        const auto frustum = _camera.getFrustum();
 
         _atmosphere->setCameraState(_camera.getPosition(), projection, view, NEAR_PLANE, FAR_PLANE);
 
@@ -398,10 +399,13 @@ private:
             glDepthMask(GL_TRUE);
 
             _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk) {
-                const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
-                _terrainMaterial->bind(model, view, projection, _camera.getPosition());
-                for (auto& buffer : chunk->getGeometry()) {
-                    buffer->draw();
+
+                if (frustum.intersect(chunk->getBounds()) != Frustum::Intersection::Outside) {
+                    const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
+                    _terrainMaterial->bind(model, view, projection, _camera.getPosition());
+                    for (auto& buffer : chunk->getGeometry()) {
+                        buffer->draw();
+                    }
                 }
             });
         });

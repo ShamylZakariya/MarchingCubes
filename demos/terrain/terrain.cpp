@@ -116,12 +116,12 @@ void TerrainChunk::march(std::function<void()> onComplete)
 
         std::cout << "TerrainChunk[" << glm::to_string(getIndex()) << "]::march - complete _triangleCount: " << _triangleCount << std::endl;
         onComplete();
+        _isMarching = false;
     };
 
-    _isPreparingForMarch = true;
+    _isMarching = true;
     updateHeightmap();
     _volume->marchAsync(onMarchComplete, nodeObserver);
-    _isPreparingForMarch = false;
 }
 
 void TerrainChunk::updateHeightmap()
@@ -273,10 +273,10 @@ namespace {
 
 void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
 {
-    // collect all TerrainChunk which needsMarch
+    // collect all TerrainChunk instances which need to be marched, and aren't being marched
     _chunksToMarch.clear();
     for (const auto& chunk : _grid) {
-        if (chunk->needsMarch()) {
+        if (chunk->needsMarch() && !chunk->isWorking()) {
             _chunksToMarch.push_back(chunk.get());
         }
     }
@@ -290,5 +290,6 @@ void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
         return da < db;
     });
 
+    // now march the queue serially from back to front
     marchSerially(_chunksToMarch);
 }

@@ -67,7 +67,7 @@ public:
     /**
      * Returns true if this segment is busy (generating heightmap, or marching the corresponding volume)
      */
-    bool isWorking() const { return _isPreparingForMarch || _volume->isMarching(); }
+    bool isWorking() const { return _isMarching; }
 
     mc::util::AABB getBounds() const { return _bounds; }
     mc::util::unowned_ptr<mc::OctreeVolume> getVolume() const { return _volume.get(); }
@@ -94,7 +94,7 @@ private:
     mc::util::LineSegmentBuffer _boundingLineBuffer;
     std::vector<float> _heightmap;
     double _lastMarchDurationSeconds = 0;
-    bool _isPreparingForMarch = false;
+    bool _isMarching = false;
 };
 
 class TerrainGrid {
