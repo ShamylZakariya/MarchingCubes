@@ -333,7 +333,7 @@ private:
     {
         _contextSize = ivec2 { width, height };
         glViewport(0, 0, width, height);
-        _aspect = static_cast<float>(width) / static_cast<float>(height);
+        _camera.updateProjection(width, height, FOV_DEGREES, NEAR_PLANE, FAR_PLANE);
     }
 
     void onKeyPress(int key, int scancode, int mods)
@@ -384,8 +384,8 @@ private:
 
     void drawFrame()
     {
-        mat4 view = _camera.view();
-        mat4 projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
+        const auto view = _camera.getView();
+        const auto projection = _camera.getProjection();
 
         _atmosphere->setCameraState(_camera.getPosition(), projection, view, NEAR_PLANE, FAR_PLANE);
 
@@ -499,6 +499,8 @@ private:
         if (isKeyDown(GLFW_KEY_RIGHT)) {
             _camera.rotateBy(+lookSpeed, 0);
         }
+
+        _camera.updateFrustum();
     }
 
     int triangleCount()
@@ -530,7 +532,6 @@ private:
     vec2 _lastMousePosition { -1 };
 
     // render state
-    float _aspect = 1;
     Camera _camera;
     std::unique_ptr<TerrainMaterial> _terrainMaterial;
     std::unique_ptr<LineMaterial> _lineMaterial;
