@@ -232,7 +232,7 @@ private:
 
     void initApp()
     {
-        _terrainChunkSize = 256;
+        _terrainChunkSize = 128;
 
         //
         // load materials
@@ -314,7 +314,7 @@ private:
         // build the terrain grid
         //
 
-        _terrainGrid = std::make_unique<TerrainGrid>(3, _terrainChunkSize, _fastNoise);
+        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, _fastNoise);
         _terrainGrid->print();
 
         const auto size = vec3(_terrainChunkSize);
@@ -399,7 +399,6 @@ private:
             glDepthMask(GL_TRUE);
 
             _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk) {
-
                 if (frustum.intersect(chunk->getBounds()) != Frustum::Intersection::Outside) {
                     const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
                     _terrainMaterial->bind(model, view, projection, _camera.getPosition());
@@ -440,9 +439,7 @@ private:
     void drawGui()
     {
         ImGui::Begin("Demo window");
-
         ImGui::LabelText("FPS", "%03.0f", _currentFps);
-        ImGui::LabelText("triangles", "%d", triangleCount());
 
         double avgMarchDuration = 0;
         _terrainGrid->forEach([&avgMarchDuration](mc::util::unowned_ptr<TerrainChunk> chunk) {
@@ -505,15 +502,6 @@ private:
         }
 
         _camera.updateFrustum();
-    }
-
-    int triangleCount()
-    {
-        int count = 0;
-        _terrainGrid->forEach([&count](mc::util::unowned_ptr<TerrainChunk> chunk) {
-            count += chunk->getTriangleCount();
-        });
-        return count;
     }
 
     bool isKeyDown(int scancode) const

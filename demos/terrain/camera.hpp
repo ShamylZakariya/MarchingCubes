@@ -16,6 +16,7 @@ public:
 
     void set(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& org)
     {
+        // https://www8.cs.umu.se/kurser/5DV051/HT12/lab/plane_extraction.pdf
         glm::mat4 clip(projection * view);
         const float* mat = glm::value_ptr(clip);
 

@@ -57,7 +57,7 @@ public:
     void setIndex(glm::ivec2 index);
     glm::ivec2 getIndex() const { return _index; }
 
-    bool needsMarch() const { return _triangleCount == 0; }
+    bool needsMarch() const { return _needsMarch; }
 
     /**
      * Kicks off geometry generation, calling onComplete when the
@@ -75,7 +75,6 @@ public:
     mc::util::LineSegmentBuffer& getAabbLineBuffer() { return _aabbLineBuffer; }
     mc::util::LineSegmentBuffer& getBoundingLineBuffer() { return _boundingLineBuffer; }
     double getLastMarchDurationSeconds() const { return _lastMarchDurationSeconds; }
-    int getTriangleCount() const { return _triangleCount; }
     glm::vec3 getWorldOrigin() const { return glm::vec3(_index.x * _size, 0, _index.y * _size); }
 
 private:
@@ -86,7 +85,6 @@ private:
     int _size = 0;
     mc::util::ThreadPool _threadPool;
     FastNoise& _noise;
-    int _triangleCount;
     mc::util::AABB _bounds;
     std::unique_ptr<mc::OctreeVolume> _volume;
     std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangles;
@@ -94,6 +92,7 @@ private:
     mc::util::LineSegmentBuffer _boundingLineBuffer;
     std::vector<float> _heightmap;
     double _lastMarchDurationSeconds = 0;
+    bool _needsMarch = false;
     bool _isMarching = false;
 };
 

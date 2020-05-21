@@ -60,9 +60,9 @@ TerrainChunk::TerrainChunk(int size, FastNoise& noise)
 
 void TerrainChunk::setIndex(ivec2 index)
 {
+    _needsMarch = true;
     _index = index;
     _volume->clear();
-    _triangleCount = 0;
     for (auto& tc : _triangles) {
         tc->clear();
     }
@@ -110,13 +110,9 @@ void TerrainChunk::march(std::function<void()> onComplete)
 
     const auto onMarchComplete = [this, startTime, onComplete]() {
         _lastMarchDurationSeconds = glfwGetTime() - startTime;
-        for (const auto& tc : _triangles) {
-            _triangleCount += tc->numTriangles();
-        }
-
-        std::cout << "TerrainChunk[" << glm::to_string(getIndex()) << "]::march - complete _triangleCount: " << _triangleCount << std::endl;
         onComplete();
         _isMarching = false;
+        _needsMarch = false;
     };
 
     _isMarching = true;
