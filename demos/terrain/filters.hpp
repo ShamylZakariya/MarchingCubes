@@ -177,26 +177,29 @@ public:
         _farRenderDistance = farRenderDistance;
     }
 
-    void setFog(float yMax, glm::vec4 groundFogColor) {
+    void setFog(float yMax, glm::vec4 groundFogColor)
+    {
         _groundFogMaxY = yMax;
         _groundFogColor = groundFogColor;
     }
 
-    void setFogWindSpeed(glm::vec3 windSpeed) {
+    void setFogWindSpeed(glm::vec3 windSpeed)
+    {
         _fogWindSpeed = windSpeed;
     }
 
     glm::vec3 getFogWindSpeed() const { return _fogWindSpeed; }
 
-    void setGroundFogWorldOffset(glm::vec3 offset) {
+    void setGroundFogWorldOffset(glm::vec3 offset)
+    {
         _groundFogWorldOffset = offset;
     }
 
     glm::vec3 getGroundFogWorldOffset() const { return _groundFogWorldOffset; }
 
 protected:
-
-    void _update(double deltaT) override {
+    void _update(double deltaT) override
+    {
         _groundFogWorldOffset += _fogWindSpeed * deltaT;
     }
 
@@ -271,8 +274,8 @@ private:
     float _farRenderDistance = 0;
     float _groundFogMaxY = 0;
     glm::vec4 _groundFogColor { 1, 1, 1, 0.5 };
-    glm::vec3 _groundFogWorldOffset{0};
-    glm::vec3 _fogWindSpeed{0};
+    glm::vec3 _groundFogWorldOffset { 0 };
+    glm::vec3 _fogWindSpeed { 0 };
 };
 
 #endif

@@ -290,7 +290,7 @@ private:
         const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png");
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
-        _atmosphere->setFog(30, vec4(0.9, 0.9, 0.92, 0.75));
+        _atmosphere->setFog(30, vec4(0.9, 0.9, 0.92, 0.25));
         _atmosphere->setFogWindSpeed(vec3(20, 0, 5));
         _atmosphere->setAlpha(1);
 
@@ -306,15 +306,20 @@ private:
         // build a volume
         //
 
-        const auto frequency = 1.0F / _terrainChunkSize;
+        const auto frequency = 4.0F / _terrainChunkSize;
         _fastNoise.SetNoiseType(FastNoise::Simplex);
         _fastNoise.SetFrequency(frequency);
+        _fastNoise.SetFractalOctaves(3);
 
         //
         // build the terrain grid
         //
 
-        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, _fastNoise);
+        auto terrainFn = [this](const vec3& world) {
+            return _fastNoise.GetSimplex(world.x, world.y, world.z);
+        };
+
+        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, terrainFn, 32);
         _terrainGrid->print();
 
         const auto size = vec3(_terrainChunkSize);
@@ -421,7 +426,7 @@ private:
 
         // draw optional markers, aabbs, etc
         if (_drawOctreeAABBs || _drawSegmentBounds) {
-            _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk){
+            _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk) {
                 const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
                 _lineMaterial->bind(projection * view * model);
                 if (_drawSegmentBounds) {
@@ -486,11 +491,11 @@ private:
         }
 
         if (isKeyDown(GLFW_KEY_UP)) {
-            _camera.rotateBy(0, +lookSpeed);
+            _camera.rotateBy(0, -lookSpeed);
         }
 
         if (isKeyDown(GLFW_KEY_DOWN)) {
-            _camera.rotateBy(0, -lookSpeed);
+            _camera.rotateBy(0, +lookSpeed);
         }
 
         if (isKeyDown(GLFW_KEY_LEFT)) {

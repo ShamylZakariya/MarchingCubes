@@ -12,6 +12,9 @@
 #include <mc/volume_samplers.hpp>
 
 #include "FastNoise.h"
+#include "terrain_samplers.hpp"
+
+typedef std::function<float(const vec3&)> TerrainVolumeSampler;
 
 struct TerrainChunk {
 private:
@@ -47,7 +50,7 @@ public:
     /**
      * Create a cube of terrain, where size is the size of an edge of the cube.
      */
-    TerrainChunk(int size, FastNoise& noise);
+    TerrainChunk(int size, TerrainVolumeSampler terrainFn, float maxHeight);
 
     ~TerrainChunk() = default;
     TerrainChunk(const TerrainChunk&) = delete;
@@ -79,18 +82,18 @@ public:
 
 private:
     glm::vec2 getXZOffset() const { return _index * _size; }
-    void updateHeightmap();
 
     glm::ivec2 _index;
     int _size = 0;
+    float _maxHeight = 0;
     mc::util::ThreadPool _threadPool;
-    FastNoise& _noise;
     mc::util::AABB _bounds;
+    TerrainVolumeSampler _terrainVolume;
     std::unique_ptr<mc::OctreeVolume> _volume;
+    mc::util::unowned_ptr<GroundSampler> _groundSampler;
     std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangles;
     mc::util::LineSegmentBuffer _aabbLineBuffer;
     mc::util::LineSegmentBuffer _boundingLineBuffer;
-    std::vector<float> _heightmap;
     double _lastMarchDurationSeconds = 0;
     bool _needsMarch = false;
     bool _isMarching = false;
@@ -98,21 +101,23 @@ private:
 
 class TerrainGrid {
 public:
-
     /**
      * Create a terrain grid size*size
      */
-    TerrainGrid(int gridSize, int chunkSize, FastNoise& noise);
+    TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terrainFn, float terrainHeight);
 
     void shift(glm::ivec2 by);
 
     void print();
 
-    void forEach(std::function<void(mc::util::unowned_ptr<TerrainChunk>)> cb) {
-        for (const auto &chunk : _grid) { cb(chunk.get()); }
+    void forEach(std::function<void(mc::util::unowned_ptr<TerrainChunk>)> cb)
+    {
+        for (const auto& chunk : _grid) {
+            cb(chunk.get());
+        }
     }
 
-    void march(const glm::vec3 &viewPos, const glm::vec3 &viewDir);
+    void march(const glm::vec3& viewPos, const glm::vec3& viewDir);
 
     int getGridSize() const { return _gridSize; }
     glm::vec3 getChunkSize() const { return glm::vec3(_chunkSize); }

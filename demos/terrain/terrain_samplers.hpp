@@ -15,7 +15,7 @@ using mc::util::iAABB;
 
 class GroundSampler : public mc::IVolumeSampler {
 public:
-    typedef std::function<float(vec3)> NoiseSampler3D;
+    typedef std::function<float(const vec3&)> NoiseSampler3D;
 
 public:
     GroundSampler() = delete;
@@ -68,114 +68,18 @@ public:
             return 1;
         }
 
-        auto v = _sample3d(p);
-        // this is nonsensical, but reduces stairstepping on y
-        auto innerV = v - fuzziness;
-        if (p.y > v) {
-            return 0;
-        } else if (p.y < innerV) {
-            return 1;
-        }
-
-        return 1 - ((p.y - innerV) / fuzziness);
+        float n = _noise3D(p);
+        float height = glm::clamp((p.y / _height), 0.0F, 1.0F);
+        float falloff = 1 - (height * height * height);
+        n *= falloff;
+        return n;
     }
 
 private:
-    inline float _sample3d(const vec3& p) const
-    {
-        float n = _noise3D(p);
-
-        // sand-dune like structure
-        float dune = n * 5;
-        dune = dune - floor(dune);
-        dune = dune * dune * _height;
-
-        // floor
-        float f = n * n * n;
-        float floor = f * _height;
-
-        return floor + dune;
-    }
-
     NoiseSampler3D _noise3D;
     float _height { 0 };
     float _floorPinion { 0 };
 
-    mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
-};
-
-class HeightmapSampler : public mc::IVolumeSampler {
-public:
-    typedef std::function<float(vec3)> NoiseSampler3D;
-
-public:
-    HeightmapSampler() = delete;
-    HeightmapSampler(const GroundSampler&) = delete;
-    HeightmapSampler(GroundSampler&&) = delete;
-
-    HeightmapSampler(float* heightmap, int size, float maxHeight, float floorThreshold,
-        const mc::MaterialState& floorMaterial,
-        const mc::MaterialState& lowMaterial,
-        const mc::MaterialState& highMaterial)
-        : IVolumeSampler(IVolumeSampler::Mode::Additive)
-        , _heightmap(heightmap)
-        , _size(size)
-        , _maxHeight(maxHeight)
-        , _floorThreshold(floorThreshold)
-        , _floorMaterial(floorMaterial)
-        , _lowMaterial(lowMaterial)
-        , _highMaterial(highMaterial)
-    {
-    }
-
-    ~HeightmapSampler() = default;
-
-    bool intersects(AABB bounds) const override
-    {
-        // We know that the geometry will span [x,y] and be no taller than
-        // the _height, so we can do an easy test
-        // TODO: query the heightmap?
-        return bounds.min.y <= _maxHeight;
-    }
-
-    AABBIntersection intersection(AABB bounds) const override
-    {
-        // This is only meaningful for subtractive samplers
-        throw std::runtime_error("intersection only meaningful for subtractive volumes");
-    }
-
-    float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
-    {
-        const float height = this->height(p.x, p.z);
-        const float innerHeight = max(height - fuzziness, 1.0F);
-
-        if (height < _floorThreshold) {
-            float t = height / _floorThreshold;
-            material = mix(_floorMaterial, _lowMaterial, t);
-        } else {
-            float t = (height - _floorThreshold) / (_maxHeight - _floorThreshold);
-            material = mix(_lowMaterial, _highMaterial, t);
-        }
-
-        if (p.y > height) {
-            return 0;
-        } else if (p.y < innerHeight || p.y < 1e-3) {
-            return 1;
-        }
-        return 1 - ((p.y - innerHeight) / fuzziness);
-    }
-
-private:
-    inline float height(int x, int y) const
-    {
-        const int offset = y * _size + x;
-        return _heightmap[offset];
-    }
-
-    float* _heightmap = nullptr;
-    int _size = 0;
-    float _maxHeight = 0;
-    float _floorThreshold { 0 };
     mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
 };
 

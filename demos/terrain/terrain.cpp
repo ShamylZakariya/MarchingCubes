@@ -1,6 +1,7 @@
 #include "terrain.hpp"
 
 #include <glm/ext.hpp>
+#include <glm/gtc/noise.hpp>
 
 #include "materials.hpp"
 #include "terrain_samplers.hpp"
@@ -10,18 +11,6 @@ using namespace glm;
 
 namespace {
 const float kFloorThreshold = 1.0F;
-const float kMaxTerrainHeight = 16.0F;
-
-float smoothstep(float t)
-{
-    return t * t * (3 - 2 * t);
-}
-
-float smoothstep(float edge0, float edge1, float t)
-{
-    t = (t - edge0) / (edge1 - edge0);
-    return t * t * (3 - 2 * t);
-}
 
 vec4 rainbow(float dist)
 {
@@ -38,11 +27,12 @@ vec4 nodeColor(int atDepth)
 
 }
 
-TerrainChunk::TerrainChunk(int size, FastNoise& noise)
+TerrainChunk::TerrainChunk(int size, TerrainVolumeSampler terrainFn, float maxHeight)
     : _index(0, 0)
     , _size(size)
+    , _maxHeight(maxHeight)
     , _threadPool(std::thread::hardware_concurrency(), true)
-    , _noise(noise)
+    , _terrainVolume(terrainFn)
 {
     std::vector<mc::util::unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
     for (size_t i = 0, N = _threadPool.size(); i < N; i++) {
@@ -53,9 +43,6 @@ TerrainChunk::TerrainChunk(int size, FastNoise& noise)
     const int minNodeSize = 4;
     const float fuzziness = 2.0F;
     _volume = std::make_unique<mc::OctreeVolume>(size, fuzziness, minNodeSize, &_threadPool, unownedTriangleConsumers);
-
-    //  +1 gives us the edge case for marching
-    _heightmap.resize((size + 1) * (size + 1));
 }
 
 void TerrainChunk::setIndex(ivec2 index)
@@ -67,21 +54,22 @@ void TerrainChunk::setIndex(ivec2 index)
         tc->clear();
     }
 
-    //
-    // build terrain sampler
-    //
-
-    _volume->add(std::make_unique<HeightmapSampler>(_heightmap.data(), _size, kMaxTerrainHeight, kFloorThreshold,
-        kFloorTerrainMaterial, kLowTerrainMaterial, kHighTerrainMaterial));
-
     const auto xzOffset = getXZOffset();
     const auto size = vec3(_volume->size());
+    const auto worldOrigin = vec3(xzOffset.x, 0, xzOffset.y);
+
+    auto noise = [this, xzOffset](const vec3& world) -> float {
+        auto s = world + vec3(xzOffset.x, 0, xzOffset.y);
+        return _terrainVolume(s);
+    };
+
+    _groundSampler = _volume->add(std::make_unique<GroundSampler>(noise, _maxHeight, kFloorThreshold,
+        kFloorTerrainMaterial, kLowTerrainMaterial, kHighTerrainMaterial));
 
     //
     //  Build the bounds in world space
     //
 
-    const auto worldOrigin = vec3(xzOffset.x, 0, xzOffset.y);
     _bounds = AABB(worldOrigin, worldOrigin + size);
 
     //
@@ -116,52 +104,7 @@ void TerrainChunk::march(std::function<void()> onComplete)
     };
 
     _isMarching = true;
-    updateHeightmap();
     _volume->marchAsync(onMarchComplete, nodeObserver);
-}
-
-void TerrainChunk::updateHeightmap()
-{
-    const auto xzOffset = getXZOffset();
-    const auto dim = _size + 1;
-
-    int slices = _threadPool.size();
-    int sliceHeight = dim / slices;
-    std::vector<std::future<void>> workers;
-    for (int slice = 0; slice < slices; slice++) {
-        workers.push_back(_threadPool.enqueue([=](int tIdx) {
-            int sliceStart = slice * sliceHeight;
-            int sliceEnd = sliceStart + sliceHeight;
-            if (slice == slices - 1) {
-                sliceEnd = dim;
-            }
-
-            for (int y = sliceStart; y < sliceEnd; y++) {
-                for (int x = 0; x < dim; x++) {
-                    float n = _noise.GetSimplex(x + xzOffset.x, y + xzOffset.y) * 0.5F + 0.5F;
-
-                    // sand-dune like structures
-                    float dune = n * 3;
-                    dune = dune - floor(dune);
-                    dune = dune * dune * kMaxTerrainHeight;
-
-                    float dune2 = n * 2;
-                    dune2 = dune2 - floor(dune2);
-                    dune2 = smoothstep(dune2) * kMaxTerrainHeight;
-
-                    // floor
-                    float f = smoothstep(n);
-                    float floor = kMaxTerrainHeight * f;
-
-                    _heightmap[y * _size + x] = (floor + dune + dune2) / 3.0F;
-                }
-            }
-        }));
-    }
-
-    for (auto& w : workers) {
-        w.wait();
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -175,7 +118,7 @@ int makeOdd(int v)
 }
 }
 
-TerrainGrid::TerrainGrid(int gridSize, int chunkSize, FastNoise& noise)
+TerrainGrid::TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terrainFn, float maxHeight)
     : _gridSize(makeOdd(gridSize))
     , _chunkSize(chunkSize)
 {
@@ -183,7 +126,7 @@ TerrainGrid::TerrainGrid(int gridSize, int chunkSize, FastNoise& noise)
     for (int i = 0; i < _gridSize; i++) {
         for (int j = 0; j < _gridSize; j++) {
             int k = i * _gridSize + j;
-            _grid[k] = std::make_unique<TerrainChunk>(chunkSize, noise);
+            _grid[k] = std::make_unique<TerrainChunk>(chunkSize, terrainFn, maxHeight);
             _grid[k]->setIndex(ivec2(j - _gridSize / 2, i - _gridSize / 2));
         }
     }
@@ -257,14 +200,15 @@ void TerrainGrid::print()
 
 namespace {
 
-    void marchSerially(std::vector<TerrainChunk*> &chunks) {
-        if (!chunks.empty()) {
-            chunks.back()->march([&chunks](){
-                chunks.pop_back();
-                marchSerially(chunks);
-            });
-        }
+void marchSerially(std::vector<TerrainChunk*>& chunks)
+{
+    if (!chunks.empty()) {
+        chunks.back()->march([&chunks]() {
+            chunks.pop_back();
+            marchSerially(chunks);
+        });
     }
+}
 }
 
 void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)

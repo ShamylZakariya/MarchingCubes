@@ -53,7 +53,7 @@ public:
         _origin = org;
     }
 
-    Intersection intersect(const mc::util::AABB &bounds) const
+    Intersection intersect(const mc::util::AABB& bounds) const
     {
         using glm::vec3;
 
@@ -80,7 +80,6 @@ public:
             topStatus = 0,
             farStatus = 0,
             nearStatus = 0;
-
 
         for (int i = 0; i < 8; i++) {
             nearStatus += _near.inFront(points[i]) ? 1 : 0;
