@@ -245,7 +245,7 @@ private:
         const auto terrainTexture0Scale = 30;
         const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
         const auto terrainTexture1Scale = 30;
-        const auto renderDistance = _terrainChunkSize * 2;
+        const auto renderDistance = _terrainChunkSize * 1.5;
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
             ambientLight,
@@ -290,8 +290,7 @@ private:
         const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png");
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
-        _atmosphere->setFog(30, vec4(0.9, 0.9, 0.92, 0.25));
-        _atmosphere->setFogWindSpeed(vec3(20, 0, 5));
+        _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
         _atmosphere->setAlpha(1);
 
         if (PALETTIZE) {
@@ -306,21 +305,30 @@ private:
         // build a volume
         //
 
-        const auto frequency = 4.0F / _terrainChunkSize;
+        const auto frequency = 1.0F / _terrainChunkSize;
+        const auto terrainHeight = 32.0F;
         _fastNoise.SetNoiseType(FastNoise::Simplex);
         _fastNoise.SetFrequency(frequency);
         _fastNoise.SetFractalOctaves(3);
+
+        _atmosphere->setFog(terrainHeight * 0.6, vec4(0.9, 0.9, 0.92, 0.35));
 
         //
         // build the terrain grid
         //
 
-        auto terrainFn = [this](const vec3& world) {
-            return _fastNoise.GetSimplex(world.x, world.y, world.z);
+        auto terrainFn = [this, terrainHeight](const vec3& world) -> float {
+            float noise2D = _fastNoise.GetSimplex(world.x, world.z);
+            float noise3D = _fastNoise.GetSimplex(world.x * 11, world.y * 11, world.z * 11);
+            float height = std::max(terrainHeight * noise2D, 0.0F);
+            if (world.y < height) {
+                float a = (height - world.y) / height;
+                return a + 0.6F * noise3D;
+            }
+            return 0;
         };
 
-        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, terrainFn, 32);
-        _terrainGrid->print();
+        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, terrainFn, terrainHeight);
 
         const auto size = vec3(_terrainChunkSize);
         const auto center = size / 2.0F;
