@@ -51,7 +51,7 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr double UI_SCALE = 1.5;
 
-constexpr int PIXEL_SCALE = 1;
+constexpr int PIXEL_SCALE = 2;
 constexpr bool PALETTIZE = false;
 
 //
@@ -318,13 +318,20 @@ private:
         //
 
         auto terrainFn = [this, terrainHeight](const vec3& world) -> float {
+            if (world.y < 1e-3F) {
+                return 1;
+            }
+
             float noise2D = _fastNoise.GetSimplex(world.x, world.z);
             float noise3D = _fastNoise.GetSimplex(world.x * 11, world.y * 11, world.z * 11);
             float height = std::max(terrainHeight * noise2D, 0.0F);
             if (world.y < height) {
+
                 float a = (height - world.y) / height;
-                return a + 0.6F * noise3D;
+                a = a * (a + 0.6F * noise3D);
+                return a;
             }
+
             return 0;
         };
 

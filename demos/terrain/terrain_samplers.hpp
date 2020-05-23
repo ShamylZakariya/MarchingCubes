@@ -64,15 +64,7 @@ public:
             material = mix(_highMaterial, _lowMaterial, t * t * t);
         }
 
-        if (p.y < 1e-3) {
-            return 1;
-        }
-
-        float n = _noise3D(p);
-        float height = glm::clamp((p.y / _height), 0.0F, 1.0F);
-        float falloff = 1 - (height * height * height);
-        n *= falloff;
-        return n;
+        return _noise3D(p);
     }
 
 private:
