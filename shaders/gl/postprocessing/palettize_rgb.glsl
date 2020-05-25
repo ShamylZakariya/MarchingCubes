@@ -30,6 +30,7 @@ uniform vec3 uPaletteSize;
 
 void main() {
     vec3 rgbIn = texture(uColorTexSampler, fs_in.texCoord).rgb;
-    vec3 rgbOut = vec3( ivec3(rgbIn * uPaletteSize) / uPaletteSize);
-    fragColor = vec4(mix(rgbIn, rgbOut, uAlpha), 1);
+    vec3 paletteSize = mix(vec3(255,255,255), uPaletteSize, uAlpha);
+    vec3 rgbOut = vec3( ivec3(rgbIn * paletteSize) / paletteSize);
+    fragColor = vec4(rgbOut, 1);
 }

@@ -49,7 +49,9 @@ void main()
 {
     vec3 rgbIn = texture(uColorTexSampler, fs_in.texCoord).rgb;
     vec3 yuv = rgb2yuv(rgbIn);
-    yuv = vec3(ivec3(yuv * uPaletteSize) / uPaletteSize);
+
+    vec3 paletteSize = mix(vec3(255,255,255), uPaletteSize, uAlpha);
+    yuv = vec3(ivec3(yuv * paletteSize) / paletteSize);
     vec3 rgbOut = yuv2rgb(yuv);
-    fragColor = vec4(mix(rgbIn, rgbOut, uAlpha), 1);
+    fragColor = vec4(rgbOut, 1);
 }

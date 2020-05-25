@@ -52,6 +52,7 @@ constexpr float FOV_DEGREES = 50.0F;
 constexpr double UI_SCALE = 1.5;
 
 constexpr int PIXEL_SCALE = 2;
+constexpr bool ATMOSPHERE = false;
 constexpr bool PALETTIZE = false;
 
 //
@@ -291,15 +292,13 @@ private:
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
-        _atmosphere->setAlpha(0);
+        _atmosphere->setAlpha(ATMOSPHERE ? 1 : 0);
 
-        if (PALETTIZE) {
-            auto palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
-                "Palettizer",
-                ivec3(32, 32, 32),
-                PalettizeFilter::ColorSpace::YUV));
-            palettizer->setAlpha(1);
-        }
+        _palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
+            "Palettizer",
+            ivec3(8, 8, 8),
+            PalettizeFilter::ColorSpace::YUV));
+        _palettizer->setAlpha(PALETTIZE ? 1 : 0);
 
         //
         // build a volume
@@ -479,6 +478,16 @@ private:
         ImGui::Checkbox("Draw AABBs", &_drawOctreeAABBs);
         ImGui::Checkbox("Draw Segment Bounds", &_drawSegmentBounds);
 
+        bool drawAtmosphere = _atmosphere->getAlpha() > 0.5F;
+        if (ImGui::Checkbox("Draw Atmosphere", &drawAtmosphere)) {
+            _atmosphere->setAlpha(drawAtmosphere ? 1 : 0);
+        }
+
+        float paletteAlpha = _palettizer->getAlpha();
+        if (ImGui::SliderFloat("Palettize", &paletteAlpha, 0, 1, "%.2f")) {
+            _palettizer->setAlpha(paletteAlpha);
+        }
+
         ImGui::End();
     }
 
@@ -557,10 +566,11 @@ private:
     mc::util::LineSegmentBuffer _axisMarker;
     std::unique_ptr<post_processing::FilterStack> _postProcessingFilters;
     mc::util::unowned_ptr<AtmosphereFilter> _atmosphere;
+    mc::util::unowned_ptr<PalettizeFilter> _palettizer;
 
     // user input state
     bool _drawOctreeAABBs = false;
-    bool _drawSegmentBounds = true;
+    bool _drawSegmentBounds = false;
 
     // demo state
     int _terrainChunkSize = 0;
