@@ -112,6 +112,13 @@ public:
     glm::ivec2 worldToIndex(const glm::vec3 &world) const;
 
     /**
+     * Get the terrain chunk at the center of the grid
+     */
+    mc::util::unowned_ptr<TerrainChunk> getCenterChunk() const {
+        return _grid[_centerOffset];
+    }
+
+    /**
      * Shift the grid of terrain chunks by a given amount. For example, shifting by (1,0) means
      * "shift right" by 1. Which will move each tile to the right, and recycle the rightmost set of
      * tiles to the left column, assign them the appriate indexes, and
@@ -132,10 +139,18 @@ public:
     int getGridSize() const { return _gridSize; }
     glm::vec3 getChunkSize() const { return glm::vec3(_chunkSize); }
     int getCount() const { return _gridSize * _gridSize; }
+    bool isMarching() const { return _isMarching; }
+
 
 private:
-    int _gridSize;
-    int _chunkSize;
+
+    void marchSerially();
+
+private:
+    int _gridSize = 0;
+    int _chunkSize = 0;
+    int _centerOffset = 0;
+    bool _isMarching = false;
     std::vector<std::unique_ptr<TerrainChunk>> _grid;
     std::vector<TerrainChunk*> _chunksToMarch;
 };

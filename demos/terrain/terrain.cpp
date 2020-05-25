@@ -130,10 +130,14 @@ TerrainGrid::TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terra
             _grid[k]->setIndex(ivec2(j - _gridSize / 2, i - _gridSize / 2));
         }
     }
+    _centerOffset = (_gridSize * _gridSize) / 2;
 }
 
 glm::ivec2 TerrainGrid::worldToIndex(const glm::vec3 &world) const {
-    return ivec2(world.x / _chunkSize, world.z / _chunkSize);
+    auto idx = ivec2(world.x / _chunkSize, world.z / _chunkSize);
+    if (world.x < 0) idx.x--;
+    if (world.z < 0) idx.y--;
+    return idx;
 }
 
 void TerrainGrid::shift(glm::ivec2 by)
@@ -203,19 +207,6 @@ void TerrainGrid::print()
     std::cout << std::endl;
 }
 
-namespace {
-
-void marchSerially(std::vector<TerrainChunk*>& chunks)
-{
-    if (!chunks.empty()) {
-        chunks.back()->march([&chunks]() {
-            chunks.pop_back();
-            marchSerially(chunks);
-        });
-    }
-}
-}
-
 void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
 {
     // collect all TerrainChunk instances which need to be marched, and aren't being marched
@@ -236,5 +227,20 @@ void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
     });
 
     // now march the queue serially from back to front
-    marchSerially(_chunksToMarch);
+    if (!_chunksToMarch.empty()) {
+        _isMarching = true;
+        marchSerially();
+    }
+}
+
+void TerrainGrid::marchSerially()
+{
+    _chunksToMarch.back()->march([this]() {
+        _chunksToMarch.pop_back();
+        if (!_chunksToMarch.empty()) {
+            marchSerially();
+        } else {
+            _isMarching = false;
+        }
+    });
 }

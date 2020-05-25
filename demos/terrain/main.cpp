@@ -291,7 +291,7 @@ private:
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
-        _atmosphere->setAlpha(1);
+        _atmosphere->setAlpha(0);
 
         if (PALETTIZE) {
             auto palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
@@ -337,10 +337,7 @@ private:
 
         _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, terrainFn, terrainHeight);
 
-        const auto size = vec3(_terrainChunkSize);
-        const auto center = size / 2.0F;
-
-        auto pos = vec3(center.x, size.y * 0.2F, 0);
+        auto pos = vec3(0, terrainHeight, 0);
         auto lookTarget = pos + vec3(0, 0, 1);
         _camera.lookAt(pos, lookTarget);
 
@@ -400,6 +397,16 @@ private:
     {
         _postProcessingFilters->update(deltaT);
         updateCamera(deltaT);
+
+        if (!_terrainGrid->isMarching()) {
+            auto idx = _terrainGrid->worldToIndex(_camera.getPosition());
+            auto centerIdx = _terrainGrid->getCenterChunk()->getIndex();
+            auto shift = centerIdx - idx;
+            if (shift != ivec2(0,0)) {
+                _terrainGrid->shift(centerIdx - idx);
+                _terrainGrid->march(_camera.getPosition(), _camera.getForward());
+            }
+        }
     }
 
     void drawFrame()

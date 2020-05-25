@@ -1,3 +1,9 @@
+# Currently
+
+1: DONE shift terrain grid as camera transits grid boundaries
+2: translate camera and world back, so the world positions are never very large
+3: then I can move on to round world
+
 # Post Processing
 - look into a raymarched cloud/fog https://www.shadertoy.com/view/Msf3zX
     - start with a static fog plane, this will help me learn the basics... just needs two plane equations, upper and lower bounds. Trace ray in worldspace through these two planes.
@@ -27,3 +33,4 @@ Make the simple approach first (no downscaling) verify it works and looks decent
     - DONE: need to do view frustum culling -- attempting to draw too many chunks
     - DONE: need a priority queue to serialize the marching of volumes. sort by dot product of aabb.center against look dir.
     - can use ray marching against the terrain function to position camera.
+
