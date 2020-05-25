@@ -401,7 +401,7 @@ private:
             auto idx = _terrainGrid->worldToIndex(_camera.getPosition());
             auto centerIdx = _terrainGrid->getCenterChunk()->getIndex();
             auto shift = centerIdx - idx;
-            if (shift != ivec2(0,0)) {
+            if (shift != ivec2(0, 0)) {
                 _terrainGrid->shift(centerIdx - idx);
                 _terrainGrid->march(_camera.getPosition(), _camera.getForward());
             }

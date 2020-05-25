@@ -133,10 +133,13 @@ TerrainGrid::TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terra
     _centerOffset = (_gridSize * _gridSize) / 2;
 }
 
-glm::ivec2 TerrainGrid::worldToIndex(const glm::vec3 &world) const {
+glm::ivec2 TerrainGrid::worldToIndex(const glm::vec3& world) const
+{
     auto idx = ivec2(world.x / _chunkSize, world.z / _chunkSize);
-    if (world.x < 0) idx.x--;
-    if (world.z < 0) idx.y--;
+    if (world.x < 0)
+        idx.x--;
+    if (world.z < 0)
+        idx.y--;
     return idx;
 }
 
@@ -176,7 +179,7 @@ void TerrainGrid::shift(glm::ivec2 by)
             // shift contents down, recycling elements at bottom to top
             for (int x = 0; x < _gridSize; x++) {
                 for (int y = _gridSize - 1; y > 0; y--) {
-                    std::swap(_grid[y * _gridSize + x], _grid[((y-1) * _gridSize) + x]);
+                    std::swap(_grid[y * _gridSize + x], _grid[((y - 1) * _gridSize) + x]);
                 }
                 _grid[x]->setIndex(_grid[_gridSize + x]->getIndex() + ivec2(0, -1));
             }

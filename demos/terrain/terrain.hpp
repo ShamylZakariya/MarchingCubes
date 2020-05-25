@@ -109,12 +109,13 @@ public:
     /**
      * Convert a position in world space to the corresponding tile index.
      */
-    glm::ivec2 worldToIndex(const glm::vec3 &world) const;
+    glm::ivec2 worldToIndex(const glm::vec3& world) const;
 
     /**
      * Get the terrain chunk at the center of the grid
      */
-    mc::util::unowned_ptr<TerrainChunk> getCenterChunk() const {
+    mc::util::unowned_ptr<TerrainChunk> getCenterChunk() const
+    {
         return _grid[_centerOffset];
     }
 
@@ -141,9 +142,7 @@ public:
     int getCount() const { return _gridSize * _gridSize; }
     bool isMarching() const { return _isMarching; }
 
-
 private:
-
     void marchSerially();
 
 private:
