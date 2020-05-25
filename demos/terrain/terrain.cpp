@@ -132,22 +132,27 @@ TerrainGrid::TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terra
     }
 }
 
+glm::ivec2 TerrainGrid::worldToIndex(const glm::vec3 &world) const {
+    return ivec2(world.x / _chunkSize, world.z / _chunkSize);
+}
+
 void TerrainGrid::shift(glm::ivec2 by)
 {
     // shift dx
     int dx = by.x;
     while (dx != 0) {
         if (dx > 0) {
-            // shift contents to right, recycling elements at right side of each row to left
+            // shift contents to right, recycling rightmost column to left
             for (int y = 0; y < _gridSize; y++) {
                 int rowOffset = y * _gridSize;
-                for (int x = _gridSize - 1; x >= 0; x--) {
+                for (int x = _gridSize - 1; x > 0; x--) {
                     std::swap(_grid[rowOffset + x], _grid[rowOffset + x - 1]);
                 }
                 _grid[rowOffset]->setIndex(_grid[rowOffset + 1]->getIndex() + ivec2(-1, 0));
             }
             dx--;
         } else {
+            // WORKS
             // shift contents to left, recycling elements at left side of each row to right
             for (int y = 0; y < _gridSize; y++) {
                 int rowOffset = y * _gridSize;
@@ -162,16 +167,16 @@ void TerrainGrid::shift(glm::ivec2 by)
 
     // shift dy
     int dy = by.y;
-    if (by.y != 0) {
+    while (dy != 0) {
         if (dy > 0) {
             // shift contents down, recycling elements at bottom to top
             for (int x = 0; x < _gridSize; x++) {
-                for (int y = _gridSize - 1; y >= 0; y--) {
-                    std::swap(_grid[y * _gridSize + x], _grid[y * (_gridSize - 1) + x]);
+                for (int y = _gridSize - 1; y > 0; y--) {
+                    std::swap(_grid[y * _gridSize + x], _grid[((y-1) * _gridSize) + x]);
                 }
                 _grid[x]->setIndex(_grid[_gridSize + x]->getIndex() + ivec2(0, -1));
             }
-            dx--;
+            dy--;
         } else {
             // shift contents up, recycling elements at top to bottom
             for (int x = 0; x < _gridSize; x++) {
@@ -180,7 +185,7 @@ void TerrainGrid::shift(glm::ivec2 by)
                 }
                 _grid[(_gridSize - 1) * _gridSize + x]->setIndex(_grid[(_gridSize - 2) * _gridSize + x]->getIndex() + ivec2(0, 1));
             }
-            dx++;
+            dy++;
         }
     }
 }

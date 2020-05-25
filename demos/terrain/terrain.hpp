@@ -106,6 +106,16 @@ public:
      */
     TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terrainFn, float terrainHeight);
 
+    /**
+     * Convert a position in world space to the corresponding tile index.
+     */
+    glm::ivec2 worldToIndex(const glm::vec3 &world) const;
+
+    /**
+     * Shift the grid of terrain chunks by a given amount. For example, shifting by (1,0) means
+     * "shift right" by 1. Which will move each tile to the right, and recycle the rightmost set of
+     * tiles to the left column, assign them the appriate indexes, and
+     */
     void shift(glm::ivec2 by);
 
     void print();
