@@ -17,26 +17,38 @@ out VS_OUT
     float shininess;
     float tex0Contribution;
     float tex1Contribution;
-    float worldDistance;
 }
 vs_out;
 
-uniform mat4 uMVP;
-uniform mat4 uModel;
+uniform mat4 uVP;
+uniform vec3 uModelTranslation;
 uniform vec3 uCameraPosition;
+uniform float uRoundWorldRadius;
 
 void main()
 {
-    gl_Position = uMVP * vec4(inPosition, 1.0);
+    // apply a "pherical" transform to the world. Note: This is a cheap hack,
+    // since we're not spherizing, rather, projecting the world to a half-dome
+    // facing up and centered beneath the camera.
+    vec3 worldPosition = inPosition + uModelTranslation;
+    vec3 worldOrigin = vec3(uCameraPosition.x, -uRoundWorldRadius, uCameraPosition.z);
+    vec3 worldDir = normalize(worldPosition - worldOrigin);
+    float radius = uRoundWorldRadius + worldPosition.y;
+    vec3 roundWorldPosition = worldOrigin + worldDir * radius;
+    worldPosition = roundWorldPosition;
+
+    gl_Position = uVP * vec4(worldPosition, 1.0);
 
     vs_out.color = inColor;
     vs_out.modelPosition = inPosition;
-    vs_out.worldNormal = mat3(uModel) * inTriangleNormal;
-    vs_out.worldPosition = vec3(uModel * vec4(inPosition, 1.0));
     vs_out.shininess = inShininess;
     vs_out.tex0Contribution = inTex0Contribution;
     vs_out.tex1Contribution = inTex1Contribution;
-    vs_out.worldDistance = distance(vs_out.worldPosition, uCameraPosition);
+    vs_out.worldNormal = inTriangleNormal;
+    vs_out.worldPosition = worldPosition;
+
+    // #if ROUND
+
 }
 
 fragment:
@@ -51,7 +63,6 @@ in VS_OUT
     float shininess;
     float tex0Contribution;
     float tex1Contribution;
-    float worldDistance;
 }
 fs_in;
 

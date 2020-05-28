@@ -51,10 +51,6 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr double UI_SCALE = 1.5;
 
-constexpr int PIXEL_SCALE = 2;
-constexpr bool ATMOSPHERE = false;
-constexpr bool PALETTIZE = false;
-
 //
 // App
 //
@@ -247,8 +243,10 @@ private:
         const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
         const auto terrainTexture1Scale = 30;
         const auto renderDistance = _terrainChunkSize * 1.5;
+        const auto roundWorldRadius = 400;
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
+            roundWorldRadius,
             ambientLight,
             lightprobeTex, skyboxTexture,
             terrainTexture0, terrainTexture0Scale,
@@ -292,13 +290,13 @@ private:
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
-        _atmosphere->setAlpha(ATMOSPHERE ? 1 : 0);
+        _atmosphere->setAlpha(1);
 
         _palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
             "Palettizer",
             ivec3(8, 8, 8),
             PalettizeFilter::ColorSpace::YUV));
-        _palettizer->setAlpha(PALETTIZE ? 1 : 0);
+        _palettizer->setAlpha(0);
 
         //
         // build a volume
@@ -310,7 +308,7 @@ private:
         _fastNoise.SetFrequency(frequency);
         _fastNoise.SetFractalOctaves(3);
 
-        _atmosphere->setFog(terrainHeight * 0.6, vec4(0.9, 0.9, 0.92, 0.35));
+        _atmosphere->setFog(terrainHeight * 0.6, vec4(0.9, 0.9, 0.92, 0.5));
 
         //
         // build the terrain grid
@@ -325,6 +323,8 @@ private:
             float noise3D = _fastNoise.GetSimplex(world.x * 11, world.y * 11, world.z * 11);
             float height = std::max(terrainHeight * noise2D, 0.0F);
             if (world.y < height) {
+                // float fade = max((height - world.y) / 8.0F, 1.0F);
+                // return fade * (1 + noise3D);
 
                 float a = (height - world.y) / height;
                 a = a * (a + 0.6F * noise3D);
@@ -416,7 +416,7 @@ private:
 
         _atmosphere->setCameraState(_camera.getPosition(), projection, view, NEAR_PLANE, FAR_PLANE);
 
-        _postProcessingFilters->execute(_contextSize / PIXEL_SCALE, _contextSize, [=]() {
+        _postProcessingFilters->execute(_contextSize / std::max(_pixelScale, 1), _contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // draw volumes
@@ -426,8 +426,8 @@ private:
 
             _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk) {
                 if (frustum.intersect(chunk->getBounds()) != Frustum::Intersection::Outside) {
-                    const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
-                    _terrainMaterial->bind(model, view, projection, _camera.getPosition());
+                    const auto modelTranslation = chunk->getWorldOrigin();
+                    _terrainMaterial->bind(modelTranslation, view, projection, _camera.getPosition());
                     for (auto& buffer : chunk->getGeometry()) {
                         buffer->draw();
                     }
@@ -441,16 +441,18 @@ private:
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_TRUE);
 
-        // draw the origin of our scene
-        _lineMaterial->bind(projection * view * mat4 { 1 });
-        _axisMarker.draw();
-
         // draw optional markers, aabbs, etc
-        if (_drawOctreeAABBs || _drawSegmentBounds) {
+        if (_drawOctreeAABBs || _drawMarkers) {
+            if (_drawMarkers) {
+                // draw the origin of our scene
+                _lineMaterial->bind(projection * view * mat4 { 1 });
+                _axisMarker.draw();
+            }
+
             _terrainGrid->forEach([&](mc::util::unowned_ptr<TerrainChunk> chunk) {
                 const auto model = translate(mat4 { 1 }, chunk->getWorldOrigin());
                 _lineMaterial->bind(projection * view * model);
-                if (_drawSegmentBounds) {
+                if (_drawMarkers) {
                     chunk->getBoundingLineBuffer().draw();
                 }
                 if (_drawOctreeAABBs) {
@@ -476,7 +478,9 @@ private:
 
         ImGui::Separator();
         ImGui::Checkbox("Draw AABBs", &_drawOctreeAABBs);
-        ImGui::Checkbox("Draw Segment Bounds", &_drawSegmentBounds);
+        ImGui::Checkbox("Draw Markers", &_drawMarkers);
+
+        ImGui::SliderInt("Pixel Scale", &_pixelScale, 1, 64);
 
         bool drawAtmosphere = _atmosphere->getAlpha() > 0.5F;
         if (ImGui::Checkbox("Draw Atmosphere", &drawAtmosphere)) {
@@ -569,8 +573,9 @@ private:
     mc::util::unowned_ptr<PalettizeFilter> _palettizer;
 
     // user input state
+    int _pixelScale = 2;
     bool _drawOctreeAABBs = false;
-    bool _drawSegmentBounds = false;
+    bool _drawMarkers = false;
 
     // demo state
     int _terrainChunkSize = 0;

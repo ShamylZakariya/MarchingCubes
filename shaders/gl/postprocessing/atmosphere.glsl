@@ -107,7 +107,7 @@ vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDi
         // sample fog at march position
         if (rayLength < sceneDepth) {
             vec3 samplePosition = marchPosition + uGroundFogWorldOffset;
-            float c = noises(samplePosition * 0.00025);
+            float c = noises(samplePosition * 0.001);
             c = (c + 1) * 0.5; // remap from [-1,1] to [0,1]
             c = smoothstep(0.35, 1, c);
             c *= density;
