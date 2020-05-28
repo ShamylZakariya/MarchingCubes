@@ -49,7 +49,8 @@ constexpr int HEIGHT = 1100;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
-constexpr double UI_SCALE = 1.5;
+constexpr float UI_SCALE = 1.5F;
+constexpr float WORLD_RADIUS = 400;
 
 //
 // App
@@ -243,7 +244,7 @@ private:
         const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
         const auto terrainTexture1Scale = 30;
         const auto renderDistance = _terrainChunkSize * 1.5;
-        const auto roundWorldRadius = 400;
+        const auto roundWorldRadius = WORLD_RADIUS;
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
             roundWorldRadius,
@@ -481,6 +482,11 @@ private:
         ImGui::Checkbox("Draw Markers", &_drawMarkers);
 
         ImGui::SliderInt("Pixel Scale", &_pixelScale, 1, 64);
+
+        bool roundWorld = _terrainMaterial->getWorldRadius() > 0;
+        if (ImGui::Checkbox("Round World", &roundWorld)) {
+            _terrainMaterial->setWorldRadius(roundWorld ? WORLD_RADIUS : 0);
+        }
 
         bool drawAtmosphere = _atmosphere->getAlpha() > 0.5F;
         if (ImGui::Checkbox("Draw Atmosphere", &drawAtmosphere)) {

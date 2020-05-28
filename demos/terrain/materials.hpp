@@ -139,6 +139,9 @@ public:
         glUniform1f(_uTexture0Scale, _texture0Scale);
         glUniform1f(_uTexture1Scale, _texture1Scale);
     }
+
+    void setWorldRadius(float radius) { _roundWorldRadius = std::max(radius, 0.0F); }
+    float getWorldRadius() const { return _roundWorldRadius; }
 };
 
 struct LineMaterial {

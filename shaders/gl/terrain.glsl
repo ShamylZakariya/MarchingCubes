@@ -31,11 +31,13 @@ void main()
     // since we're not spherizing, rather, projecting the world to a half-dome
     // facing up and centered beneath the camera.
     vec3 worldPosition = inPosition + uModelTranslation;
-    vec3 worldOrigin = vec3(uCameraPosition.x, -uRoundWorldRadius, uCameraPosition.z);
-    vec3 worldDir = normalize(worldPosition - worldOrigin);
-    float radius = uRoundWorldRadius + worldPosition.y;
-    vec3 roundWorldPosition = worldOrigin + worldDir * radius;
-    worldPosition = roundWorldPosition;
+
+    if (uRoundWorldRadius > 0) {
+        vec3 worldOrigin = vec3(uCameraPosition.x, -uRoundWorldRadius, uCameraPosition.z);
+        vec3 worldDir = normalize(worldPosition - worldOrigin);
+        float radius = uRoundWorldRadius + worldPosition.y;
+        worldPosition = worldOrigin + worldDir * radius;
+    }
 
     gl_Position = uVP * vec4(worldPosition, 1.0);
 
