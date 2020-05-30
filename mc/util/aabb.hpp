@@ -33,10 +33,10 @@ namespace util {
 
         typedef T value_type;
 
-        /*
-        Create a default AABB_. Will return true for invalid() because
-        it hasn't been assigned any value yet.
-    */
+        /**
+        * Create a default AABB_. Will return true for invalid() because
+        * it hasn't been assigned any value yet.
+        */
         AABB_()
             : min(std::numeric_limits<T>::max())
             , max(-std::numeric_limits<T>::max())
@@ -72,29 +72,29 @@ namespace util {
             return min != other.min || max != other.max;
         }
 
-        /*
-        Two circumstances for "invalid" AABB_. It could be collapsed, where width,
-        breadth or height are less than or equal to zero, or it is default constructed
-        and not yet assigned values.
-    */
+        /**
+        * Two circumstances for "invalid" AABB_. It could be collapsed, where width,
+        * breadth or height are less than or equal to zero, or it is default constructed
+        * and not yet assigned values.
+        */
 
         bool valid() const
         {
             return (min.x < max.x) && (min.y < max.y) && (min.z < max.z);
         }
 
-        /*
-        return true if this AABB is valid, e.g, not collapsed and has been expanded to fit something.
-    */
+        /**
+        * return true if this AABB is valid, e.g, not collapsed and has been expanded to fit something.
+        */
         operator bool() const
         {
             return valid();
         }
 
-        /*
-        Make this AABB_ invalid e.g., just like a default-constructed AABB_.
-        Will fail the valid test.
-    */
+        /**
+        * Make this AABB_ invalid e.g., just like a default-constructed AABB_.
+        * Will fail the valid test.
+        */
         void invalidate()
         {
             min.x = std::numeric_limits<T>::max();
@@ -105,9 +105,9 @@ namespace util {
             max.z = -std::numeric_limits<T>::max();
         }
 
-        /*
-        return geometric center of AABB_
-    */
+        /**
+        * return geometric center of AABB_
+        */
         glm::vec<3, T, Q> center() const
         {
             return glm::vec<3, T, Q>(
@@ -116,39 +116,39 @@ namespace util {
                 (min.z + max.z) / 2);
         }
 
-        /*
-        return the radius of the sphere that would exactly enclose this AABB_
-    */
+        /**
+        * return the radius of the sphere that would exactly enclose this AABB_
+        */
         T radius() const
         {
             return glm::length((max - min) * 0.5F);
         }
 
-        /*
-        return the squared radius of the sphere that would exactly enclose this AABB_
-    */
+        /**
+        * return the squared radius of the sphere that would exactly enclose this AABB_
+        */
         T radius2() const
         {
             return glm::length2((max - min) * 0.5F);
         }
 
-        /*
-        return the magnitude along the 3 axes.
-    */
+        /**
+        * return the magnitude along the 3 axes.
+        */
         glm::vec<3, T, Q> size() const { return glm::vec<3, T, Q>(max.x - min.x, max.y - min.y, max.z - min.z); }
 
-        /*
-        return the volume displaced by this aabb
-    */
+        /**
+        * return the volume displaced by this aabb
+        */
         T volume() const
         {
             auto sz = size();
             return sz.x * sz.y * sz.z;
         }
 
-        /*
-        return AABB_ containing both
-    */
+        /**
+        * return AABB_ containing both
+        */
         const AABB_<T, Q> operator+(const AABB_<T, Q>& a) const
         {
             return AABB_<T, Q>(
@@ -160,9 +160,9 @@ namespace util {
                 std::max<T>(max.z, a.max.z));
         }
 
-        /*
-        return AABB_ containing both this AABB_ and the point
-    */
+        /**
+        * return AABB_ containing both this AABB_ and the point
+        */
         const AABB_<T, Q> operator+(const glm::vec<3, T, Q>& p) const
         {
             return AABB_<T, Q>(
@@ -174,9 +174,9 @@ namespace util {
                 std::max<T>(max.z, p.z));
         }
 
-        /*
-        Expand AABB_ by scalar value
-    */
+        /**
+        * Expand AABB_ by scalar value
+        */
         const AABB_<T, Q> operator+(const T d) const
         {
             return AABB_<T, Q>(
@@ -185,9 +185,9 @@ namespace util {
                 min.z - d, max.z + d);
         }
 
-        /*
-        Inset AABB_ by scalar value
-    */
+        /**
+        * Inset AABB_ by scalar value
+        */
         const AABB_<T, Q> operator-(const T d) const
         {
             return AABB_<T, Q>(
@@ -196,9 +196,9 @@ namespace util {
                 min.z + d, max.z - d);
         }
 
-        /*
-        Make this AABB_ become the add of it and the other AABB_
-    */
+        /**
+        * Make this AABB_ become the add of it and the other AABB_
+        */
         AABB_<T, Q>& operator+=(const AABB_<T, Q>& a)
         {
             min.x = std::min(min.x, a.min.x),
@@ -211,9 +211,9 @@ namespace util {
             return *this;
         }
 
-        /*
-        Make this AABB_ become the union of it and the other AABB_
-    */
+        /**
+        * Make this AABB_ become the union of it and the other AABB_
+        */
         void add(const AABB_<T, Q>& a)
         {
             min.x = std::min(min.x, a.min.x),
@@ -224,9 +224,9 @@ namespace util {
             max.z = std::max(max.z, a.max.z);
         }
 
-        /*
-        Expand this AABB_ ( if necessary ) to contain the given point
-    */
+        /**
+        * Expand this AABB_ ( if necessary ) to contain the given point
+        */
         AABB_<T, Q>& operator+=(const glm::vec<3, T, Q>& p)
         {
             min.x = std::min(min.x, p.x);
@@ -239,18 +239,18 @@ namespace util {
             return *this;
         }
 
-        /*
-        Expand this AABB_ ( if necessary ) to contain the given point
-    */
+        /**
+        * Expand this AABB_ ( if necessary ) to contain the given point
+        */
         void add(const glm::vec<3, T, Q>& p)
         {
             min = glm::min(min, p);
             max = glm::max(max, p);
         }
 
-        /*
-        Expand this AABB_ ( if necessary ) ton contain the given sphere
-    */
+        /**
+        * Expand this AABB_ ( if necessary ) ton contain the given sphere
+        */
         void add(const glm::vec<3, T, Q>& p, T radius)
         {
             min.x = std::min(min.x, p.x - radius);
@@ -261,9 +261,9 @@ namespace util {
             max.z = std::max(max.z, p.z + radius);
         }
 
-        /*
-        Outset this AABB_ by scalar factor
-    */
+        /**
+        * Outset this AABB_ by scalar factor
+        */
         AABB_<T, Q>& operator+=(const T d)
         {
             min.x -= d;
@@ -276,9 +276,9 @@ namespace util {
             return *this;
         }
 
-        /*
-        Outset this AABB_ by scalar factor
-    */
+        /**
+        * Outset this AABB_ by scalar factor
+        */
         AABB_<T, Q>& outset(T d)
         {
             min.x -= d;
@@ -290,9 +290,9 @@ namespace util {
             return *this;
         }
 
-        /*
-        Inset this AABB_ by scalar factor
-    */
+        /**
+        * Inset this AABB_ by scalar factor
+        */
         AABB_<T, Q>& operator-=(const T d)
         {
             min.x += d;
@@ -305,9 +305,9 @@ namespace util {
             return *this;
         }
 
-        /*
-        Inset this AABB_ by scalar factor
-    */
+        /**
+        * Inset this AABB_ by scalar factor
+        */
         AABB_<T, Q>& inset(T d)
         {
             min.x += d;
@@ -319,9 +319,9 @@ namespace util {
             return *this;
         }
 
-        /*
-        Transform this AABB_ by p
-    */
+        /**
+        * Transform this AABB_ by p
+        */
         AABB_<T, Q>& translate(const glm::vec<3, T, Q>& p)
         {
             min += p;
@@ -329,9 +329,17 @@ namespace util {
             return *this;
         }
 
-        /*
-        return true if point is in this AABB_
-    */
+        /**
+         * Returns a copy of this AABB translated by p distance
+         */
+        AABB_<T, Q> translatedBy(const glm::vec<3, T, Q>& p) const
+        {
+            return AABB_<T, Q> { min + p, max + p };
+        }
+
+        /**
+        * return true if point is in this AABB_
+        */
         bool contains(const glm::vec<3, T, Q>& point) const
         {
             return (point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y && point.z >= min.z && point.z <= max.z);
@@ -363,9 +371,9 @@ namespace util {
             c[7] = glm::vec<3, T, Q>(max.x, max.y, min.z);
         }
 
-        /*
-        return the intersection type of this AABB_ with other
-    */
+        /**
+        * return the intersection type of this AABB_ with other
+        */
         Intersection intersect(const AABB_<T, Q>& other) const
         {
             // Check first to see if 'other' is completely inside this AABB_.
@@ -384,17 +392,17 @@ namespace util {
             return (xOverlap && yOverlap && zOverlap) ? Intersection::Intersects : Intersection::Outside;
         }
 
-        /*
-        return the intersection type of this AABB_ with the sphere at center with given radius
-    */
+        /**
+        * return the intersection type of this AABB_ with the sphere at center with given radius
+        */
         Intersection intersect(const glm::vec<3, T, Q>& center, T radius) const
         {
             return intersects(AABB_<T, Q>(center, radius));
         }
 
         /**
-     * Subdivides this AABB into 8 child AABBs
-     */
+        * Subdivides this AABB into 8 child AABBs
+        */
         void octreeSubdivide(std::array<AABB_<T, Q>, 8>& into) const
         {
             auto min = this->min;

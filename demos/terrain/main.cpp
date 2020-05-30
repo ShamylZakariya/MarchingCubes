@@ -244,10 +244,9 @@ private:
         const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
         const auto terrainTexture1Scale = 30;
         const auto renderDistance = _terrainChunkSize * 1.5;
-        const auto roundWorldRadius = WORLD_RADIUS;
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
-            roundWorldRadius,
+            0,
             ambientLight,
             lightprobeTex, skyboxTexture,
             terrainTexture0, terrainTexture0Scale,
@@ -291,7 +290,7 @@ private:
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
-        _atmosphere->setAlpha(1);
+        _atmosphere->setAlpha(0);
 
         _palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
             "Palettizer",
@@ -315,6 +314,13 @@ private:
         // build the terrain grid
         //
 
+        auto greebleFn = [this](const vec2& world) -> GreebleSample {
+            const float probability = (_fastNoise.GetSimplex(world.x, world.y) + 1) * 0.5F; // map to [0,1]
+            const vec2 offset { 0, 0 };
+            const uint64_t seed = static_cast<uint64_t>(12345 + probability * 678910);
+            return GreebleSample { probability, offset, seed };
+        };
+
         auto terrainFn = [this, terrainHeight](const vec3& world) -> float {
             if (world.y < 1e-3F) {
                 return 1;
@@ -335,7 +341,7 @@ private:
             return 0;
         };
 
-        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, terrainFn, terrainHeight);
+        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, terrainFn, terrainHeight, greebleFn);
 
         auto pos = vec3(0, terrainHeight, 0);
         auto lookTarget = pos + vec3(0, 0, 1);

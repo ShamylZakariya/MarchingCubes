@@ -49,6 +49,16 @@ public:
     Mode mode() const { return _mode; }
 
     /*
+     Create a copy of this IVOlumeSampler
+    */
+    virtual std::unique_ptr<IVolumeSampler> copy() const = 0;
+
+    /**
+     * Apply a translation to the sampler
+     */
+    virtual void translate(const glm::vec3 &by) = 0;
+
+    /*
      Return true iff bounds intersects the region affected by this sampler
     */
     virtual bool intersects(util::AABB bounds) const = 0;

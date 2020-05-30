@@ -29,6 +29,7 @@ public:
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _noise3D(noise3D)
         , _height(height)
+        , _floorThreshold(floorThreshold)
         , _floorPinion(floorThreshold / height)
         , _floorMaterial(floorMaterial)
         , _lowMaterial(lowMaterial)
@@ -37,6 +38,15 @@ public:
     }
 
     ~GroundSampler() = default;
+
+    std::unique_ptr<mc::IVolumeSampler> copy() const override
+    {
+        return std::make_unique<GroundSampler>(_noise3D, _height, _floorThreshold, _floorMaterial, _lowMaterial, _highMaterial);
+    }
+
+    void translate(const glm::vec3 &by) override {
+        _translation += by;
+    }
 
     bool intersects(AABB bounds) const override
     {
@@ -54,7 +64,8 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
     {
-        float sampleHeight = clamp(p.y / _height, 0.0F, 1.0F);
+        vec3 worldPosition = _translation + p;
+        float sampleHeight = clamp(worldPosition.y / _height, 0.0F, 1.0F);
 
         if (sampleHeight < _floorPinion) {
             material = _floorMaterial;
@@ -64,38 +75,19 @@ public:
             material = mix(_highMaterial, _lowMaterial, t * t * t);
         }
 
-        return _noise3D(p);
+        return _noise3D(worldPosition);
     }
 
 private:
     NoiseSampler3D _noise3D;
-    float _height { 0 };
-    float _floorPinion { 0 };
-
+    float _height = 0;
+    float _floorThreshold = 0;
+    float _floorPinion = 0;
+    vec3 _translation{0,0,0};
     mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
 };
 
 class Tube : public mc::IVolumeSampler {
-private:
-    vec3 _tubeAxisOrigin { 0 };
-    vec3 _tubeAxisDir { 0, 0, 1 };
-    vec3 _tubeAxisPerp { 0, 1, 0 };
-    vec3 _innerRadiusOffset { 0 };
-    float _innerRadius { 0 };
-    float _outerRadius { 0 };
-    float _innerRadius2 { 0 };
-    float _outerRadius2 { 0 };
-
-    vec3 _frontFaceNormal { 0, 0, 1 };
-    vec3 _frontFaceOrigin { 0 };
-    vec3 _backFaceNormal { 0, 0, -1 };
-    vec3 _backFaceOrigin { 0, 0, 0 };
-
-    float _cutAngleRadians { 0 };
-    float _cosCutAngle { 0 };
-    bool _hasInnerCylinderOffset = false;
-    mc::MaterialState _material;
-
 public:
     struct Config {
         // origin of the cylinder representing the outer radius of the tube
@@ -138,6 +130,7 @@ public:
 
     Tube(Config c)
         : IVolumeSampler(Mode::Additive)
+        , _config(c)
         , _tubeAxisOrigin(c.axisOrigin)
         , _tubeAxisDir(normalize(c.axisDir))
         , _tubeAxisPerp(normalize(c.axisPerp))
@@ -160,6 +153,16 @@ public:
     Tube(const Tube&) = delete;
     Tube(Tube&&) = delete;
     ~Tube() = default;
+
+    std::unique_ptr<mc::IVolumeSampler> copy() const override
+    {
+        return std::make_unique<Tube>(_config);
+    }
+
+    void translate(const vec3 &by) override {
+        _config.axisOrigin += by;
+        _tubeAxisOrigin += by;
+    }
 
     bool intersects(AABB bounds) const override
     {
@@ -303,6 +306,27 @@ private:
         pointOnAxis = origin + t * _tubeAxisDir;
         return distance2(pointOnAxis, p);
     }
+
+private:
+    Config _config;
+    vec3 _tubeAxisOrigin { 0 };
+    vec3 _tubeAxisDir { 0, 0, 1 };
+    vec3 _tubeAxisPerp { 0, 1, 0 };
+    vec3 _innerRadiusOffset { 0 };
+    float _innerRadius { 0 };
+    float _outerRadius { 0 };
+    float _innerRadius2 { 0 };
+    float _outerRadius2 { 0 };
+
+    vec3 _frontFaceNormal { 0, 0, 1 };
+    vec3 _frontFaceOrigin { 0 };
+    vec3 _backFaceNormal { 0, 0, -1 };
+    vec3 _backFaceOrigin { 0, 0, 0 };
+
+    float _cutAngleRadians { 0 };
+    float _cosCutAngle { 0 };
+    bool _hasInnerCylinderOffset = false;
+    mc::MaterialState _material;
 };
 
 #endif

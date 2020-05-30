@@ -134,6 +134,15 @@ public:
 
     ~SphereVolumeSampler() override = default;
 
+    std::unique_ptr<IVolumeSampler> copy() const override
+    {
+        return std::make_unique<SphereVolumeSampler>(_position, _radius, mode());
+    }
+
+    void translate(const glm::vec3 &by) override {
+        _position += by;
+    }
+
     bool intersects(util::AABB bounds) const override
     {
         using glm::max;
@@ -226,6 +235,15 @@ public:
     {
     }
 
+    std::unique_ptr<IVolumeSampler> copy() const override
+    {
+        return std::make_unique<HalfspaceVolumeSampler>(_origin, _normal, mode());
+    }
+
+    void translate(const glm::vec3 &by) override {
+        _origin += by;
+    }
+
     bool intersects(util::AABB bounds) const override
     {
         for (const auto& v : bounds.corners()) {
@@ -294,6 +312,15 @@ public:
     {
     }
 
+    std::unique_ptr<IVolumeSampler> copy() const override
+    {
+        return std::make_unique<BoundedPlaneVolumeSampler>(_origin, _normal, _thickness, mode());
+    }
+
+    void translate(const glm::vec3 &by) override {
+        _origin += by;
+    }
+
     bool intersects(util::AABB bounds) const override
     {
         return volume_samplers_helpers::boundedPlaneIntersection(_origin, _normal, _thickness / 2, bounds) != AABBIntersection::None;
@@ -344,6 +371,15 @@ public:
         , _rotation(rotation)
     {
         _update();
+    }
+
+    std::unique_ptr<IVolumeSampler> copy() const override
+    {
+        return std::make_unique<RectangularPrismVolumeSampler>(_origin, _halfExtents, _rotation, mode());
+    }
+
+    void translate(const glm::vec3 &by) override {
+        _origin += by;
     }
 
     bool intersects(util::AABB bounds) const override
