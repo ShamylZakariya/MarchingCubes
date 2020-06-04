@@ -234,98 +234,51 @@ void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
     }
 }
 
-void TerrainGrid::findChunksIntersecting(AABB region, std::vector<mc::util::unowned_ptr<TerrainChunk>>& into)
-{
-    for (const auto& chunk : _grid) {
-        if (chunk->getBounds().intersect(region) != AABB::Intersection::Outside) {
-            into.push_back(chunk.get());
-        }
-    }
-}
-
-void TerrainGrid::findChunksIntersecting(mc::IVolumeSampler* sampler, const vec3& samplerChunkWorldOrigin, std::vector<mc::util::unowned_ptr<TerrainChunk>>& into)
-{
-    for (const auto& chunk : _grid) {
-        const auto relativeOrigin = chunk->getWorldOrigin() - samplerChunkWorldOrigin;
-        const auto relativeBounds = AABB{ relativeOrigin, relativeOrigin + chunk->getBounds().size() };
-        if (sampler->intersects(relativeBounds)) {
-            into.push_back(chunk);
-        }
-    }
+bool TerrainGrid::samplerIntersects(mc::IVolumeSampler* sampler, const vec3& samplerChunkWorldOrigin, const AABB worldBounds) {
+    const auto relativeOrigin = worldBounds.min - samplerChunkWorldOrigin;
+    const auto relativeBounds = AABB { relativeOrigin, relativeOrigin + worldBounds.size() };
+     return sampler->intersects(relativeBounds);
 }
 
 void TerrainGrid::updateGreebling()
 {
-    std::vector<mc::util::unowned_ptr<TerrainChunk>> chunks;
-
+    const float sampleFrequency = 5.0F;
     for (const auto& chunk : _dirtyChunks) {
-        std::cout << "Greebling chunk " << glm::to_string(chunk->getIndex()) << std::endl;
+        const auto chunkBounds = chunk->getBounds();
 
-        auto bounds = chunk->getBounds();
-        auto center = bounds.size() / 2;
-        auto position = vec3{0, center.y, center.z};
+        const auto extent = chunkBounds.size();
+        const auto greebleBounds = AABB(
+            vec3(chunkBounds.min.x - extent.x, chunkBounds.min.y, chunkBounds.min.z - extent.z),
+            vec3(chunkBounds.max.x + extent.x, chunkBounds.max.y, chunkBounds.max.z + extent.z));
+        const auto stepSize = greebleBounds.size() / (3 * sampleFrequency);
+        for (float x = greebleBounds.min.x; x <= greebleBounds.max.x; x += stepSize.x) {
+            for (float z = greebleBounds.min.z; z <= greebleBounds.max.z; z += stepSize.z) {
+                ivec2 world(floor(x), floor(z));
+                const GreebleSample greebleSample = _greebleSampler(world);
+                if (greebleSample.probability > 0.7) {
 
-        auto shape = std::make_unique<mc::SphereVolumeSampler>(position, 20, mc::IVolumeSampler::Mode::Additive);
-        chunks.clear();
-        findChunksIntersecting(shape.get(), chunk->getWorldOrigin(), chunks);
+                    auto lx = x - chunkBounds.min.x;
+                    auto lz = z - chunkBounds.min.z;
 
-        if (chunks.size() == 1) {
-            std::cout << "\tInserting shape " << shape.get() << " into SINGLE chunk " << glm::to_string(chunk->getIndex()) << std::endl;
-            chunks.front()->getVolume()->add(std::move(shape));
-        } else if (chunks.size() > 1) {
-            for (const auto& spanningChunk : chunks) {
-                std::cout << "\tInserting shape " << shape.get() << " into SPANNING chunk " << glm::to_string(chunk->getIndex()) << std::endl;
-                // create a translation to apply to the clone so that when inserted into spanning chunk, it will
-                // be in the right local position to map to the same world position as the source chunk.
-                const auto translation = chunk->getWorldOrigin() - spanningChunk->getWorldOrigin();
-                auto clone = shape->copy();
-                clone->translate(translation);
-                spanningChunk->getVolume()->add(std::move(clone));
+                    // create an arch
+                    auto rng = rng_xorshift64 { greebleSample.seed };
+                    Tube::Config arch;
+                    arch.axisOrigin = vec3 { lx + greebleSample.offset.x, 0, lz + greebleSample.offset.y };
+                    arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(4, 10), 0);
+                    arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
+                    arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
+                    arch.length = rng.nextFloat(3, 7);
+                    arch.innerRadius = rng.nextFloat(10, 15);
+                    arch.outerRadius = rng.nextFloat(20, 35);
+                    arch.frontFaceNormal = arch.axisDir;
+                    arch.backFaceNormal = -arch.axisDir;
+                    arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
+                    arch.material = kArchMaterial;
+                    chunk->getVolume()->add(std::make_unique<Tube>(arch));
+                }
             }
         }
     }
-
-    // for (const auto& chunk : _dirtyChunks) {
-    //     const auto bounds = chunk->getBounds();
-    //     const auto stepSize = bounds.size() / 10.0F;
-    //     for (float x = bounds.min.x; x < bounds.max.x; x += stepSize.x) {
-    //         for (float z = bounds.min.z; z < bounds.max.z; z += stepSize.z) {
-    //             const GreebleSample greeble = _greebleSampler(vec2(floor(x), floor(z)));
-    //             if (greeble.probability > 0.7) {
-    //                 auto rng = rng_xorshift64 { greeble.seed };
-    //                 // create an arch
-
-    //                 Tube::Config arch;
-    //                 arch.axisOrigin = vec3 { x + greeble.offset.x, 0, z + greeble.offset.y };
-    //                 arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(4, 10), 0);
-    //                 arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
-    //                 arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
-    //                 arch.length = rng.nextFloat(7, 11);
-    //                 arch.innerRadius = rng.nextFloat(35, 43);
-    //                 arch.outerRadius = rng.nextFloat(48, 55);
-    //                 arch.frontFaceNormal = arch.axisDir;
-    //                 arch.backFaceNormal = -arch.axisDir;
-    //                 arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
-    //                 arch.material = kArchMaterial;
-
-    //                 auto tubeProto = std::make_unique<Tube>(arch);
-    //                 chunks.clear();
-    //                 findChunksIntersecting(tubeProto.get(), chunks);
-
-    //                 if (chunks.size() == 1) {
-    //                     chunks.front()->getVolume()->add(std::move(tubeProto));
-    //                 } else if (chunks.size() > 1) {
-    //                     for (const auto& chunk : chunks) {
-    //                         chunk->getVolume()->add(tubeProto->copy());
-    //                     }
-    //                 }
-
-    //             } else if (greeble.probability < 0.3) {
-    //                 // create something else? A boulder? A tower?
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 void TerrainGrid::marchSerially()

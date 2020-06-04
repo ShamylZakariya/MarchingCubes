@@ -133,6 +133,10 @@ public:
         return _size;
     }
 
+    std::size_t count() const {
+        return _samplers.size();
+    }
+
     void setFuzziness(float ft) { _fuzziness = std::max<float>(ft, 0); }
     float fuzziness() const { return _fuzziness; }
 

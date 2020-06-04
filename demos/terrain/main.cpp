@@ -51,6 +51,7 @@ constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
 constexpr float UI_SCALE = 1.5F;
 constexpr float WORLD_RADIUS = 400;
+constexpr int TERRAIN_GRID_SIZE = 3;
 
 //
 // App
@@ -321,6 +322,8 @@ private:
             return GreebleSample { probability, offset, seed };
         };
 
+        // this is a nice simple terrain function which is a bit of a noise-based heightmap
+        // with some volumetric noise thrown in to provide blobbiness and overhangs
         auto terrainFn = [this, terrainHeight](const vec3& world) -> float {
             if (world.y < 1e-3F) {
                 return 1;
@@ -330,9 +333,6 @@ private:
             float noise3D = _fastNoise.GetSimplex(world.x * 11, world.y * 11, world.z * 11);
             float height = std::max(terrainHeight * noise2D, 0.0F);
             if (world.y < height) {
-                // float fade = max((height - world.y) / 8.0F, 1.0F);
-                // return fade * (1 + noise3D);
-
                 float a = (height - world.y) / height;
                 a = a * (a + 0.6F * noise3D);
                 return a;
@@ -341,7 +341,7 @@ private:
             return 0;
         };
 
-        _terrainGrid = std::make_unique<TerrainGrid>(5, _terrainChunkSize, terrainFn, terrainHeight, greebleFn);
+        _terrainGrid = std::make_unique<TerrainGrid>(TERRAIN_GRID_SIZE, _terrainChunkSize, terrainFn, terrainHeight, greebleFn);
 
         auto pos = vec3(0, terrainHeight, 0);
         auto lookTarget = pos + vec3(0, 0, 1);
@@ -487,7 +487,11 @@ private:
         ImGui::Checkbox("Draw AABBs", &_drawOctreeAABBs);
         ImGui::Checkbox("Draw Markers", &_drawMarkers);
 
-        ImGui::SliderInt("Pixel Scale", &_pixelScale, 1, 64);
+        ImU32 pixelScale = _pixelScale;
+        ImU32 pixelScaleStep = 1;
+        if (ImGui::InputScalar("Pixel Scale", ImGuiDataType_U32, &pixelScale, &pixelScaleStep, nullptr)) {
+            _pixelScale = max<int>(pixelScale, 1);
+        }
 
         bool roundWorld = _terrainMaterial->getWorldRadius() > 0;
         if (ImGui::Checkbox("Round World", &roundWorld)) {
@@ -587,7 +591,7 @@ private:
     // user input state
     int _pixelScale = 2;
     bool _drawOctreeAABBs = false;
-    bool _drawMarkers = false;
+    bool _drawMarkers = true;
 
     // demo state
     int _terrainChunkSize = 0;

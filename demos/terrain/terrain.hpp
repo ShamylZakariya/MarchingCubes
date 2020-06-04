@@ -149,24 +149,14 @@ public:
     int getCount() const { return _gridSize * _gridSize; }
     bool isMarching() const { return _isMarching; }
 
-    /**
-     * Returns a list of TerrainChunks which intersect the provided AABB
-     */
-    std::vector<mc::util::unowned_ptr<TerrainChunk>> findChunksIntersecting(AABB region)
-    {
-        std::vector<mc::util::unowned_ptr<TerrainChunk>> store;
-        findChunksIntersecting(region, store);
-        return store;
-    }
-
 private:
-    void findChunksIntersecting(AABB region, std::vector<mc::util::unowned_ptr<TerrainChunk>>& into);
-
     /**
-     * Find terrain chunks which intersect the given sampler. Since samplers are defined in chunk-local space (not world)
-     * this requires the world origin of a terrain chunk to act as a root coordinate system.
+     * Returns true if the sampler intersects the given bounds in world coordinates. Note, samplers
+     * exist in the coordinate system of a specific volume, so to work, this method requires
+     * samplerChunkWorldOrigin which is the origin of the terrain chunk the sampler is in.
      */
-    void findChunksIntersecting(mc::IVolumeSampler* sampler, const vec3& samplerChunkWorldOrigin, std::vector<mc::util::unowned_ptr<TerrainChunk>>& into);
+    bool samplerIntersects(mc::IVolumeSampler* sampler, const vec3& samplerChunkWorldOrigin, const AABB worldBounds);
+
     void updateGreebling();
     void marchSerially();
 
@@ -178,7 +168,6 @@ private:
     std::vector<std::unique_ptr<TerrainChunk>> _grid;
     std::vector<TerrainChunk*> _dirtyChunks;
     GreebleSampler _greebleSampler;
-    std::map<glm::ivec2, std::vector<mc::IVolumeSampler*>> _greebleSamplersByGridIndex;
 };
 
 #endif
