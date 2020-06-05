@@ -26,6 +26,7 @@
 
 #include "../common/cubemap_blur.hpp"
 #include "../common/post_processing_stack.hpp"
+#include "../common/xorshift.hpp"
 #include "FastNoise.h"
 #include "camera.hpp"
 #include "filters.hpp"
@@ -315,33 +316,83 @@ private:
         // build the terrain grid
         //
 
-        auto greebleFn = [this](const vec2& world) -> GreebleSample {
-            const float probability = (_fastNoise.GetSimplex(world.x, world.y) + 1) * 0.5F; // map to [0,1]
-            const vec2 offset { 0, 0 };
-            const uint64_t seed = static_cast<uint64_t>(12345 + probability * 678910);
-            return GreebleSample { probability, offset, seed };
+        class LumpyTerrainSource : public TerrainSource {
+        private:
+            FastNoise& _noise;
+            float _maxHeight;
+
+        public:
+            LumpyTerrainSource(FastNoise& noise, float maxHeight)
+                : _noise(noise)
+                , _maxHeight(maxHeight)
+            {
+            }
+            float maxHeight() const override
+            {
+                return _maxHeight;
+            }
+            float sample(const vec3& world) const override
+            {
+                if (world.y < 1e-3F) {
+                    return 1;
+                }
+
+                float noise2D = _noise.GetSimplex(world.x, world.z);
+                float noise3D = _noise.GetSimplex(world.x * 11, world.y * 11, world.z * 11);
+                float height = std::max(_maxHeight * noise2D, 0.0F);
+                if (world.y < height) {
+                    float a = (height - world.y) / height;
+                    a = a * (a + 0.6F * noise3D);
+                    return a;
+                }
+
+                return 0;
+            }
         };
 
-        // this is a nice simple terrain function which is a bit of a noise-based heightmap
-        // with some volumetric noise thrown in to provide blobbiness and overhangs
-        auto terrainFn = [this, terrainHeight](const vec3& world) -> float {
-            if (world.y < 1e-3F) {
-                return 1;
+        class Greebler : public GreebleSource {
+        private:
+            FastNoise& _noise;
+
+        public:
+            Greebler(FastNoise& fn)
+                : _noise(fn)
+            {
             }
 
-            float noise2D = _fastNoise.GetSimplex(world.x, world.z);
-            float noise3D = _fastNoise.GetSimplex(world.x * 11, world.y * 11, world.z * 11);
-            float height = std::max(terrainHeight * noise2D, 0.0F);
-            if (world.y < height) {
-                float a = (height - world.y) / height;
-                a = a * (a + 0.6F * noise3D);
-                return a;
+            Sample sample(const vec3 world) const override
+            {
+                const float probability = (_noise.GetSimplex(world.x, world.z) + 1) * 0.5F; // map to [0,1]
+                const vec3 offset { 0 };
+                const uint64_t seed = static_cast<uint64_t>(12345 + probability * 678910);
+                return Sample { probability, offset, seed };
             }
 
-            return 0;
+            std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample& sample, const vec3& local) const override
+            {
+                if (sample.probability > 0.9) {
+                    auto rng = rng_xorshift64 { sample.seed };
+                    Tube::Config arch;
+                    arch.axisOrigin = vec3 { local.x + sample.offset.x, 0, local.z + sample.offset.y };
+                    arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(4, 10), 0);
+                    arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
+                    arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
+                    arch.length = rng.nextFloat(3, 7);
+                    arch.innerRadius = rng.nextFloat(10, 15);
+                    arch.outerRadius = rng.nextFloat(20, 35);
+                    arch.frontFaceNormal = arch.axisDir;
+                    arch.backFaceNormal = -arch.axisDir;
+                    arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
+                    arch.material = kArchMaterial;
+                    return std::make_unique<Tube>(arch);
+                }
+                return nullptr;
+            }
         };
 
-        _terrainGrid = std::make_unique<TerrainGrid>(TERRAIN_GRID_SIZE, _terrainChunkSize, terrainFn, terrainHeight, greebleFn);
+        std::unique_ptr<TerrainSource> terrainSource = std::make_unique<LumpyTerrainSource>(_fastNoise, terrainHeight);
+        std::unique_ptr<GreebleSource> greebleSource = std::make_unique<Greebler>(_fastNoise);
+        _terrainGrid = std::make_unique<TerrainGrid>(TERRAIN_GRID_SIZE, _terrainChunkSize, std::move(terrainSource), std::move(greebleSource));
 
         auto pos = vec3(0, terrainHeight, 0);
         auto lookTarget = pos + vec3(0, 0, 1);

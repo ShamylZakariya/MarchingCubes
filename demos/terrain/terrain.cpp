@@ -3,7 +3,6 @@
 #include <glm/ext.hpp>
 #include <glm/gtc/noise.hpp>
 
-#include "../common/xorshift.hpp"
 #include "materials.hpp"
 #include "terrain_samplers.hpp"
 
@@ -27,12 +26,12 @@ vec4 nodeColor(int atDepth)
 
 }
 
-TerrainChunk::TerrainChunk(int size, TerrainVolumeSampler terrainFn, float maxHeight)
+TerrainChunk::TerrainChunk(int size, mc::util::unowned_ptr<TerrainSource> terrain)
     : _index(0, 0)
     , _size(size)
-    , _maxHeight(maxHeight)
+    , _maxHeight(terrain->maxHeight())
     , _threadPool(std::thread::hardware_concurrency(), true)
-    , _terrainVolume(terrainFn)
+    , _terrain(terrain)
 {
     std::vector<mc::util::unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
     for (size_t i = 0, N = _threadPool.size(); i < N; i++) {
@@ -64,7 +63,7 @@ void TerrainChunk::setIndex(ivec2 index)
     // build a ground sampling volume
     auto noise = [this, xzOffset](const vec3& world) -> float {
         auto s = world + vec3(xzOffset.x, 0, xzOffset.y);
-        return _terrainVolume(s);
+        return _terrain->sample(s);
     };
 
     _groundSampler = _volume->add(std::make_unique<GroundSampler>(noise, _maxHeight, kFloorThreshold,
@@ -114,16 +113,17 @@ int makeOdd(int v)
 }
 }
 
-TerrainGrid::TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terrainFn, float maxHeight, GreebleSampler greebleSampler)
+TerrainGrid::TerrainGrid(int gridSize, int chunkSize, std::unique_ptr<TerrainSource> &&terrain, std::unique_ptr<GreebleSource> &&greebler)
     : _gridSize(makeOdd(gridSize))
     , _chunkSize(chunkSize)
-    , _greebleSampler(greebleSampler)
+    , _terrain(std::move(terrain))
+    , _greebler(std::move(greebler))
 {
     _grid.resize(_gridSize * _gridSize);
     for (int i = 0; i < _gridSize; i++) {
         for (int j = 0; j < _gridSize; j++) {
             int k = i * _gridSize + j;
-            _grid[k] = std::make_unique<TerrainChunk>(chunkSize, terrainFn, maxHeight);
+            _grid[k] = std::make_unique<TerrainChunk>(chunkSize, _terrain.get());
             _grid[k]->setIndex(ivec2(j - _gridSize / 2, i - _gridSize / 2));
         }
     }
@@ -242,7 +242,15 @@ bool TerrainGrid::samplerIntersects(mc::IVolumeSampler* sampler, const vec3& sam
 
 void TerrainGrid::updateGreebling()
 {
-    const float sampleFrequency = 5.0F;
+    if (!_greebler) return;
+
+    // I still have artifacts because stepping on thirds doesn't solve the problem probably
+    const float stepSize = 15;
+    auto snap = [stepSize](float v)->float {
+        int x = v / stepSize;
+        return x * stepSize;
+    };
+
     for (const auto& chunk : _dirtyChunks) {
         const auto chunkBounds = chunk->getBounds();
 
@@ -250,31 +258,14 @@ void TerrainGrid::updateGreebling()
         const auto greebleBounds = AABB(
             vec3(chunkBounds.min.x - extent.x, chunkBounds.min.y, chunkBounds.min.z - extent.z),
             vec3(chunkBounds.max.x + extent.x, chunkBounds.max.y, chunkBounds.max.z + extent.z));
-        const auto stepSize = greebleBounds.size() / (3 * sampleFrequency);
-        for (float x = greebleBounds.min.x; x <= greebleBounds.max.x; x += stepSize.x) {
-            for (float z = greebleBounds.min.z; z <= greebleBounds.max.z; z += stepSize.z) {
-                ivec2 world(floor(x), floor(z));
-                const GreebleSample greebleSample = _greebleSampler(world);
-                if (greebleSample.probability > 0.7) {
-
-                    auto lx = x - chunkBounds.min.x;
-                    auto lz = z - chunkBounds.min.z;
-
-                    // create an arch
-                    auto rng = rng_xorshift64 { greebleSample.seed };
-                    Tube::Config arch;
-                    arch.axisOrigin = vec3 { lx + greebleSample.offset.x, 0, lz + greebleSample.offset.y };
-                    arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(4, 10), 0);
-                    arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
-                    arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
-                    arch.length = rng.nextFloat(3, 7);
-                    arch.innerRadius = rng.nextFloat(10, 15);
-                    arch.outerRadius = rng.nextFloat(20, 35);
-                    arch.frontFaceNormal = arch.axisDir;
-                    arch.backFaceNormal = -arch.axisDir;
-                    arch.cutAngleRadians = radians(rng.nextFloat(16, 32));
-                    arch.material = kArchMaterial;
-                    chunk->getVolume()->add(std::make_unique<Tube>(arch));
+        for (float x = greebleBounds.min.x; x <= greebleBounds.max.x; x += stepSize) {
+            for (float z = greebleBounds.min.z; z <= greebleBounds.max.z; z += stepSize) {
+                const vec3 world(snap(x), 0, snap(z));
+                const GreebleSource::Sample sample = _greebler->sample(world);
+                const vec3 local(x - chunkBounds.min.x, 0, z - chunkBounds.min.z);
+                std::unique_ptr<mc::IVolumeSampler> greeble = _greebler->evaluate(sample, local);
+                if (greeble) {
+                    chunk->getVolume()->add(std::move(greeble));
                 }
             }
         }

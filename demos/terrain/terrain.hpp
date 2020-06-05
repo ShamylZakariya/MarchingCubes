@@ -15,14 +15,28 @@
 #include "FastNoise.h"
 #include "terrain_samplers.hpp"
 
-typedef std::function<float(const vec3&)> TerrainVolumeSampler;
-
-struct GreebleSample {
-    float probability;
-    glm::vec2 offset;
-    uint64_t seed;
+class TerrainSource {
+public:
+    TerrainSource() = default;
+    virtual ~TerrainSource() = default;
+    virtual float maxHeight() const = 0;
+    virtual float sample(const vec3 &world) const = 0;
 };
-typedef std::function<GreebleSample(const vec2&)> GreebleSampler;
+
+class GreebleSource {
+public:
+    struct Sample {
+        float probability;
+        glm::vec3 offset;
+        uint64_t seed;
+    };
+
+public:
+    GreebleSource() = default;
+    virtual ~GreebleSource() = default;
+    virtual Sample sample(const vec3 world) const = 0;
+    virtual std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample &sample, const vec3 &local) const = 0;
+};
 
 const mc::MaterialState kFloorTerrainMaterial {
     glm::vec4(0, 0, 0, 1),
@@ -57,7 +71,7 @@ public:
     /**
      * Create a cube of terrain, where size is the size of an edge of the cube.
      */
-    TerrainChunk(int size, TerrainVolumeSampler terrainFn, float maxHeight);
+    TerrainChunk(int size, mc::util::unowned_ptr<TerrainSource> terrain);
 
     ~TerrainChunk() = default;
     TerrainChunk(const TerrainChunk&) = delete;
@@ -95,7 +109,7 @@ private:
     float _maxHeight = 0;
     mc::util::ThreadPool _threadPool;
     mc::util::AABB _bounds;
-    TerrainVolumeSampler _terrainVolume;
+    mc::util::unowned_ptr<TerrainSource> _terrain;
     std::unique_ptr<mc::OctreeVolume> _volume;
     mc::util::unowned_ptr<GroundSampler> _groundSampler;
     std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangles;
@@ -111,7 +125,7 @@ public:
     /**
      * Create a terrain grid size*size
      */
-    TerrainGrid(int gridSize, int chunkSize, TerrainVolumeSampler terrainFn, float terrainHeight, GreebleSampler greebler);
+    TerrainGrid(int gridSize, int chunkSize, std::unique_ptr<TerrainSource> &&terrain, std::unique_ptr<GreebleSource> &&greebler);
 
     /**
      * Convert a position in world space to the corresponding tile index.
@@ -167,7 +181,8 @@ private:
     bool _isMarching = false;
     std::vector<std::unique_ptr<TerrainChunk>> _grid;
     std::vector<TerrainChunk*> _dirtyChunks;
-    GreebleSampler _greebleSampler;
+    std::unique_ptr<TerrainSource> _terrain;
+    std::unique_ptr<GreebleSource> _greebler;
 };
 
 #endif
