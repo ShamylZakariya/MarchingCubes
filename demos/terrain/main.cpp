@@ -26,7 +26,6 @@
 
 #include "../common/cubemap_blur.hpp"
 #include "../common/post_processing_stack.hpp"
-#include "../common/xorshift.hpp"
 #include "FastNoise.h"
 #include "camera.hpp"
 #include "filters.hpp"
@@ -360,17 +359,23 @@ private:
             {
             }
 
+            int sampleStepSize() const override
+            {
+                return 15;
+            }
+
             Sample sample(const vec3 world) const override
             {
                 const float probability = (_noise.GetSimplex(world.x, world.z) + 1) * 0.5F; // map to [0,1]
-                const vec3 offset { 0 };
                 const uint64_t seed = static_cast<uint64_t>(12345 + probability * 678910);
+                auto rng = rng_xorshift64 { seed };
+                const vec3 offset { rng.nextFloat(-5, 5), rng.nextFloat(-5, 5), rng.nextFloat(-5, 5) };
                 return Sample { probability, offset, seed };
             }
 
             std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample& sample, const vec3& local) const override
             {
-                if (sample.probability > 0.9) {
+                if (sample.probability > 0.7) {
                     auto rng = rng_xorshift64 { sample.seed };
                     Tube::Config arch;
                     arch.axisOrigin = vec3 { local.x + sample.offset.x, 0, local.z + sample.offset.y };

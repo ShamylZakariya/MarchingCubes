@@ -12,8 +12,10 @@
 #include <mc/volume.hpp>
 #include <mc/volume_samplers.hpp>
 
+#include "../common/xorshift.hpp"
 #include "FastNoise.h"
 #include "terrain_samplers.hpp"
+
 
 class TerrainSource {
 public:
@@ -34,6 +36,7 @@ public:
 public:
     GreebleSource() = default;
     virtual ~GreebleSource() = default;
+    virtual int sampleStepSize() const = 0;
     virtual Sample sample(const vec3 world) const = 0;
     virtual std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample &sample, const vec3 &local) const = 0;
 };

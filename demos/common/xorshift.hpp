@@ -10,7 +10,7 @@ struct xorshift32_state {
 };
 
 /* The state word must be initialized to non-zero */
-uint32_t xorshift32(struct xorshift32_state* state)
+inline uint32_t xorshift32(struct xorshift32_state* state)
 {
     /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
     uint32_t x = state->a;
@@ -24,7 +24,7 @@ struct xorshift64_state {
     uint64_t a;
 };
 
-uint64_t xorshift64(struct xorshift64_state* state)
+inline uint64_t xorshift64(struct xorshift64_state* state)
 {
     uint64_t x = state->a;
     x ^= x << 13;
@@ -38,7 +38,7 @@ struct xorshift128_state {
 };
 
 /* The state array must be initialized to not be all zero */
-uint32_t xorshift128(struct xorshift128_state* state)
+inline uint32_t xorshift128(struct xorshift128_state* state)
 {
     /* Algorithm "xor128" from p. 5 of Marsaglia, "Xorshift RNGs" */
     uint32_t t = state->d;

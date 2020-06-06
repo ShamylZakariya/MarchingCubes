@@ -240,29 +240,30 @@ bool TerrainGrid::samplerIntersects(mc::IVolumeSampler* sampler, const vec3& sam
      return sampler->intersects(relativeBounds);
 }
 
+namespace {
+    float snap(float v, int step) {
+        int x = v / step;
+        return x * step;
+    }
+}
+
 void TerrainGrid::updateGreebling()
 {
     if (!_greebler) return;
 
-    // I still have artifacts because stepping on thirds doesn't solve the problem probably
-    const float stepSize = 15;
-    auto snap = [stepSize](float v)->float {
-        int x = v / stepSize;
-        return x * stepSize;
-    };
-
+    const int step = _greebler->sampleStepSize();
     for (const auto& chunk : _dirtyChunks) {
         const auto chunkBounds = chunk->getBounds();
-
         const auto extent = chunkBounds.size();
-        const auto greebleBounds = AABB(
-            vec3(chunkBounds.min.x - extent.x, chunkBounds.min.y, chunkBounds.min.z - extent.z),
-            vec3(chunkBounds.max.x + extent.x, chunkBounds.max.y, chunkBounds.max.z + extent.z));
-        for (float x = greebleBounds.min.x; x <= greebleBounds.max.x; x += stepSize) {
-            for (float z = greebleBounds.min.z; z <= greebleBounds.max.z; z += stepSize) {
-                const vec3 world(snap(x), 0, snap(z));
+        const auto range = AABB(
+            vec3(snap(chunkBounds.min.x - extent.x, step), chunkBounds.min.y, snap(chunkBounds.min.z - extent.z, step)),
+            vec3(snap(chunkBounds.max.x + extent.x, step), chunkBounds.max.y, snap(chunkBounds.max.z + extent.z, step)));
+
+        for (float x = range.min.x; x <= range.max.x; x += step) {
+            for (float z = range.min.z; z <= range.max.z; z += step) {
+                const vec3 world(x, 0, z);
                 const GreebleSource::Sample sample = _greebler->sample(world);
-                const vec3 local(x - chunkBounds.min.x, 0, z - chunkBounds.min.z);
+                const vec3 local(world.x - chunkBounds.min.x, 0, world.z - chunkBounds.min.z);
                 std::unique_ptr<mc::IVolumeSampler> greeble = _greebler->evaluate(sample, local);
                 if (greeble) {
                     chunk->getVolume()->add(std::move(greeble));
