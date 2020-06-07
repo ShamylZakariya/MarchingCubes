@@ -192,8 +192,8 @@ public:
     {
         using namespace glm;
         const auto right = vec3 { _look[0][0], _look[1][0], _look[2][0] };
-        _look = rotate(mat4{_look}, pitch, right);
-        _look = rotate(mat4{_look}, yaw, vec3{0,1,0});
+        _look = rotate(mat4 { _look }, pitch, right);
+        _look = rotate(mat4 { _look }, yaw, vec3 { 0, 1, 0 });
     }
 
     void lookAt(glm::vec3 position, glm::vec3 at, glm::vec3 up = glm::vec3(0, 1, 0))

@@ -16,15 +16,6 @@
 #include "FastNoise.h"
 #include "terrain_samplers.hpp"
 
-
-class TerrainSource {
-public:
-    TerrainSource() = default;
-    virtual ~TerrainSource() = default;
-    virtual float maxHeight() const = 0;
-    virtual float sample(const vec3 &world) const = 0;
-};
-
 class GreebleSource {
 public:
     struct Sample {
@@ -74,7 +65,7 @@ public:
     /**
      * Create a cube of terrain, where size is the size of an edge of the cube.
      */
-    TerrainChunk(int size, mc::util::unowned_ptr<TerrainSource> terrain);
+    TerrainChunk(int size, mc::util::unowned_ptr<TerrainSampleSource> terrain);
 
     ~TerrainChunk() = default;
     TerrainChunk(const TerrainChunk&) = delete;
@@ -112,9 +103,9 @@ private:
     float _maxHeight = 0;
     mc::util::ThreadPool _threadPool;
     mc::util::AABB _bounds;
-    mc::util::unowned_ptr<TerrainSource> _terrain;
+    mc::util::unowned_ptr<TerrainSampleSource> _terrainSampleSource;
     std::unique_ptr<mc::OctreeVolume> _volume;
-    mc::util::unowned_ptr<GroundSampler> _groundSampler;
+    mc::util::unowned_ptr<TerrainSampler> _groundSampler;
     std::vector<std::unique_ptr<mc::TriangleConsumer<mc::Vertex>>> _triangles;
     mc::util::LineSegmentBuffer _aabbLineBuffer;
     mc::util::LineSegmentBuffer _boundingLineBuffer;
@@ -128,7 +119,7 @@ public:
     /**
      * Create a terrain grid size*size
      */
-    TerrainGrid(int gridSize, int chunkSize, std::unique_ptr<TerrainSource> &&terrain, std::unique_ptr<GreebleSource> &&greebler);
+    TerrainGrid(int gridSize, int chunkSize, std::unique_ptr<TerrainSampleSource> &&terrain, std::unique_ptr<GreebleSource> &&greebler);
 
     /**
      * Convert a position in world space to the corresponding tile index.
@@ -184,8 +175,8 @@ private:
     bool _isMarching = false;
     std::vector<std::unique_ptr<TerrainChunk>> _grid;
     std::vector<TerrainChunk*> _dirtyChunks;
-    std::unique_ptr<TerrainSource> _terrain;
-    std::unique_ptr<GreebleSource> _greebler;
+    std::unique_ptr<TerrainSampleSource> _terrainSampleSource;
+    std::unique_ptr<GreebleSource> _greebleSource;
 };
 
 #endif

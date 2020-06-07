@@ -26,12 +26,12 @@ vec4 nodeColor(int atDepth)
 
 }
 
-TerrainChunk::TerrainChunk(int size, mc::util::unowned_ptr<TerrainSource> terrain)
+TerrainChunk::TerrainChunk(int size, mc::util::unowned_ptr<TerrainSampleSource> terrain)
     : _index(0, 0)
     , _size(size)
     , _maxHeight(terrain->maxHeight())
     , _threadPool(std::thread::hardware_concurrency(), true)
-    , _terrain(terrain)
+    , _terrainSampleSource(terrain)
 {
     std::vector<mc::util::unowned_ptr<mc::TriangleConsumer<mc::Vertex>>> unownedTriangleConsumers;
     for (size_t i = 0, N = _threadPool.size(); i < N; i++) {
@@ -55,18 +55,12 @@ void TerrainChunk::setIndex(ivec2 index)
 
     const auto xzOffset = getXZOffset();
     const auto size = vec3(_volume->size());
-    const auto worldOrigin = vec3(xzOffset.x, 0, xzOffset.y);
+    const auto sampleOffset = vec3(xzOffset.x, 0, xzOffset.y);
 
     // bounds are in world not local space
-    _bounds = AABB(worldOrigin, worldOrigin + size);
+    _bounds = AABB(sampleOffset, sampleOffset + size);
 
-    // build a ground sampling volume
-    auto noise = [this, xzOffset](const vec3& world) -> float {
-        auto s = world + vec3(xzOffset.x, 0, xzOffset.y);
-        return _terrain->sample(s);
-    };
-
-    _groundSampler = _volume->add(std::make_unique<GroundSampler>(noise, _maxHeight, kFloorThreshold,
+    _groundSampler = _volume->add(std::make_unique<TerrainSampler>(_terrainSampleSource, sampleOffset, kFloorThreshold,
         kFloorTerrainMaterial, kLowTerrainMaterial, kHighTerrainMaterial));
 
     //  Build a debug frame to show our volume
@@ -113,17 +107,19 @@ int makeOdd(int v)
 }
 }
 
-TerrainGrid::TerrainGrid(int gridSize, int chunkSize, std::unique_ptr<TerrainSource> &&terrain, std::unique_ptr<GreebleSource> &&greebler)
+TerrainGrid::TerrainGrid(int gridSize, int chunkSize,
+    std::unique_ptr<TerrainSampleSource>&& terrainSampleSource,
+    std::unique_ptr<GreebleSource>&& greebleSource)
     : _gridSize(makeOdd(gridSize))
     , _chunkSize(chunkSize)
-    , _terrain(std::move(terrain))
-    , _greebler(std::move(greebler))
+    , _terrainSampleSource(std::move(terrainSampleSource))
+    , _greebleSource(std::move(greebleSource))
 {
     _grid.resize(_gridSize * _gridSize);
     for (int i = 0; i < _gridSize; i++) {
         for (int j = 0; j < _gridSize; j++) {
             int k = i * _gridSize + j;
-            _grid[k] = std::make_unique<TerrainChunk>(chunkSize, _terrain.get());
+            _grid[k] = std::make_unique<TerrainChunk>(chunkSize, _terrainSampleSource.get());
             _grid[k]->setIndex(ivec2(j - _gridSize / 2, i - _gridSize / 2));
         }
     }
@@ -234,24 +230,27 @@ void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
     }
 }
 
-bool TerrainGrid::samplerIntersects(mc::IVolumeSampler* sampler, const vec3& samplerChunkWorldOrigin, const AABB worldBounds) {
+bool TerrainGrid::samplerIntersects(mc::IVolumeSampler* sampler, const vec3& samplerChunkWorldOrigin, const AABB worldBounds)
+{
     const auto relativeOrigin = worldBounds.min - samplerChunkWorldOrigin;
     const auto relativeBounds = AABB { relativeOrigin, relativeOrigin + worldBounds.size() };
-     return sampler->intersects(relativeBounds);
+    return sampler->intersects(relativeBounds);
 }
 
 namespace {
-    float snap(float v, int step) {
-        int x = v / step;
-        return x * step;
-    }
+float snap(float v, int step)
+{
+    int x = v / step;
+    return x * step;
+}
 }
 
 void TerrainGrid::updateGreebling()
 {
-    if (!_greebler) return;
+    if (!_greebleSource)
+        return;
 
-    const int step = _greebler->sampleStepSize();
+    const int step = _greebleSource->sampleStepSize();
     for (const auto& chunk : _dirtyChunks) {
         const auto chunkBounds = chunk->getBounds();
         const auto extent = chunkBounds.size();
@@ -262,9 +261,9 @@ void TerrainGrid::updateGreebling()
         for (float x = range.min.x; x <= range.max.x; x += step) {
             for (float z = range.min.z; z <= range.max.z; z += step) {
                 const vec3 world(x, 0, z);
-                const GreebleSource::Sample sample = _greebler->sample(world);
+                const GreebleSource::Sample sample = _greebleSource->sample(world);
                 const vec3 local(world.x - chunkBounds.min.x, 0, world.z - chunkBounds.min.z);
-                std::unique_ptr<mc::IVolumeSampler> greeble = _greebler->evaluate(sample, local);
+                std::unique_ptr<mc::IVolumeSampler> greeble = _greebleSource->evaluate(sample, local);
                 if (greeble) {
                     chunk->getVolume()->add(std::move(greeble));
                 }

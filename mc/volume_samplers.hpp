@@ -124,7 +124,7 @@ namespace volume_samplers_helpers {
  */
 class SphereVolumeSampler : public IVolumeSampler {
 public:
-    SphereVolumeSampler(glm::vec3 position, float radius, const MaterialState &material, Mode mode)
+    SphereVolumeSampler(glm::vec3 position, float radius, const MaterialState& material, Mode mode)
         : IVolumeSampler(mode)
         , _position(position)
         , _radius(radius)
@@ -229,7 +229,7 @@ on the negative side are inside.
 */
 class HalfspaceVolumeSampler : public IVolumeSampler {
 public:
-    HalfspaceVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, const MaterialState &material, Mode mode)
+    HalfspaceVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, const MaterialState& material, Mode mode)
         : IVolumeSampler(mode)
         , _origin(planeOrigin)
         , _normal(planeNormal)
@@ -306,7 +306,7 @@ private:
  */
 class BoundedPlaneVolumeSampler : public IVolumeSampler {
 public:
-    BoundedPlaneVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, float planeThickness, const MaterialState &material, Mode mode)
+    BoundedPlaneVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, float planeThickness, const MaterialState& material, Mode mode)
         : IVolumeSampler(mode)
         , _origin(planeOrigin)
         , _normal(glm::normalize(planeNormal))
@@ -367,7 +367,7 @@ private:
 
 class RectangularPrismVolumeSampler : public IVolumeSampler {
 public:
-    RectangularPrismVolumeSampler(glm::vec3 origin, glm::vec3 halfExtents, glm::mat3 rotation, const MaterialState &material, Mode mode)
+    RectangularPrismVolumeSampler(glm::vec3 origin, glm::vec3 halfExtents, glm::mat3 rotation, const MaterialState& material, Mode mode)
         : IVolumeSampler(mode)
         , _origin(origin)
         , _halfExtents(max(halfExtents, glm::vec3(0)))

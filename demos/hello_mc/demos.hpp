@@ -24,7 +24,6 @@ const mc::MaterialState kDefaultMaterial {
     0
 };
 
-
 class Demo {
 public:
     Demo() = default;

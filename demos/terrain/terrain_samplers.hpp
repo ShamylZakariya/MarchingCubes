@@ -13,35 +13,41 @@ using namespace glm;
 using mc::util::AABB;
 using mc::util::iAABB;
 
-class GroundSampler : public mc::IVolumeSampler {
+class TerrainSampleSource {
 public:
-    typedef std::function<float(const vec3&)> NoiseSampler3D;
+    TerrainSampleSource() = default;
+    virtual ~TerrainSampleSource() = default;
+    virtual float maxHeight() const = 0;
+    virtual float sample(const vec3& world) const = 0;
+};
 
+class TerrainSampler : public mc::IVolumeSampler {
 public:
-    GroundSampler() = delete;
-    GroundSampler(const GroundSampler&) = delete;
-    GroundSampler(GroundSampler&&) = delete;
+    TerrainSampler() = delete;
+    TerrainSampler(const TerrainSampler&) = delete;
+    TerrainSampler(TerrainSampler&&) = delete;
 
-    GroundSampler(NoiseSampler3D noise3D, float height, float floorThreshold,
+    TerrainSampler(mc::util::unowned_ptr<TerrainSampleSource> sampler, vec3 sampleOffset, float floorThreshold,
         const mc::MaterialState& floorMaterial,
         const mc::MaterialState& lowMaterial,
         const mc::MaterialState& highMaterial)
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
-        , _noise3D(noise3D)
-        , _height(height)
+        , _sampler(sampler)
+        , _height(sampler->maxHeight())
         , _floorThreshold(floorThreshold)
-        , _floorPinion(floorThreshold / height)
+        , _floorPinion(floorThreshold / sampler->maxHeight())
+        , _sampleOffset(sampleOffset)
         , _floorMaterial(floorMaterial)
         , _lowMaterial(lowMaterial)
         , _highMaterial(highMaterial)
     {
     }
 
-    ~GroundSampler() = default;
+    ~TerrainSampler() = default;
 
     std::unique_ptr<mc::IVolumeSampler> copy() const override
     {
-        return std::make_unique<GroundSampler>(_noise3D, _height, _floorThreshold, _floorMaterial, _lowMaterial, _highMaterial);
+        return std::make_unique<TerrainSampler>(_sampler, _sampleOffset, _floorThreshold, _floorMaterial, _lowMaterial, _highMaterial);
     }
 
     bool intersects(AABB bounds) const override
@@ -60,7 +66,7 @@ public:
 
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
     {
-        vec3 worldPosition = _translation + p;
+        vec3 worldPosition = p + _sampleOffset;
         float sampleHeight = clamp(worldPosition.y / _height, 0.0F, 1.0F);
 
         if (sampleHeight < _floorPinion) {
@@ -71,15 +77,16 @@ public:
             material = mix(_highMaterial, _lowMaterial, t * t * t);
         }
 
-        return _noise3D(worldPosition);
+        return _sampler->sample(worldPosition);
     }
 
 private:
-    NoiseSampler3D _noise3D;
+    mc::util::unowned_ptr<TerrainSampleSource> _sampler;
     float _height = 0;
     float _floorThreshold = 0;
     float _floorPinion = 0;
-    vec3 _translation{0,0,0};
+    vec3 _sampleOffset { 0 };
+
     mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
 };
 

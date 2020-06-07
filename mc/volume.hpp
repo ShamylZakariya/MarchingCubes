@@ -128,7 +128,8 @@ public:
         return _size;
     }
 
-    std::size_t count() const {
+    std::size_t count() const
+    {
         return _samplers.size();
     }
 

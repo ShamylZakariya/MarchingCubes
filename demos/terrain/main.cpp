@@ -315,7 +315,7 @@ private:
         // build the terrain grid
         //
 
-        class LumpyTerrainSource : public TerrainSource {
+        class LumpyTerrainSource : public TerrainSampleSource {
         private:
             FastNoise& _noise;
             float _maxHeight;
@@ -395,7 +395,7 @@ private:
             }
         };
 
-        std::unique_ptr<TerrainSource> terrainSource = std::make_unique<LumpyTerrainSource>(_fastNoise, terrainHeight);
+        std::unique_ptr<TerrainSampleSource> terrainSource = std::make_unique<LumpyTerrainSource>(_fastNoise, terrainHeight);
         std::unique_ptr<GreebleSource> greebleSource = std::make_unique<Greebler>(_fastNoise);
         _terrainGrid = std::make_unique<TerrainGrid>(TERRAIN_GRID_SIZE, _terrainChunkSize, std::move(terrainSource), std::move(greebleSource));
 
