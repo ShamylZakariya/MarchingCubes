@@ -124,11 +124,12 @@ namespace volume_samplers_helpers {
  */
 class SphereVolumeSampler : public IVolumeSampler {
 public:
-    SphereVolumeSampler(glm::vec3 position, float radius, Mode mode)
+    SphereVolumeSampler(glm::vec3 position, float radius, const MaterialState &material, Mode mode)
         : IVolumeSampler(mode)
         , _position(position)
         , _radius(radius)
         , _radius2(radius * radius)
+        , _material(material)
     {
     }
 
@@ -136,11 +137,7 @@ public:
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<SphereVolumeSampler>(_position, _radius, mode());
-    }
-
-    void translate(const glm::vec3 &by) override {
-        _position += by;
+        return std::make_unique<SphereVolumeSampler>(_position, _radius, _material, mode());
     }
 
     bool intersects(util::AABB bounds) const override
@@ -188,6 +185,7 @@ public:
         float innerRadius = _radius - fuzziness;
         float min2 = innerRadius * innerRadius;
         if (d2 <= min2) {
+            material = _material;
             return 1;
         }
 
@@ -197,7 +195,9 @@ public:
         }
 
         float d = sqrt(d2) - innerRadius;
-        return 1 - (d / fuzziness);
+        float c = 1 - (d / fuzziness);
+        material = mix(material, _material, c);
+        return c;
     }
 
     void setPosition(const glm::vec3& center)
@@ -219,6 +219,7 @@ private:
     glm::vec3 _position;
     float _radius;
     float _radius2;
+    MaterialState _material;
 };
 
 /*
@@ -228,20 +229,17 @@ on the negative side are inside.
 */
 class HalfspaceVolumeSampler : public IVolumeSampler {
 public:
-    HalfspaceVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, Mode mode)
+    HalfspaceVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, const MaterialState &material, Mode mode)
         : IVolumeSampler(mode)
         , _origin(planeOrigin)
         , _normal(planeNormal)
+        , _material(material)
     {
     }
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<HalfspaceVolumeSampler>(_origin, _normal, mode());
-    }
-
-    void translate(const glm::vec3 &by) override {
-        _origin += by;
+        return std::make_unique<HalfspaceVolumeSampler>(_origin, _normal, _material, mode());
     }
 
     bool intersects(util::AABB bounds) const override
@@ -279,11 +277,14 @@ public:
     {
         float signedDist = dot(_normal, p - _origin);
         if (signedDist < -fuzziness) {
+            material = _material;
             return 1;
         } else if (signedDist > 0) {
             return 0;
         }
-        return -signedDist / fuzziness;
+        const float c = -signedDist / fuzziness;
+        material = mix(material, _material, c);
+        return c;
     }
 
     void setPlaneOrigin(const glm::vec3 planeOrigin) { _origin = planeOrigin; }
@@ -295,6 +296,7 @@ public:
 private:
     glm::vec3 _origin;
     glm::vec3 _normal;
+    MaterialState _material;
 };
 
 /*
@@ -304,21 +306,18 @@ private:
  */
 class BoundedPlaneVolumeSampler : public IVolumeSampler {
 public:
-    BoundedPlaneVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, float planeThickness, Mode mode)
+    BoundedPlaneVolumeSampler(glm::vec3 planeOrigin, glm::vec3 planeNormal, float planeThickness, const MaterialState &material, Mode mode)
         : IVolumeSampler(mode)
         , _origin(planeOrigin)
         , _normal(glm::normalize(planeNormal))
         , _thickness(std::max<float>(planeThickness, 0))
+        , _material(material)
     {
     }
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<BoundedPlaneVolumeSampler>(_origin, _normal, _thickness, mode());
-    }
-
-    void translate(const glm::vec3 &by) override {
-        _origin += by;
+        return std::make_unique<BoundedPlaneVolumeSampler>(_origin, _normal, _thickness, _material, mode());
     }
 
     bool intersects(util::AABB bounds) const override
@@ -339,12 +338,15 @@ public:
         float innerDist = outerDist - fuzziness;
 
         if (dist <= innerDist) {
+            material = _material;
             return 1;
         } else if (dist >= outerDist) {
             return 0;
         }
 
-        return 1 - ((dist - innerDist) / fuzziness);
+        const float c = 1 - ((dist - innerDist) / fuzziness);
+        material = mix(material, _material, c);
+        return c;
     }
 
     void setPlaneOrigin(const glm::vec3 planeOrigin) { _origin = planeOrigin; }
@@ -360,26 +362,24 @@ private:
     glm::vec3 _origin;
     glm::vec3 _normal;
     float _thickness;
+    MaterialState _material;
 };
 
 class RectangularPrismVolumeSampler : public IVolumeSampler {
 public:
-    RectangularPrismVolumeSampler(glm::vec3 origin, glm::vec3 halfExtents, glm::mat3 rotation, Mode mode)
+    RectangularPrismVolumeSampler(glm::vec3 origin, glm::vec3 halfExtents, glm::mat3 rotation, const MaterialState &material, Mode mode)
         : IVolumeSampler(mode)
         , _origin(origin)
         , _halfExtents(max(halfExtents, glm::vec3(0)))
         , _rotation(rotation)
+        , _material(material)
     {
         _update();
     }
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<RectangularPrismVolumeSampler>(_origin, _halfExtents, _rotation, mode());
-    }
-
-    void translate(const glm::vec3 &by) override {
-        _origin += by;
+        return std::make_unique<RectangularPrismVolumeSampler>(_origin, _halfExtents, _rotation, _material, mode());
     }
 
     bool intersects(util::AABB bounds) const override
@@ -472,7 +472,9 @@ public:
             auto negYAmt = -negY / fuzziness;
             auto posZAmt = -posZ / fuzziness;
             auto negZAmt = -negZ / fuzziness;
-            return min(min(posXAmt, min(negXAmt, min(posYAmt, min(negYAmt, min(posZAmt, negZAmt))))), 1.0F);
+            const auto c = min(min(posXAmt, min(negXAmt, min(posYAmt, min(negYAmt, min(posZAmt, negZAmt))))), 1.0F);
+            material = mix(material, _material, c);
+            return c;
         }
         return 0;
     }
@@ -575,6 +577,7 @@ private:
 
     std::array<glm::vec3, 8> _corners;
     util::AABB _bounds;
+    MaterialState _material;
 };
 
 } // namespace mc

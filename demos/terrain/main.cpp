@@ -49,7 +49,7 @@ constexpr int HEIGHT = 1100;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float FOV_DEGREES = 50.0F;
-constexpr float UI_SCALE = 1.5F;
+constexpr float UI_SCALE = 2.0F;
 constexpr float WORLD_RADIUS = 400;
 constexpr int TERRAIN_GRID_SIZE = 3;
 
@@ -375,7 +375,7 @@ private:
 
             std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample& sample, const vec3& local) const override
             {
-                if (sample.probability > 0.7) {
+                if (sample.probability > 0.9) {
                     auto rng = rng_xorshift64 { sample.seed };
                     Tube::Config arch;
                     arch.axisOrigin = vec3 { local.x + sample.offset.x, 0, local.z + sample.offset.y };

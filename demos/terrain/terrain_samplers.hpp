@@ -44,10 +44,6 @@ public:
         return std::make_unique<GroundSampler>(_noise3D, _height, _floorThreshold, _floorMaterial, _lowMaterial, _highMaterial);
     }
 
-    void translate(const glm::vec3 &by) override {
-        _translation += by;
-    }
-
     bool intersects(AABB bounds) const override
     {
         // We know that the geometry will span [x,y] and be no taller than
@@ -157,11 +153,6 @@ public:
     std::unique_ptr<mc::IVolumeSampler> copy() const override
     {
         return std::make_unique<Tube>(_config);
-    }
-
-    void translate(const vec3 &by) override {
-        _config.axisOrigin += by;
-        _tubeAxisOrigin += by;
     }
 
     bool intersects(AABB bounds) const override

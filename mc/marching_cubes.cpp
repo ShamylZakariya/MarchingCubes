@@ -48,27 +48,6 @@ namespace {
     //
 
     /*
-    Linearly interpolate the position where an isosurface cuts
-    an edge between two vertices, each with their own scalar value
-    */
-
-    // glm::vec3 IsoStateInterpolator(float isolevel, const glm::vec3& p1, const glm::vec3& p2, float valp1, float valp2)
-    // {
-    //     constexpr float EPSILON = 1e-5f;
-    //     if (std::abs(isolevel - valp1) < EPSILON)
-    //         return p1;
-
-    //     if (std::abs(isolevel - valp2) < EPSILON)
-    //         return p2;
-
-    //     if (std::abs(valp1 - valp2) < EPSILON)
-    //         return p1;
-
-    //     auto mu = (isolevel - valp1) / (valp2 - valp1);
-    //     return mix(p1, p2, mu);
-    // }
-
-    /*
     Linearly interpolate the grid call values where an isosurface cuts
     an edge between two positions, each with their own scalar value
     */

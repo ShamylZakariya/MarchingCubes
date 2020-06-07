@@ -17,6 +17,14 @@ using mc::util::iAABB;
 //  Geometry Demos
 //
 
+const mc::MaterialState kDefaultMaterial {
+    glm::vec4(1, 1, 1, 1),
+    0,
+    0,
+    0
+};
+
+
 class Demo {
 public:
     Demo() = default;
@@ -37,7 +45,7 @@ public:
         auto center = size / 2.0F;
 
         _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+            center, vec3(10, 10, 10), mat3 { 1 }, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -67,7 +75,7 @@ public:
         _radius = 10;
 
         _sphere = volume->add(std::make_unique<mc::SphereVolumeSampler>(
-            _pos, _radius, mc::IVolumeSampler::Mode::Additive));
+            _pos, _radius, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -95,7 +103,7 @@ public:
         auto size = vec3(volume->size());
         auto center = size / 2.0F;
         _plane = volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
-            center, planeNormal(mat4 { 1 }), 10, mc::IVolumeSampler::Mode::Additive));
+            center, planeNormal(mat4 { 1 }), 10, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -124,7 +132,7 @@ public:
         auto size = vec3(volume->size());
         auto center = size / 2.0F;
         _plane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
-            center, planeNormal(mat4 { 1 }), mc::IVolumeSampler::Mode::Additive));
+            center, planeNormal(mat4 { 1 }), kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
     }
 
     void step(float time) override
@@ -155,7 +163,7 @@ public:
         std::default_random_engine gen { static_cast<long unsigned int>(12345) };
 
         _bottomPlane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
-            vec3(0, size.y * 0.35, 0), vec3(0, 1, 0), mc::IVolumeSampler::Mode::Subtractive));
+            vec3(0, size.y * 0.35, 0), vec3(0, 1, 0), kDefaultMaterial, mc::IVolumeSampler::Mode::Subtractive));
 
         const int numSpheres = 30;
         const int numCubes = 10;
@@ -179,7 +187,7 @@ public:
                 auto bobExtent = bobExtentDist(gen);
 
                 auto sphere = volume->add(std::make_unique<mc::SphereVolumeSampler>(
-                    pos, radius, mc::IVolumeSampler::Mode::Additive));
+                    pos, radius, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
 
                 _spheres.push_back(SphereState {
                     sphere, pos, rate, phase, bobExtent });
@@ -214,7 +222,7 @@ public:
 
                 auto cube = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
                     pos, vec3(size) / 2.0F, rotation(0, spinPhase, spinRate, spinAxis),
-                    mc::IVolumeSampler::Mode::Additive));
+                    kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
 
                 _cubes.push_back(CubeState {
                     cube,
@@ -287,10 +295,10 @@ public:
         auto center = size / 2.0F;
 
         volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+            center, vec3(10, 10, 10), mat3 { 1 }, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
 
         _cube = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center + vec3(0, -5, 0), vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Subtractive));
+            center + vec3(0, -5, 0), vec3(10, 10, 10), mat3 { 1 }, kDefaultMaterial, mc::IVolumeSampler::Mode::Subtractive));
     }
 
     void step(float time) override
@@ -314,10 +322,10 @@ public:
         auto center = size / 2.0F;
 
         volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+            center, vec3(10, 10, 10), mat3 { 1 }, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
 
         _plane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
-            center, planeNormal(mat4 { 1 }), mc::IVolumeSampler::Mode::Subtractive));
+            center, planeNormal(mat4 { 1 }), kDefaultMaterial, mc::IVolumeSampler::Mode::Subtractive));
     }
 
     void step(float time) override
@@ -347,10 +355,10 @@ public:
         auto center = size / 2.0F;
 
         volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
-            center, vec3(10, 10, 10), mat3 { 1 }, mc::IVolumeSampler::Mode::Additive));
+            center, vec3(10, 10, 10), mat3 { 1 }, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
 
         volume->add(std::make_unique<mc::SphereVolumeSampler>(
-            center + vec3(0, -10, 0), 10, mc::IVolumeSampler::Mode::Subtractive));
+            center + vec3(0, -10, 0), 10, kDefaultMaterial, mc::IVolumeSampler::Mode::Subtractive));
     }
 };
 
