@@ -44,14 +44,42 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr int WIDTH = 1440;
-constexpr int HEIGHT = 1100;
-constexpr float NEAR_PLANE = 0.1f;
-constexpr float FAR_PLANE = 1000.0f;
-constexpr float FOV_DEGREES = 50.0F;
-constexpr float UI_SCALE = 2.0F;
-constexpr float WORLD_RADIUS = 400;
-constexpr int TERRAIN_GRID_SIZE = 3;
+constexpr int kWindowWidth = 1440;
+constexpr int kWindowHeight = 1100;
+constexpr float kNearPlane = 0.1f;
+constexpr float kFarPlane = 1000.0f;
+constexpr float kFovDegrees = 50.0F;
+constexpr float kUiScale = 1.75F;
+constexpr float kWorldRadius = 400;
+constexpr int kTerrainGridSize = 5;
+
+const mc::MaterialState kFloorTerrainMaterial {
+    glm::vec4(1, 0, 0, 1),
+    0,
+    1,
+    0
+};
+
+const mc::MaterialState kLowTerrainMaterial {
+    glm::vec4(0, 1, 0, 1),
+    0,
+    1,
+    0
+};
+
+const mc::MaterialState kHighTerrainMaterial {
+    glm::vec4(0,0,1, 1),
+    0,
+    1,
+    0
+};
+
+const mc::MaterialState kArchMaterial {
+    glm::vec4(0,1,1, 1),
+    0,
+    0,
+    1
+};
 
 //
 // App
@@ -77,11 +105,11 @@ public:
 
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.ScaleAllSizes(UI_SCALE);
+        style.ScaleAllSizes(kUiScale);
 
         const auto fontFile = "./fonts/ConsolaMono.ttf";
         if (std::filesystem::exists(fontFile)) {
-            ImGui::GetIO().Fonts->AddFontFromFileTTF(fontFile, 12 * UI_SCALE);
+            ImGui::GetIO().Fonts->AddFontFromFileTTF(fontFile, 12 * kUiScale);
         }
 
         // set imgui platform/renderer bindings
@@ -161,7 +189,7 @@ private:
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        _window = glfwCreateWindow(WIDTH, HEIGHT, "Terrain", nullptr, nullptr);
+        _window = glfwCreateWindow(kWindowWidth, kWindowHeight, "Terrain", nullptr, nullptr);
         glfwSetWindowUserPointer(_window, this);
         glfwSetFramebufferSizeCallback(_window, [](GLFWwindow* window, int width, int height) {
             auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
@@ -315,7 +343,7 @@ private:
         // build the terrain grid
         //
 
-        class LumpyTerrainSource : public TerrainSampleSource {
+        class LumpyTerrainSource : public TerrainSampler::SampleSource {
         private:
             FastNoise& _noise;
             float _maxHeight;
@@ -330,22 +358,31 @@ private:
             {
                 return _maxHeight;
             }
-            float sample(const vec3& world) const override
+            float sample(const vec3& world, mc::MaterialState &material) const override
             {
                 if (world.y < 1e-3F) {
+                    material = kFloorTerrainMaterial;
                     return 1;
                 }
 
                 float noise2D = _noise.GetSimplex(world.x, world.z);
                 float noise3D = _noise.GetSimplex(world.x * 11, world.y * 11, world.z * 11);
                 float height = std::max(_maxHeight * noise2D, 0.0F);
+                float contribution = 0;
                 if (world.y < height) {
                     float a = (height - world.y) / height;
-                    a = a * (a + 0.6F * noise3D);
-                    return a;
+                    contribution = a * (a + 0.6F * noise3D);
                 }
 
-                return 0;
+                float k = world.y / _maxHeight;
+                if (k < 0.5) {
+                    material = mix(kFloorTerrainMaterial, kLowTerrainMaterial, k / 0.1F);
+                } else {
+                    k = (k - 0.1F) / 0.9F;
+                    material = mix(kLowTerrainMaterial, kHighTerrainMaterial, min(k, 1.0F));
+                }
+
+                return contribution;
             }
         };
 
@@ -395,9 +432,9 @@ private:
             }
         };
 
-        std::unique_ptr<TerrainSampleSource> terrainSource = std::make_unique<LumpyTerrainSource>(_fastNoise, terrainHeight);
+        std::unique_ptr<TerrainSampler::SampleSource> terrainSource = std::make_unique<LumpyTerrainSource>(_fastNoise, terrainHeight);
         std::unique_ptr<GreebleSource> greebleSource = std::make_unique<Greebler>(_fastNoise);
-        _terrainGrid = std::make_unique<TerrainGrid>(TERRAIN_GRID_SIZE, _terrainChunkSize, std::move(terrainSource), std::move(greebleSource));
+        _terrainGrid = std::make_unique<TerrainGrid>(kTerrainGridSize, _terrainChunkSize, std::move(terrainSource), std::move(greebleSource));
 
         auto pos = vec3(0, terrainHeight, 0);
         auto lookTarget = pos + vec3(0, 0, 1);
@@ -412,7 +449,7 @@ private:
     {
         _contextSize = ivec2 { width, height };
         glViewport(0, 0, width, height);
-        _camera.updateProjection(width, height, FOV_DEGREES, NEAR_PLANE, FAR_PLANE);
+        _camera.updateProjection(width, height, kFovDegrees, kNearPlane, kFarPlane);
     }
 
     void onKeyPress(int key, int scancode, int mods)
@@ -477,7 +514,7 @@ private:
         const auto projection = _camera.getProjection();
         const auto frustum = _camera.getFrustum();
 
-        _atmosphere->setCameraState(_camera.getPosition(), projection, view, NEAR_PLANE, FAR_PLANE);
+        _atmosphere->setCameraState(_camera.getPosition(), projection, view, kNearPlane, kFarPlane);
 
         _postProcessingFilters->execute(_contextSize / std::max(_pixelScale, 1), _contextSize, [=]() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -551,7 +588,7 @@ private:
 
         bool roundWorld = _terrainMaterial->getWorldRadius() > 0;
         if (ImGui::Checkbox("Round World", &roundWorld)) {
-            _terrainMaterial->setWorldRadius(roundWorld ? WORLD_RADIUS : 0);
+            _terrainMaterial->setWorldRadius(roundWorld ? kWorldRadius : 0);
         }
 
         bool drawAtmosphere = _atmosphere->getAlpha() > 0.5F;
@@ -628,7 +665,7 @@ private:
     int _framesRendered = 0;
     double _currentFps = 0;
     bool _running = false;
-    ivec2 _contextSize { WIDTH, HEIGHT };
+    ivec2 _contextSize { kWindowWidth, kWindowHeight };
 
     // input state
     bool _mouseButtonState[3] = { false, false, false };

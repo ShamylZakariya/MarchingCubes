@@ -9,7 +9,6 @@
 using namespace glm;
 
 namespace {
-const float kFloorThreshold = 1.0F;
 
 vec4 rainbow(float dist)
 {
@@ -26,7 +25,7 @@ vec4 nodeColor(int atDepth)
 
 }
 
-TerrainChunk::TerrainChunk(int size, mc::util::unowned_ptr<TerrainSampleSource> terrain)
+TerrainChunk::TerrainChunk(int size, mc::util::unowned_ptr<TerrainSampler::SampleSource> terrain)
     : _index(0, 0)
     , _size(size)
     , _maxHeight(terrain->maxHeight())
@@ -59,9 +58,7 @@ void TerrainChunk::setIndex(ivec2 index)
 
     // bounds are in world not local space
     _bounds = AABB(sampleOffset, sampleOffset + size);
-
-    _groundSampler = _volume->add(std::make_unique<TerrainSampler>(_terrainSampleSource, sampleOffset, kFloorThreshold,
-        kFloorTerrainMaterial, kLowTerrainMaterial, kHighTerrainMaterial));
+    _groundSampler = _volume->add(std::make_unique<TerrainSampler>(_terrainSampleSource, sampleOffset));
 
     //  Build a debug frame to show our volume
 
@@ -108,7 +105,7 @@ int makeOdd(int v)
 }
 
 TerrainGrid::TerrainGrid(int gridSize, int chunkSize,
-    std::unique_ptr<TerrainSampleSource>&& terrainSampleSource,
+    std::unique_ptr<TerrainSampler::SampleSource>&& terrainSampleSource,
     std::unique_ptr<GreebleSource>&& greebleSource)
     : _gridSize(makeOdd(gridSize))
     , _chunkSize(chunkSize)

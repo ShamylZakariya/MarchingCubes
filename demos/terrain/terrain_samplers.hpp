@@ -13,33 +13,26 @@ using namespace glm;
 using mc::util::AABB;
 using mc::util::iAABB;
 
-class TerrainSampleSource {
-public:
-    TerrainSampleSource() = default;
-    virtual ~TerrainSampleSource() = default;
-    virtual float maxHeight() const = 0;
-    virtual float sample(const vec3& world) const = 0;
-};
 
 class TerrainSampler : public mc::IVolumeSampler {
+public:
+    class SampleSource {
+    public:
+        SampleSource() = default;
+        virtual ~SampleSource() = default;
+        virtual float maxHeight() const = 0;
+        virtual float sample(const vec3& world, mc::MaterialState& material) const = 0;
+    };
 public:
     TerrainSampler() = delete;
     TerrainSampler(const TerrainSampler&) = delete;
     TerrainSampler(TerrainSampler&&) = delete;
 
-    TerrainSampler(mc::util::unowned_ptr<TerrainSampleSource> sampler, vec3 sampleOffset, float floorThreshold,
-        const mc::MaterialState& floorMaterial,
-        const mc::MaterialState& lowMaterial,
-        const mc::MaterialState& highMaterial)
+    TerrainSampler(mc::util::unowned_ptr<SampleSource> sampler, vec3 sampleOffset)
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _sampler(sampler)
-        , _height(sampler->maxHeight())
-        , _floorThreshold(floorThreshold)
-        , _floorPinion(floorThreshold / sampler->maxHeight())
         , _sampleOffset(sampleOffset)
-        , _floorMaterial(floorMaterial)
-        , _lowMaterial(lowMaterial)
-        , _highMaterial(highMaterial)
+        , _height(sampler->maxHeight())
     {
     }
 
@@ -47,7 +40,7 @@ public:
 
     std::unique_ptr<mc::IVolumeSampler> copy() const override
     {
-        return std::make_unique<TerrainSampler>(_sampler, _sampleOffset, _floorThreshold, _floorMaterial, _lowMaterial, _highMaterial);
+        return std::make_unique<TerrainSampler>(_sampler, _sampleOffset);
     }
 
     bool intersects(AABB bounds) const override
@@ -67,27 +60,13 @@ public:
     float valueAt(const vec3& p, float fuzziness, mc::MaterialState& material) const override
     {
         vec3 worldPosition = p + _sampleOffset;
-        float sampleHeight = clamp(worldPosition.y / _height, 0.0F, 1.0F);
-
-        if (sampleHeight < _floorPinion) {
-            material = _floorMaterial;
-        } else {
-            float t = (sampleHeight - _floorPinion) / (1 - _floorPinion);
-            t = (1 - sampleHeight);
-            material = mix(_highMaterial, _lowMaterial, t * t * t);
-        }
-
-        return _sampler->sample(worldPosition);
+        return _sampler->sample(worldPosition, material);
     }
 
 private:
-    mc::util::unowned_ptr<TerrainSampleSource> _sampler;
-    float _height = 0;
-    float _floorThreshold = 0;
-    float _floorPinion = 0;
+    mc::util::unowned_ptr<SampleSource> _sampler;
     vec3 _sampleOffset { 0 };
-
-    mc::MaterialState _floorMaterial, _lowMaterial, _highMaterial;
+    float _height = 0;
 };
 
 class Tube : public mc::IVolumeSampler {
