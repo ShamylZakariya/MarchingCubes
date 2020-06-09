@@ -41,12 +41,12 @@ using std::unique_ptr;
 // Constants
 //
 
-constexpr int WIDTH = 1440;
-constexpr int HEIGHT = 1440;
-constexpr float NEAR_PLANE = 0.1f;
-constexpr float FAR_PLANE = 1000.0f;
-constexpr float FOV_DEGREES = 50.0F;
-constexpr float OCTREE_NODE_VISUAL_INSET_FACTOR = 0.0F;
+constexpr int kWindowWidth = 1440;
+constexpr int kWindowHeight = 1440;
+constexpr float kNearPlane = 0.1f;
+constexpr float kFarPlane = 1000.0f;
+constexpr float kFovDegrees = 50.0F;
+constexpr float kOctreeNodeVisualInsetFactor = 0.0F;
 
 //
 // Materials
@@ -339,7 +339,7 @@ private:
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        _window = glfwCreateWindow(WIDTH, HEIGHT, "Marching Cubes", nullptr, nullptr);
+        _window = glfwCreateWindow(kWindowWidth, kWindowHeight, "Marching Cubes", nullptr, nullptr);
         glfwSetWindowUserPointer(_window, this);
         glfwSetFramebufferSizeCallback(_window, [](GLFWwindow* window, int width, int height) {
             auto app = reinterpret_cast<App*>(glfwGetWindowUserPointer(window));
@@ -496,7 +496,7 @@ private:
 
         _volume->walkOctree([this](mc::OctreeVolume::Node* node) {
             auto bounds = node->bounds;
-            bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
+            bounds.inset(node->depth * kOctreeNodeVisualInsetFactor);
             _octreeAABBLineSegmentStorage.add(bounds, nodeColor(node->depth));
             return true;
         });
@@ -720,7 +720,7 @@ private:
             {
                 // update the occupied aabb display
                 auto bounds = node->bounds;
-                bounds.inset(node->depth * OCTREE_NODE_VISUAL_INSET_FACTOR);
+                bounds.inset(node->depth * kOctreeNodeVisualInsetFactor);
                 _octreeOccupiedAABBsLineSegmentStorage.add(bounds, nodeColor(node->depth));
             }
 
@@ -790,11 +790,11 @@ private:
             auto width = scale * _aspect * size;
             auto height = scale * size;
 
-            auto distance = FAR_PLANE / 2;
+            auto distance = kFarPlane / 2;
             cameraPosition = -distance * trackballZ;
             view = lookAt(cameraPosition, vec3(0), trackballY);
 
-            projection = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, NEAR_PLANE, FAR_PLANE);
+            projection = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, kNearPlane, kFarPlane);
         } else {
             auto bounds = _volume->bounds();
             auto minDistance = 0.1F;
@@ -804,7 +804,7 @@ private:
             cameraPosition = -distance * trackballZ;
             view = lookAt(cameraPosition, vec3(0), trackballY);
 
-            projection = glm::perspective(radians(FOV_DEGREES), _aspect, NEAR_PLANE, FAR_PLANE);
+            projection = glm::perspective(radians(kFovDegrees), _aspect, kNearPlane, kFarPlane);
         }
 
         return projection * view * model;
