@@ -52,31 +52,33 @@ constexpr float kFovDegrees = 50.0F;
 constexpr float kUiScale = 1.75F;
 constexpr float kWorldRadius = 400;
 constexpr int kTerrainGridSize = 5;
+constexpr int kTerrainChunkSize = 128;
+
 
 const mc::MaterialState kFloorTerrainMaterial {
-    glm::vec4(1, 0, 0, 1),
+    glm::vec4(1, 1, 1, 1),
+    0.3,
     0,
-    1,
     0
 };
 
 const mc::MaterialState kLowTerrainMaterial {
-    glm::vec4(0, 1, 0, 1),
+    glm::vec4(1, 1, 1, 1),
     0,
     1,
     0
 };
 
 const mc::MaterialState kHighTerrainMaterial {
-    glm::vec4(0,0,1, 1),
+    glm::vec4(1,1,1, 1),
     0,
-    1,
-    0
+    0,
+    1
 };
 
 const mc::MaterialState kArchMaterial {
-    glm::vec4(0,1,1, 1),
-    0,
+    glm::vec4(0.2,0.2,0.25, 1),
+    0.1,
     0,
     1
 };
@@ -259,23 +261,27 @@ private:
 
     void initApp()
     {
-        _terrainChunkSize = 128;
-
         //
         // load materials
         //
 
-        const auto ambientLight = vec3(0.45, 0.5, 0.0);
+        auto textureSetup = [](){
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        };
+
+        const auto ambientLight = vec3(0.1, 0.1, 0.1);
         const auto skyboxTexture = mc::util::LoadTextureCube("textures/sky", ".jpg");
         const mc::util::TextureHandleRef lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
-        const auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg");
+        const auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg", textureSetup);
         const auto terrainTexture0Scale = 30;
-        const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg");
+        const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg", textureSetup);
         const auto terrainTexture1Scale = 30;
-        const auto renderDistance = _terrainChunkSize * 1.5;
+        const auto renderDistance = kTerrainChunkSize * 1.5;
 
         _terrainMaterial = std::make_unique<TerrainMaterial>(
-            0,
+            kWindowHeight,
             ambientLight,
             lightprobeTex, skyboxTexture,
             terrainTexture0, terrainTexture0Scale,
@@ -319,7 +325,7 @@ private:
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
-        _atmosphere->setAlpha(0);
+        _atmosphere->setAlpha(1);
 
         _palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
             "Palettizer",
@@ -331,7 +337,7 @@ private:
         // build a volume
         //
 
-        const auto frequency = 1.0F / _terrainChunkSize;
+        const auto frequency = 1.0F / kTerrainChunkSize;
         const auto terrainHeight = 32.0F;
         _fastNoise.SetNoiseType(FastNoise::Simplex);
         _fastNoise.SetFrequency(frequency);
@@ -374,8 +380,8 @@ private:
                     contribution = a * (a + 0.6F * noise3D);
                 }
 
-                float k = world.y / _maxHeight;
-                if (k < 0.5) {
+                float k = world.y / (0.5F * _maxHeight);
+                if (k < 0.1) {
                     material = mix(kFloorTerrainMaterial, kLowTerrainMaterial, k / 0.1F);
                 } else {
                     k = (k - 0.1F) / 0.9F;
@@ -412,12 +418,12 @@ private:
 
             std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample& sample, const vec3& local) const override
             {
-                if (sample.probability > 0.9) {
+                if (sample.probability > 0.8) {
                     auto rng = rng_xorshift64 { sample.seed };
                     Tube::Config arch;
                     arch.axisOrigin = vec3 { local.x + sample.offset.x, 0, local.z + sample.offset.y };
                     arch.innerRadiusAxisOffset = vec3(0, rng.nextFloat(4, 10), 0);
-                    arch.axisDir = normalize(vec3(rng.nextFloat(-0.6, 0.6), rng.nextFloat(-0.2, 0.2), 1));
+                    arch.axisDir = normalize(vec3(rng.nextFloat(-1, 1), rng.nextFloat(-0.2, 0.2), rng.nextFloat(1, 1)));
                     arch.axisPerp = normalize(vec3(rng.nextFloat(-0.2, 0.2), 1, 0));
                     arch.length = rng.nextFloat(3, 7);
                     arch.innerRadius = rng.nextFloat(10, 15);
@@ -434,15 +440,13 @@ private:
 
         std::unique_ptr<TerrainSampler::SampleSource> terrainSource = std::make_unique<LumpyTerrainSource>(_fastNoise, terrainHeight);
         std::unique_ptr<GreebleSource> greebleSource = std::make_unique<Greebler>(_fastNoise);
-        _terrainGrid = std::make_unique<TerrainGrid>(kTerrainGridSize, _terrainChunkSize, std::move(terrainSource), std::move(greebleSource));
+        _terrainGrid = std::make_unique<TerrainGrid>(kTerrainGridSize, kTerrainChunkSize, std::move(terrainSource), std::move(greebleSource));
 
         auto pos = vec3(0, terrainHeight, 0);
         auto lookTarget = pos + vec3(0, 0, 1);
         _camera.lookAt(pos, lookTarget);
 
         _terrainGrid->march(_camera.getPosition(), _camera.getForward());
-
-        std::cout << "initApp - Done" << std::endl;
     }
 
     void onResize(int width, int height)
@@ -684,10 +688,9 @@ private:
     // user input state
     int _pixelScale = 2;
     bool _drawOctreeAABBs = false;
-    bool _drawMarkers = true;
+    bool _drawMarkers = false;
 
     // demo state
-    int _terrainChunkSize = 0;
     std::unique_ptr<TerrainGrid> _terrainGrid;
     FastNoise _fastNoise;
 };

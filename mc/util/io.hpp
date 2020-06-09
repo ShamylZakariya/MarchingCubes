@@ -84,7 +84,7 @@ namespace util {
     /**
     Loads image into a texture 2d
     */
-    TextureHandleRef LoadTexture2D(const std::string& filename);
+    TextureHandleRef LoadTexture2D(const std::string& filename, std::function<void()> setup = nullptr);
 
     /**
     Loads images into a cubemap texture in this order:

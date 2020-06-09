@@ -114,12 +114,11 @@ void main()
 #if SHOW_NORMALS
     vec3 color = fs_in.worldNormal * 0.5 + 0.5;
 #else
-    vec3 diffuse0 = mix(fs_in.color, fs_in.color * TriPlanarTexture(uTexture0Sampler, uTexture0Scale), fs_in.tex0Contribution).rgb;
-    vec3 diffuse1 = mix(fs_in.color, fs_in.color * TriPlanarTexture(uTexture1Sampler, uTexture1Scale), fs_in.tex1Contribution).rgb;
-    vec3 color = 0.5 * (diffuse0 + diffuse1);
-#endif
-    color *= uAmbientLight + lightProbeLight;
+    vec3 diffuse = mix(vec3(1), TriPlanarTexture(uTexture0Sampler, uTexture0Scale).rgb, fs_in.tex0Contribution);
+    diffuse = mix(diffuse, TriPlanarTexture(uTexture1Sampler, uTexture1Scale).rgb, fs_in.tex1Contribution);
+    vec3 color = fs_in.color.rgb * diffuse;
+    color = uAmbientLight + lightProbeLight * color;
     color = mix(color, reflectionColor, fs_in.shininess);
-
+#endif
     fragColor = vec4(color, 1);
 }

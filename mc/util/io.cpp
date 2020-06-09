@@ -37,7 +37,7 @@ namespace util {
         stbi_image_free(_bytes);
     }
 
-    TextureHandleRef LoadTexture2D(const std::string& filename)
+    TextureHandleRef LoadTexture2D(const std::string& filename, std::function<void()> setup)
     {
         int texWidth, texHeight, texChannels;
         stbi_uc* data = stbi_load(filename.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
@@ -50,12 +50,15 @@ namespace util {
         glGenTextures(1, &textureId);
         glBindTexture(GL_TEXTURE_2D, textureId);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
         stbi_image_free(data);
+        if (setup) {
+            setup();
+        } else {
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
 
         return std::make_shared<TextureHandle>(textureId, GL_TEXTURE_2D, texWidth, texHeight);
     }
