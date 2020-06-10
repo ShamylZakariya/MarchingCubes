@@ -29,7 +29,7 @@ public:
     virtual ~GreebleSource() = default;
     virtual int sampleStepSize() const = 0;
     virtual Sample sample(const vec3 world) const = 0;
-    virtual std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample &sample, const vec3 &local) const = 0;
+    virtual std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample& sample, const vec3& local) const = 0;
 };
 
 struct TerrainChunk {
@@ -92,8 +92,8 @@ public:
      * Create a terrain grid size*size
      */
     TerrainGrid(int gridSize, int chunkSize,
-        std::unique_ptr<TerrainSampler::SampleSource> &&terrainSampleSource,
-        std::unique_ptr<GreebleSource> &&greebler);
+        std::unique_ptr<TerrainSampler::SampleSource>&& terrainSampleSource,
+        std::unique_ptr<GreebleSource>&& greebler);
 
     /**
      * Convert a position in world space to the corresponding tile index.

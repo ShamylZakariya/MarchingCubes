@@ -51,7 +51,8 @@ uniform float uFarRenderDistance;
 uniform float uNearPlane;
 uniform float uFarPlane;
 
-uniform float uGroundFogMaxY;
+uniform float uWorldRadius;
+uniform float uGroundFogMaxHeight;
 uniform vec4 uGroundFogColor;
 uniform vec3 uGroundFogWorldOffset;
 
@@ -91,7 +92,7 @@ vec3 getFragmentWorldPosition()
 vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDir, vec3 skyboxColor)
 {
     // March the volume defined by noises(), from back to front
-
+    vec3 worldOrigin = vec3(uCameraPosition.x, -uWorldRadius, uCameraPosition.z);
     float dist = min(uFarRenderDistance, sceneDepth);
     float density = dist / uFarRenderDistance;
     vec3 marchPosition = uCameraPosition + rayDir * dist;
@@ -112,13 +113,22 @@ vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDi
             c = smoothstep(0.35, 1, c);
             c *= density;
 
-            // fade out as it approaches the fog plane top
-            float dy = clamp((uGroundFogMaxY - samplePosition.y) / uGroundFogMaxY, 0, 1);
-            c *= dy;
+            // fade fog out as it approaches the fog height
+            float sampleHeight = marchPosition.y;
+            if (uWorldRadius > 0) {
+                float distanceFromOrigin = distance(marchPosition, worldOrigin);
+                sampleHeight = distanceFromOrigin - uWorldRadius;
+            }
+            float heightFade = 1 - clamp(sampleHeight / uGroundFogMaxHeight, 0, 1);
+            c *= heightFade;
 
             if (c > 0) {
                 totalContribution += c;
-                vec3 contribution = mix(uGroundFogColor.rgb, skyboxColor, rayLength / uFarRenderDistance);
+
+                // fade fog color to skybox color when it approaches far render distance
+                float skyboxMixFactor = rayLength / uFarRenderDistance;
+                skyboxMixFactor *= skyboxMixFactor * skyboxMixFactor;
+                vec3 contribution = mix(uGroundFogColor.rgb, skyboxColor, skyboxMixFactor);
                 color = mix(color, contribution, c);
             }
         }

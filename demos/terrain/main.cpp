@@ -51,9 +51,8 @@ constexpr float kFarPlane = 1000.0f;
 constexpr float kFovDegrees = 50.0F;
 constexpr float kUiScale = 1.75F;
 constexpr float kWorldRadius = 400;
-constexpr int kTerrainGridSize = 5;
+constexpr int kTerrainGridSize = 3;
 constexpr int kTerrainChunkSize = 128;
-
 
 const mc::MaterialState kFloorTerrainMaterial {
     glm::vec4(1, 1, 1, 1),
@@ -70,14 +69,14 @@ const mc::MaterialState kLowTerrainMaterial {
 };
 
 const mc::MaterialState kHighTerrainMaterial {
-    glm::vec4(1,1,1, 1),
+    glm::vec4(1, 1, 1, 1),
     0,
     0,
     1
 };
 
 const mc::MaterialState kArchMaterial {
-    glm::vec4(0.2,0.2,0.25, 1),
+    glm::vec4(0.2, 0.2, 0.25, 1),
     0.1,
     0,
     1
@@ -265,9 +264,11 @@ private:
         // load materials
         //
 
-        auto textureSetup = [](){
-            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        auto textureSetup = []() {
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+            // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glGenerateMipmap(GL_TEXTURE_2D);
         };
 
@@ -325,6 +326,7 @@ private:
         _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
+        _atmosphere->setWorldRadius(kWorldRadius);
         _atmosphere->setAlpha(1);
 
         _palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
@@ -364,7 +366,7 @@ private:
             {
                 return _maxHeight;
             }
-            float sample(const vec3& world, mc::MaterialState &material) const override
+            float sample(const vec3& world, mc::MaterialState& material) const override
             {
                 if (world.y < 1e-3F) {
                     material = kFloorTerrainMaterial;
@@ -593,6 +595,7 @@ private:
         bool roundWorld = _terrainMaterial->getWorldRadius() > 0;
         if (ImGui::Checkbox("Round World", &roundWorld)) {
             _terrainMaterial->setWorldRadius(roundWorld ? kWorldRadius : 0);
+            _atmosphere->setWorldRadius(roundWorld ? kWorldRadius : 0);
         }
 
         bool drawAtmosphere = _atmosphere->getAlpha() > 0.5F;

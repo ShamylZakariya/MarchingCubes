@@ -157,7 +157,8 @@ public:
         _uNearPlane = glGetUniformLocation(_program, "uNearPlane");
         _uFarPlane = glGetUniformLocation(_program, "uFarPlane");
 
-        _uGroundFogMaxY = glGetUniformLocation(_program, "uGroundFogMaxY");
+        _uWorldRadius = glGetUniformLocation(_program, "uWorldRadius");
+        _uGroundFogMaxHeight = glGetUniformLocation(_program, "uGroundFogMaxHeight");
         _uGroundFogColor = glGetUniformLocation(_program, "uGroundFogColor");
         _uGroundFogWorldOffset = glGetUniformLocation(_program, "uGroundFogWorldOffset");
     }
@@ -177,9 +178,9 @@ public:
         _farRenderDistance = farRenderDistance;
     }
 
-    void setFog(float yMax, glm::vec4 groundFogColor)
+    void setFog(float maxHeight, glm::vec4 groundFogColor)
     {
-        _groundFogMaxY = yMax;
+        _groundFogMaxHeight = maxHeight;
         _groundFogColor = groundFogColor;
     }
 
@@ -197,6 +198,13 @@ public:
 
     glm::vec3 getGroundFogWorldOffset() const { return _groundFogWorldOffset; }
 
+    void setWorldRadius(float r)
+    {
+        _worldRadius = r;
+    }
+
+    float getWorldRadius() const { return _worldRadius; }
+
 protected:
     void _update(double deltaT) override
     {
@@ -205,7 +213,6 @@ protected:
 
     void _render(const glm::ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<post_processing::detail::VertexP2T2>& clipspaceQuad) override
     {
-        CHECK_GL_ERROR("_render START");
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, colorTex);
         glActiveTexture(GL_TEXTURE1);
@@ -217,13 +224,11 @@ protected:
 
         glUseProgram(_program);
 
-        CHECK_GL_ERROR("_render 1");
         glUniform1i(_uColorSampler, 0);
         glUniform1i(_uDepthSampler, 1);
         glUniform1i(_uSkyboxSampler, 2);
         glUniform1i(_uNoiseSampler, 3);
 
-        CHECK_GL_ERROR("_render 2");
         glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_projection)));
         glUniformMatrix4fv(_uViewInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_view)));
         glUniform3fv(_uCameraPosition, 1, glm::value_ptr(_cameraPosition));
@@ -232,16 +237,14 @@ protected:
         glUniform1f(_uNearPlane, _nearPlane);
         glUniform1f(_uFarPlane, _farPlane);
 
-        CHECK_GL_ERROR("_render 3");
-        glUniform1f(_uGroundFogMaxY, _groundFogMaxY);
+        glUniform1f(_uWorldRadius, _worldRadius);
+        glUniform1f(_uGroundFogMaxHeight, _groundFogMaxHeight);
         glUniform4fv(_uGroundFogColor, 1, glm::value_ptr(_groundFogColor));
         glUniform3fv(_uGroundFogWorldOffset, 1, glm::value_ptr(_groundFogWorldOffset));
         CHECK_GL_ERROR("_render 4");
 
         clipspaceQuad.draw();
         glUseProgram(0);
-
-        CHECK_GL_ERROR("_render END");
     }
 
 private:
@@ -259,7 +262,8 @@ private:
     GLint _uFarRenderDistance = -1;
     GLint _uNearPlane = -1;
     GLint _uFarPlane = -1;
-    GLint _uGroundFogMaxY = -1;
+    GLint _uGroundFogMaxHeight = -1;
+    GLint _uWorldRadius = -1;
     GLint _uGroundFogColor = -1;
     GLint _uGroundFogWorldOffset = -1;
 
@@ -272,7 +276,8 @@ private:
     float _farPlane = 0;
     float _nearRenderDistance = 0;
     float _farRenderDistance = 0;
-    float _groundFogMaxY = 0;
+    float _groundFogMaxHeight = 0;
+    float _worldRadius = 0;
     glm::vec4 _groundFogColor { 1, 1, 1, 0.5 };
     glm::vec3 _groundFogWorldOffset { 0 };
     glm::vec3 _fogWindSpeed { 0 };

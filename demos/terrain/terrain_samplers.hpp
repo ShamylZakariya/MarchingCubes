@@ -13,7 +13,6 @@ using namespace glm;
 using mc::util::AABB;
 using mc::util::iAABB;
 
-
 class TerrainSampler : public mc::IVolumeSampler {
 public:
     class SampleSource {
@@ -23,6 +22,7 @@ public:
         virtual float maxHeight() const = 0;
         virtual float sample(const vec3& world, mc::MaterialState& material) const = 0;
     };
+
 public:
     TerrainSampler() = delete;
     TerrainSampler(const TerrainSampler&) = delete;
