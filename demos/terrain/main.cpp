@@ -264,20 +264,23 @@ private:
         // load materials
         //
 
-        auto textureSetup = []() {
+        auto mipmappedTextureSetup = []() {
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-            // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glGenerateMipmap(GL_TEXTURE_2D);
+        };
+
+        auto nonMipmappedTextureSetup = []() {
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         };
 
         const auto ambientLight = vec3(0.1, 0.1, 0.1);
         const auto skyboxTexture = mc::util::LoadTextureCube("textures/sky", ".jpg");
         const mc::util::TextureHandleRef lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
-        const auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg", textureSetup);
+        const auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg", mipmappedTextureSetup);
         const auto terrainTexture0Scale = 30;
-        const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg", textureSetup);
+        const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg", mipmappedTextureSetup);
         const auto terrainTexture1Scale = 30;
         const auto renderDistance = kTerrainChunkSize * 1.5;
 
@@ -322,8 +325,9 @@ private:
 
         _postProcessingFilters = std::make_unique<post_processing::FilterStack>();
 
-        const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png");
-        _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture));
+        const auto bluenoiseTexture = mc::util::LoadTexture2D("textures/blue.png", nonMipmappedTextureSetup);
+        const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png", mipmappedTextureSetup);
+        _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture, bluenoiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
         _atmosphere->setWorldRadius(kWorldRadius);
@@ -345,7 +349,7 @@ private:
         _fastNoise.SetFrequency(frequency);
         _fastNoise.SetFractalOctaves(3);
 
-        _atmosphere->setFog(terrainHeight * 0.6, vec4(0.9, 0.9, 0.92, 0.5));
+        _atmosphere->setFog(terrainHeight * 0.75, vec4(0.9, 0.9, 0.92, 0.75));
 
         //
         // build the terrain grid

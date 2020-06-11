@@ -36,16 +36,20 @@ fragment:
 }
 fs_in;
 
+const float kGoldenRatioConjugate = 0.61803398875f; // also just fract(goldenRatio)
+
 out vec4 fragColor;
 
 uniform sampler2D uColorSampler;
 uniform sampler2D uDepthSampler;
 uniform samplerCube uSkyboxSampler;
-uniform sampler2D uNoiseSampler;
+uniform sampler2D uWhiteNoiseSampler;
+uniform sampler2D uBlueNoiseSampler;
 
 uniform mat4 uProjectionInverse;
 uniform mat4 uViewInverse;
 uniform vec3 uCameraPosition;
+uniform vec2 uResolution;
 uniform float uNearRenderDistance;
 uniform float uFarRenderDistance;
 uniform float uNearPlane;
@@ -55,6 +59,7 @@ uniform float uWorldRadius;
 uniform float uGroundFogMaxHeight;
 uniform vec4 uGroundFogColor;
 uniform vec3 uGroundFogWorldOffset;
+uniform int uFrameCount;
 
 float noise(in vec3 x)
 {
@@ -62,7 +67,7 @@ float noise(in vec3 x)
     vec2 offz = vec2(0.317, 0.123);
     vec2 uv1 = x.xy + offz * floor(z);
     vec2 uv2 = uv1 + offz;
-    return mix(textureLod(uNoiseSampler, uv1, 0.0).x, textureLod(uNoiseSampler, uv2, 0.0).x, fract(z)) - 0.5;
+    return mix(textureLod(uWhiteNoiseSampler, uv1, 0.0).x, textureLod(uWhiteNoiseSampler, uv2, 0.0).x, fract(z)) - 0.5;
 }
 
 float noises( in vec3 p){
@@ -91,12 +96,19 @@ vec3 getFragmentWorldPosition()
 
 vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDir, vec3 skyboxColor)
 {
-    // March the volume defined by noises(), from back to front
+    //https://blog.demofox.org/2020/05/10/ray-marching-fog-with-blue-noise/
+    float offset = texture(uBlueNoiseSampler, gl_FragCoord.xy / 1024.0f).r;
+    offset = fract(offset + float(uFrameCount % 64) * kGoldenRatioConjugate);
+
+    // March the volume defined by noises(), from back to front, with a nudge
+    // based on the blue noise offset to reduce appearance of aliasing
     vec3 worldOrigin = vec3(uCameraPosition.x, -uWorldRadius, uCameraPosition.z);
     float dist = min(uFarRenderDistance, sceneDepth);
-    float density = dist / uFarRenderDistance;
+    dist *= 1 - 0.125 * offset;
+
     vec3 marchPosition = uCameraPosition + rayDir * dist;
-    int steps = 30;
+    int steps = 8;
+    float density = 4.0 * dist / uFarRenderDistance;
     vec3 marchDir = uCameraPosition - marchPosition;
     float rayLength = length(marchDir);
     vec3 marchIncrement = marchDir / steps;

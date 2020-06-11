@@ -137,14 +137,16 @@ private:
 
 class AtmosphereFilter : public post_processing::Filter {
 public:
-    AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef skybox, mc::util::TextureHandleRef noise)
+    AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef skybox, mc::util::TextureHandleRef whiteNoise, mc::util::TextureHandleRef blueNoise)
         : Filter(name)
         , _skybox(skybox)
-        , _noise(noise)
+        , _whiteNoise(whiteNoise)
+        , _blueNoise(blueNoise)
     {
         _program = mc::util::CreateProgramFromFile("shaders/gl/postprocessing/atmosphere.glsl");
 
-        _uNoiseSampler = glGetUniformLocation(_program, "uNoiseSampler");
+        _uWhiteNoiseSampler = glGetUniformLocation(_program, "uWhiteNoiseSampler");
+        _uBlueNoiseSampler = glGetUniformLocation(_program, "uBlueNoiseSampler");
         _uColorSampler = glGetUniformLocation(_program, "uColorSampler");
         _uDepthSampler = glGetUniformLocation(_program, "uDepthSampler");
         _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
@@ -161,6 +163,8 @@ public:
         _uGroundFogMaxHeight = glGetUniformLocation(_program, "uGroundFogMaxHeight");
         _uGroundFogColor = glGetUniformLocation(_program, "uGroundFogColor");
         _uGroundFogWorldOffset = glGetUniformLocation(_program, "uGroundFogWorldOffset");
+
+        _uFrameCount = glGetUniformLocation(_program, "uFrameCount");
     }
 
     void setCameraState(const glm::vec3 position, const glm::mat4& projection, const glm::mat4& view, float nearPlane, float farPlane)
@@ -220,14 +224,17 @@ protected:
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_CUBE_MAP, _skybox->id());
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, _noise->id());
+        glBindTexture(GL_TEXTURE_2D, _whiteNoise->id());
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, _blueNoise->id());
 
         glUseProgram(_program);
 
         glUniform1i(_uColorSampler, 0);
         glUniform1i(_uDepthSampler, 1);
         glUniform1i(_uSkyboxSampler, 2);
-        glUniform1i(_uNoiseSampler, 3);
+        glUniform1i(_uWhiteNoiseSampler, 3);
+        glUniform1i(_uBlueNoiseSampler, 4);
 
         glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_projection)));
         glUniformMatrix4fv(_uViewInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_view)));
@@ -241,10 +248,13 @@ protected:
         glUniform1f(_uGroundFogMaxHeight, _groundFogMaxHeight);
         glUniform4fv(_uGroundFogColor, 1, glm::value_ptr(_groundFogColor));
         glUniform3fv(_uGroundFogWorldOffset, 1, glm::value_ptr(_groundFogWorldOffset));
-        CHECK_GL_ERROR("_render 4");
+
+        glUniform1i(_uFrameCount, _frameCount);
 
         clipspaceQuad.draw();
         glUseProgram(0);
+
+        _frameCount++;
     }
 
 private:
@@ -254,7 +264,8 @@ private:
     GLint _uColorSampler = -1;
     GLint _uDepthSampler = -1;
     GLint _uSkyboxSampler = -1;
-    GLint _uNoiseSampler = -1;
+    GLint _uWhiteNoiseSampler = -1;
+    GLint _uBlueNoiseSampler = -1;
     GLint _uProjectionInverse = -1;
     GLint _uViewInverse = -1;
     GLint _uCameraPosition = -1;
@@ -266,9 +277,11 @@ private:
     GLint _uWorldRadius = -1;
     GLint _uGroundFogColor = -1;
     GLint _uGroundFogWorldOffset = -1;
+    GLint _uFrameCount;
 
     mc::util::TextureHandleRef _skybox;
-    mc::util::TextureHandleRef _noise;
+    mc::util::TextureHandleRef _whiteNoise;
+    mc::util::TextureHandleRef _blueNoise;
     glm::mat4 _projection;
     glm::mat4 _view;
     glm::vec3 _cameraPosition;
@@ -281,6 +294,7 @@ private:
     glm::vec4 _groundFogColor { 1, 1, 1, 0.5 };
     glm::vec3 _groundFogWorldOffset { 0 };
     glm::vec3 _fogWindSpeed { 0 };
+    int _frameCount = 0;
 };
 
 #endif
