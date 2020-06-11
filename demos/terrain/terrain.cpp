@@ -133,6 +133,16 @@ glm::ivec2 TerrainGrid::worldToIndex(const glm::vec3& world) const
     return idx;
 }
 
+mc::util::unowned_ptr<TerrainChunk> TerrainGrid::getTerrainChunkContaining(const glm::vec3& world) const
+{
+    const ivec2 idx0 = _grid[0]->getIndex();
+    const ivec2 targetIdx = worldToIndex(world);
+    const ivec2 delta = targetIdx - idx0;
+    if (delta.x >= 0 && delta.x < _gridSize && delta.y >= 0 && delta.y < _gridSize) {
+        return _grid[delta.y * _gridSize + delta.x];
+    }
+}
+
 void TerrainGrid::shift(glm::ivec2 by)
 {
     // shift dx
@@ -193,7 +203,7 @@ void TerrainGrid::print()
     for (int i = 0; i < _gridSize; i++) {
         for (int j = 0; j < _gridSize; j++) {
             int k = i * _gridSize + j;
-            std::cout << "\t" << glm::to_string(_grid[k]->getIndex()) << std::endl;
+            std::cout << "\tidx:" << k << "\t" << glm::to_string(_grid[k]->getIndex()) << std::endl;
         }
         std::cout << "\n";
     }

@@ -514,6 +514,7 @@ private:
             if (shift != ivec2(0, 0)) {
                 _terrainGrid->shift(centerIdx - idx);
                 _terrainGrid->march(_camera.getPosition(), _camera.getForward());
+                std::cout << "Shifted terrain. Camera in chunk: " << to_string(_terrainGrid->getTerrainChunkContaining(_camera.getPosition())->getIndex()) << std::endl;
             }
         }
     }

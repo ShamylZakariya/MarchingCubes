@@ -101,6 +101,11 @@ public:
     glm::ivec2 worldToIndex(const glm::vec3& world) const;
 
     /**
+     * Get the TerainChunk which contains the point in world coordinates.
+     */
+    mc::util::unowned_ptr<TerrainChunk> getTerrainChunkContaining(const glm::vec3 &world) const;
+
+    /**
      * Get the terrain chunk at the center of the grid
      */
     mc::util::unowned_ptr<TerrainChunk> getCenterChunk() const
