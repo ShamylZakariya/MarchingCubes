@@ -345,6 +345,18 @@ namespace util {
             return (point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y && point.z >= min.z && point.z <= max.z);
         }
 
+        /**
+         * Clamps the point to be inside the bounds defined by this AABB_.
+         */
+        glm::vec<3, T, Q> clamp(glm::vec<3, T, Q> p) const
+        {
+            return glm::vec<3, T, Q> {
+                std::max(min.x, std::min(p.x, max.x)),
+                std::max(min.y, std::min(p.y, max.y)),
+                std::max(min.z, std::min(p.z, max.z))
+            };
+        }
+
         std::array<glm::vec<3, T, Q>, 8> corners() const
         {
             return std::array<glm::vec<3, T, Q>, 8> {

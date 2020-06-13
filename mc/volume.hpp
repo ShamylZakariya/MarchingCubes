@@ -157,7 +157,25 @@ public:
         }
         ~Node() = default;
 
-        float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const {
+        /**
+         * Sample the volume in this node at a given point in the octree volume's coordinate
+         * space. This implementation is slightly less efficient than the one used by march(),
+         * because march is able to "freeze" the sampler set during a collection phase. This
+         * should be adequate for use in raymarching and scene sampling.
+         * p: A point in OctreeVolume's bounds
+         * fuzziness: The fuzziness component. See IVolumeSampler::valueAt
+         * materialState: Receives the accumulated material state for the point.
+         * clamp: If true, p is clamped to be inside the node's bounds.
+         * Returns the value of the isosurface at the sample point, from 0 to 1.
+         */
+        float valueAt(glm::vec3 p, float fuzziness, MaterialState& material, bool clamp) const {
+            if (clamp) {
+                p = glm::vec3{
+                    std::max(bounds.min.x, std::min(p.x, bounds.max.x)),
+                    std::max(bounds.min.y, std::min(p.y, bounds.max.y)),
+                    std::max(bounds.min.z, std::min(p.z, bounds.max.z))
+                };
+            }
             // run additive samplers, interpolating material state
             float value = 0;
             for (auto additiveSampler : additiveSamplers) {

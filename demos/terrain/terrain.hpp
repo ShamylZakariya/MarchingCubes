@@ -147,13 +147,20 @@ public:
         operator bool() const { return isHit; }
     };
 
+    enum class RaycastEdgeBehavior {
+        Zero, // raycast marching outside a terrain segment returns 0
+        Clamp // raycast marching outside a terrain segment is clamped to the boundary value.
+    };
+
     /**
      * Perform a raycast against the terrain volume.
      * Raycast from origin, in direction dir. Marches the ray with increments of stepSize, for a max distance of
      * maxLength. If computeNormal is set, will compute the normal of the terrain function (including greebling) at
      * intersection point.
      */
-    RaycastResult rayCast(const glm::vec3& origin, const glm::vec3& dir, float stepSize, float maxLength, bool computeNormal) const;
+    RaycastResult rayCast(const glm::vec3& origin, const glm::vec3& dir,
+        float stepSize, float maxLength, bool computeNormal,
+        RaycastEdgeBehavior edgeBehavior = RaycastEdgeBehavior::Clamp) const;
 
 private:
     /**

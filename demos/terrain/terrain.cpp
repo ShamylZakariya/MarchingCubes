@@ -240,27 +240,31 @@ void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
 
 namespace {
 const float kIsoThreshold = 0.001F;
-vec3 normalAt(mc::OctreeVolume::Node* node, const glm::vec3& p)
+vec3 normalAt(mc::OctreeVolume::Node* node, glm::vec3 p)
 {
     mc::MaterialState _;
     const float d = 0.05f;
-    vec3 grad(
-        node->valueAt(p + vec3(d, 0, 0), 1, _) - node->valueAt(p + vec3(-d, 0, 0), 1, _),
-        node->valueAt(p + vec3(0, d, 0), 1, _) - node->valueAt(p + vec3(0, -d, 0), 1, _),
-        node->valueAt(p + vec3(0, 0, d), 1, _) - node->valueAt(p + vec3(0, 0, -d), 1, _));
+    vec3 gradient(
+        node->valueAt(p + vec3(d, 0, 0), 1, _, false) - node->valueAt(p + vec3(-d, 0, 0), 1, _, false),
+        node->valueAt(p + vec3(0, d, 0), 1, _, false) - node->valueAt(p + vec3(0, -d, 0), 1, _, false),
+        node->valueAt(p + vec3(0, 0, d), 1, _, false) - node->valueAt(p + vec3(0, 0, -d), 1, _, false));
 
-    return -normalize(grad);
-}
+    return -normalize(gradient);
 }
 
-TerrainGrid::RaycastResult TerrainGrid::rayCast(const glm::vec3& origin, const glm::vec3& dir, float stepSize, float maxLength, bool computeNormal) const
+}
+
+TerrainGrid::RaycastResult TerrainGrid::rayCast(const glm::vec3& origin, const glm::vec3& dir,
+    float stepSize, float maxLength,
+    bool computeNormal, RaycastEdgeBehavior edgeBehavior) const
 {
-    vec3 samplePoint = origin;
     const float maxLength2 = maxLength * maxLength;
     const float minStepSize = stepSize * pow<float>(0.5, 6);
+    const bool clamp = edgeBehavior == RaycastEdgeBehavior::Clamp;
     mc::util::unowned_ptr<TerrainChunk> currentChunk = getTerrainChunkContaining(origin);
     mc::util::unowned_ptr<TerrainChunk> lastChunk = getTerrainChunkContaining(origin + dir * maxLength);
     const bool crossesChunks = lastChunk != currentChunk;
+    vec3 samplePoint = origin;
     mc::MaterialState _;
     bool firstStep = true;
     bool forward = true;
@@ -270,10 +274,13 @@ TerrainGrid::RaycastResult TerrainGrid::rayCast(const glm::vec3& origin, const g
         auto volume = currentChunk->getVolume();
         auto chunkWorldOrigin = currentChunk->getWorldOrigin();
         vec3 localSamplePoint = samplePoint - chunkWorldOrigin;
+        if (clamp) {
+            localSamplePoint = volume->bounds().clamp(localSamplePoint);
+        }
 
         auto node = volume->findNode(localSamplePoint);
         if (node != nullptr) {
-            float value = node->valueAt(localSamplePoint, 1, _);
+            float value = node->valueAt(localSamplePoint, 1, _, false);
 
             if (firstStep && value > 0.5F + kIsoThreshold) {
                 // the raycast origin is inside the volume. Reverse raycast to find exit point.
@@ -286,10 +293,10 @@ TerrainGrid::RaycastResult TerrainGrid::rayCast(const glm::vec3& origin, const g
             if (std::abs(value - 0.5F) < kIsoThreshold) {
                 RaycastResult result;
                 result.isHit = true;
-                result.distance = glm::distance(samplePoint, origin) * wasInsideVolume ? -1 : 1;
+                result.distance = glm::distance(samplePoint, origin) * (wasInsideVolume ? -1 : 1);
                 result.position = samplePoint;
                 if (computeNormal) {
-                    result.normal = normalAt(node, samplePoint);
+                    result.normal = normalAt(node, localSamplePoint);
                 }
             }
 
@@ -311,9 +318,9 @@ TerrainGrid::RaycastResult TerrainGrid::rayCast(const glm::vec3& origin, const g
             RaycastResult result;
             result.isHit = true;
             result.position = samplePoint;
-            result.distance = glm::distance(samplePoint, origin) * wasInsideVolume ? -1 : 1;;
+            result.distance = glm::distance(samplePoint, origin) * (wasInsideVolume ? -1 : 1);
             if (computeNormal) {
-                result.normal = normalAt(node, samplePoint);
+                result.normal = normalAt(node, localSamplePoint);
             }
             return result;
         }

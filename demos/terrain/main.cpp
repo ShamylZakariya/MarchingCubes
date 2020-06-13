@@ -664,13 +664,14 @@ private:
 
         if (isKeyDown(GLFW_KEY_SPACE)) {
             // send a raycast straight down
-            auto result = _terrainGrid->rayCast(_camera.getPosition(), vec3(0,-1,0), 0.5F, 1000, true);
+            auto result = _terrainGrid->rayCast(_camera.getPosition(), vec3(0, -1, 0),
+                0.5F, 1000, true, TerrainGrid::RaycastEdgeBehavior::Clamp);
             if (result) {
                 std::cout << "Raycast result from camera position: " << to_string(_camera.getPosition())
-                    << "\n\tposition: " << to_string(result.position)
-                    << "\n\tdistance: " << result.distance
-                    << "\n\tnormal: " << to_string(result.normal)
-                    << std::endl;
+                          << "\n\tposition: " << to_string(result.position)
+                          << "\n\tdistance: " << result.distance
+                          << "\n\tnormal: " << to_string(result.normal)
+                          << std::endl;
             } else {
                 std::cout << "No raycast result" << std::endl;
             }
