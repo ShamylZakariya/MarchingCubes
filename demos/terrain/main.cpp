@@ -613,6 +613,8 @@ private:
             _palettizer->setAlpha(paletteAlpha);
         }
 
+        ImGui::Checkbox("Camera Follows Ground", &_cameraFollowsGround);
+
         ImGui::End();
     }
 
@@ -621,29 +623,36 @@ private:
         // WASD
         const float movementSpeed = 20 * deltaT * (isKeyDown(GLFW_KEY_LEFT_SHIFT) ? 5 : 1);
         const float lookSpeed = radians<float>(90) * deltaT;
+        bool didMove = false;
 
         if (isKeyDown(GLFW_KEY_A)) {
             _camera.moveBy(movementSpeed * vec3(+1, 0, 0));
+            didMove = true;
         }
 
         if (isKeyDown(GLFW_KEY_D)) {
             _camera.moveBy(movementSpeed * vec3(-1, 0, 0));
+            didMove = true;
         }
 
         if (isKeyDown(GLFW_KEY_W)) {
             _camera.moveBy(movementSpeed * vec3(0, 0, +1));
+            didMove = true;
         }
 
         if (isKeyDown(GLFW_KEY_S)) {
             _camera.moveBy(movementSpeed * vec3(0, 0, -1));
+            didMove = true;
         }
 
         if (isKeyDown(GLFW_KEY_Q)) {
             _camera.moveBy(movementSpeed * vec3(0, -1, 0));
+            didMove = true;
         }
 
         if (isKeyDown(GLFW_KEY_E)) {
             _camera.moveBy(movementSpeed * vec3(0, +1, 0));
+            didMove = true;
         }
 
         if (isKeyDown(GLFW_KEY_UP)) {
@@ -662,23 +671,16 @@ private:
             _camera.rotateBy(+lookSpeed, 0);
         }
 
-        if (isKeyDown(GLFW_KEY_SPACE)) {
-            // send a raycast straight down
-            auto result = _terrainGrid->rayCast(_camera.getPosition(), vec3(0, -1, 0),
+        if (didMove) {
+            // send a raycast straight down and position camera 1 unit above that point.
+            auto position = _camera.getPosition();
+            auto result = _terrainGrid->rayCast(position, vec3(0, -1, 0),
                 0.5F, 1000, true, TerrainGrid::RaycastEdgeBehavior::Clamp);
             if (result) {
-                std::cout << "Raycast result from camera position: " << to_string(_camera.getPosition())
-                          << "\n\tposition: " << to_string(result.position)
-                          << "\n\tdistance: " << result.distance
-                          << "\n\tnormal: " << to_string(result.normal)
-                          << std::endl;
-            } else {
-                std::cout << "No raycast result" << std::endl;
+                position.y = result.position.y + 1.0F;
+                _camera.setPosition(position);
             }
         }
-
-        // March a ray down from camera to see distance from terrain volume
-        // and update position accordingly.
 
         _camera.updateFrustum();
     }
@@ -715,6 +717,7 @@ private:
     int _pixelScale = 2;
     bool _drawOctreeAABBs = false;
     bool _drawMarkers = false;
+    bool _cameraFollowsGround = true;
 
     // demo state
     std::unique_ptr<TerrainGrid> _terrainGrid;

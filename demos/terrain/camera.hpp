@@ -181,7 +181,12 @@ public:
             _look[2][2]);
     }
 
-    void moveBy(glm::vec3 deltaLocal)
+    void setPosition(const glm::vec3& newPosition)
+    {
+        _position = newPosition;
+    }
+
+    void moveBy(const glm::vec3& deltaLocal)
     {
         using namespace glm;
         vec3 deltaWorld = inverse(_look) * deltaLocal;
@@ -196,7 +201,7 @@ public:
         _look = rotate(mat4 { _look }, yaw, vec3 { 0, 1, 0 });
     }
 
-    void lookAt(glm::vec3 position, glm::vec3 at, glm::vec3 up = glm::vec3(0, 1, 0))
+    void lookAt(const glm::vec3& position, const glm::vec3& at, const glm::vec3& up = glm::vec3(0, 1, 0))
     {
         using namespace glm;
         _position = position;

@@ -17,10 +17,11 @@ using namespace glm;
 namespace mc {
 
 namespace {
-    OctreeVolume::Node *findChildContaining(OctreeVolume::Node *node, const glm::vec3 &p) {
+    OctreeVolume::Node* findChildContaining(OctreeVolume::Node* node, const glm::vec3& p)
+    {
         // TODO: This can be optimized by checking which quadrant the point
         // is in and simply jumping to the right child.
-        for (const auto &child : node->children) {
+        for (const auto& child : node->children) {
             if (child->bounds.contains(p)) {
                 return child.get();
             }
@@ -32,7 +33,7 @@ namespace {
 mc::util::unowned_ptr<OctreeVolume::Node>
 OctreeVolume::findNode(const glm::vec3& point) const
 {
-    Node *currentNode = _root.get();
+    Node* currentNode = _root.get();
 
     // quick test; if this octree volume root doesn't contain the point
     // then none of the leaf nodes will.
@@ -40,8 +41,9 @@ OctreeVolume::findNode(const glm::vec3& point) const
         return nullptr;
     }
 
-    while(currentNode) {
-        if (currentNode->isLeaf) return currentNode;
+    while (currentNode) {
+        if (currentNode->isLeaf)
+            return currentNode;
         currentNode = findChildContaining(currentNode, point);
     }
 

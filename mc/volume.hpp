@@ -168,9 +168,10 @@ public:
          * clamp: If true, p is clamped to be inside the node's bounds.
          * Returns the value of the isosurface at the sample point, from 0 to 1.
          */
-        float valueAt(glm::vec3 p, float fuzziness, MaterialState& material, bool clamp) const {
+        float valueAt(glm::vec3 p, float fuzziness, MaterialState& material, bool clamp) const
+        {
             if (clamp) {
-                p = glm::vec3{
+                p = glm::vec3 {
                     std::max(bounds.min.x, std::min(p.x, bounds.max.x)),
                     std::max(bounds.min.y, std::min(p.y, bounds.max.y)),
                     std::max(bounds.min.z, std::min(p.z, bounds.max.z))
@@ -264,7 +265,7 @@ public:
      * Find the leaf node containing point, or null if point is outside the OctreeVolume bounds.
      * Point is in the local coordinate space.
      */
-    mc::util::unowned_ptr<Node> findNode(const glm::vec3 &point) const;
+    mc::util::unowned_ptr<Node> findNode(const glm::vec3& point) const;
 
     /**
      * March the represented volume into the triangle consumers provided in the constructor
