@@ -157,6 +157,31 @@ public:
         }
         ~Node() = default;
 
+        float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const {
+            // run additive samplers, interpolating material state
+            float value = 0;
+            for (auto additiveSampler : additiveSamplers) {
+                MaterialState m;
+                auto v = additiveSampler->valueAt(p, fuzziness, m);
+                if (value == 0) {
+                    material = m;
+                } else {
+                    material = mix(material, m, v);
+                }
+                value += v;
+            }
+
+            // run subtractions (these don't affect material state)
+            value = std::min<float>(value, 1.0F);
+            for (auto subtractiveSampler : subtractiveSamplers) {
+                MaterialState _;
+                value -= subtractiveSampler->valueAt(p, fuzziness, _);
+            }
+            value = std::max<float>(value, 0.0F);
+
+            return value;
+        }
+
         util::AABB bounds;
         int depth = 0;
         int childIdx = 0;
@@ -216,6 +241,12 @@ public:
 
         walker(_root.get());
     }
+
+    /**
+     * Find the leaf node containing point, or null if point is outside the OctreeVolume bounds.
+     * Point is in the local coordinate space.
+     */
+    mc::util::unowned_ptr<Node> findNode(const glm::vec3 &point) const;
 
     /**
      * March the represented volume into the triangle consumers provided in the constructor

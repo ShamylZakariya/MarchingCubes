@@ -103,7 +103,7 @@ public:
     /**
      * Get the TerainChunk which contains the point in world coordinates.
      */
-    mc::util::unowned_ptr<TerrainChunk> getTerrainChunkContaining(const glm::vec3 &world) const;
+    mc::util::unowned_ptr<TerrainChunk> getTerrainChunkContaining(const glm::vec3& world) const;
 
     /**
      * Get the terrain chunk at the center of the grid
@@ -135,6 +135,25 @@ public:
     glm::vec3 getChunkSize() const { return glm::vec3(_chunkSize); }
     int getCount() const { return _gridSize * _gridSize; }
     bool isMarching() const { return _isMarching; }
+
+    struct RaycastResult {
+        static RaycastResult none() { return { false }; }
+
+        bool isHit = false;
+        float distance = 0;
+        glm::vec3 position { 0 };
+        glm::vec3 normal { 0 };
+
+        operator bool() const { return isHit; }
+    };
+
+    /**
+     * Perform a raycast against the terrain volume.
+     * Raycast from origin, in direction dir. Marches the ray with increments of stepSize, for a max distance of
+     * maxLength. If computeNormal is set, will compute the normal of the terrain function (including greebling) at
+     * intersection point.
+     */
+    RaycastResult rayCast(const glm::vec3& origin, const glm::vec3& dir, float stepSize, float maxLength, bool computeNormal) const;
 
 private:
     /**

@@ -141,6 +141,7 @@ mc::util::unowned_ptr<TerrainChunk> TerrainGrid::getTerrainChunkContaining(const
     if (delta.x >= 0 && delta.x < _gridSize && delta.y >= 0 && delta.y < _gridSize) {
         return _grid[delta.y * _gridSize + delta.x];
     }
+    return nullptr;
 }
 
 void TerrainGrid::shift(glm::ivec2 by)
@@ -235,6 +236,101 @@ void TerrainGrid::march(const glm::vec3& viewPos, const glm::vec3& viewDir)
         updateGreebling();
         marchSerially();
     }
+}
+
+namespace {
+const float kIsoThreshold = 0.001F;
+vec3 normalAt(mc::OctreeVolume::Node* node, const glm::vec3& p)
+{
+    mc::MaterialState _;
+    const float d = 0.05f;
+    vec3 grad(
+        node->valueAt(p + vec3(d, 0, 0), 1, _) - node->valueAt(p + vec3(-d, 0, 0), 1, _),
+        node->valueAt(p + vec3(0, d, 0), 1, _) - node->valueAt(p + vec3(0, -d, 0), 1, _),
+        node->valueAt(p + vec3(0, 0, d), 1, _) - node->valueAt(p + vec3(0, 0, -d), 1, _));
+
+    return -normalize(grad);
+}
+}
+
+TerrainGrid::RaycastResult TerrainGrid::rayCast(const glm::vec3& origin, const glm::vec3& dir, float stepSize, float maxLength, bool computeNormal) const
+{
+    vec3 samplePoint = origin;
+    const float maxLength2 = maxLength * maxLength;
+    const float minStepSize = stepSize * pow<float>(0.5, 6);
+    mc::util::unowned_ptr<TerrainChunk> currentChunk = getTerrainChunkContaining(origin);
+    mc::util::unowned_ptr<TerrainChunk> lastChunk = getTerrainChunkContaining(origin + dir * maxLength);
+    const bool crossesChunks = lastChunk != currentChunk;
+    mc::MaterialState _;
+    bool firstStep = true;
+    bool forward = true;
+    bool wasInsideVolume = false;
+
+    while (distance2(samplePoint, origin) < maxLength2) {
+        auto volume = currentChunk->getVolume();
+        auto chunkWorldOrigin = currentChunk->getWorldOrigin();
+        vec3 localSamplePoint = samplePoint - chunkWorldOrigin;
+
+        auto node = volume->findNode(localSamplePoint);
+        if (node != nullptr) {
+            float value = node->valueAt(localSamplePoint, 1, _);
+
+            if (firstStep && value > 0.5F + kIsoThreshold) {
+                // the raycast origin is inside the volume. Reverse raycast to find exit point.
+                forward = false;
+                wasInsideVolume = true;
+                stepSize *= -1;
+            }
+
+            // we landed right on the iso surface boundary, we're done.
+            if (std::abs(value - 0.5F) < kIsoThreshold) {
+                RaycastResult result;
+                result.isHit = true;
+                result.distance = glm::distance(samplePoint, origin) * wasInsideVolume ? -1 : 1;
+                result.position = samplePoint;
+                if (computeNormal) {
+                    result.normal = normalAt(node, samplePoint);
+                }
+            }
+
+            if (forward) {
+                if (value > 0.5F) {
+                    forward = false;
+                    stepSize *= -0.5F;
+                }
+            } else {
+                if (value < 0.5F) {
+                    forward = true;
+                    stepSize *= -0.5F;
+                }
+            }
+        }
+
+        if (std::abs(stepSize) <= minStepSize) {
+            // we've been binary searching about the threshold; this is good enough.
+            RaycastResult result;
+            result.isHit = true;
+            result.position = samplePoint;
+            result.distance = glm::distance(samplePoint, origin) * wasInsideVolume ? -1 : 1;;
+            if (computeNormal) {
+                result.normal = normalAt(node, samplePoint);
+            }
+            return result;
+        }
+
+        samplePoint += dir * stepSize;
+        firstStep = false;
+
+        if (crossesChunks) {
+            currentChunk = getTerrainChunkContaining(samplePoint);
+            if (!currentChunk) {
+                return RaycastResult::none();
+            }
+        }
+    }
+
+    std::cout << "Done - exceeded max raycast distance" << std::endl;
+    return RaycastResult::none();
 }
 
 bool TerrainGrid::samplerIntersects(mc::IVolumeSampler* sampler, const vec3& samplerChunkWorldOrigin, const AABB worldBounds)

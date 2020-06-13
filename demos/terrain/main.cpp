@@ -662,6 +662,23 @@ private:
             _camera.rotateBy(+lookSpeed, 0);
         }
 
+        if (isKeyDown(GLFW_KEY_SPACE)) {
+            // send a raycast straight down
+            auto result = _terrainGrid->rayCast(_camera.getPosition(), vec3(0,-1,0), 0.5F, 1000, true);
+            if (result) {
+                std::cout << "Raycast result from camera position: " << to_string(_camera.getPosition())
+                    << "\n\tposition: " << to_string(result.position)
+                    << "\n\tdistance: " << result.distance
+                    << "\n\tnormal: " << to_string(result.normal)
+                    << std::endl;
+            } else {
+                std::cout << "No raycast result" << std::endl;
+            }
+        }
+
+        // March a ray down from camera to see distance from terrain volume
+        // and update position accordingly.
+
         _camera.updateFrustum();
     }
 
