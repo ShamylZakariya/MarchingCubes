@@ -21,18 +21,21 @@
 
 namespace mc {
 
-//
-// VolumeSampler
-//
-
+/**
+ * IVolumeSampler represents a "thing" which can be queried for isosurface contribution to
+ * a BaseCompositeVolume. Subclasses (e.g., SphereVolumeSampler) will use a parametric or
+ * data lookup to compute the contribution of a voxel to the isosurface.
+ */
 class IVolumeSampler {
 public:
+    // Types of intersection with an AABB.
     enum class AABBIntersection {
-        None,
-        IntersectsAABB,
-        ContainsAABB
+        None, // The AABB does not intersect this IVolumeSampler.
+        IntersectsAABB, // The AABB intersects this IVOlumeSampler.
+        ContainsAABB // The AABB is entirely inside this IVolumeSampler.
     };
 
+    // Specifies if an IVolumeSampler adds or subtracts from the isosurface.
     enum class Mode {
         Additive,
         Subtractive
@@ -46,10 +49,10 @@ public:
 
     virtual ~IVolumeSampler() = default;
 
-    Mode mode() const { return _mode; }
+    Mode getMode() const { return _mode; }
 
     /*
-     Create a copy of this IVOlumeSampler
+     Create a copy of this IVolumeSampler
     */
     virtual std::unique_ptr<IVolumeSampler> copy() const = 0;
 
@@ -75,7 +78,7 @@ public:
      example, in the case of a circle or radius r, a point distance <= r - fuziness
      returns a value of 1, and a distance >= r returns 0,
      and values in between return a linear transition.
-     Write the material properties of the volume into `material
+     Writes the material properties of the volume at the sampler point into `material`.
      */
     virtual float valueAt(const glm::vec3& p, float fuzziness, MaterialState& material) const = 0;
 
@@ -83,10 +86,9 @@ private:
     Mode _mode;
 };
 
-//
-// Volume
-//
-
+/**
+ * BaseCompositeVolume is the base class for volumes made up of multiple IVolumeSampler instances.
+ */
 class BaseCompositeVolume {
 public:
     BaseCompositeVolume(glm::ivec3 size, float fuzziness)
@@ -97,13 +99,14 @@ public:
 
     virtual ~BaseCompositeVolume() = default;
 
+    // Adds an IVolumeSampler instance, transferring ownership to BaseCompositeVolume.
     template <typename T>
     util::unowned_ptr<T> add(std::unique_ptr<T>&& sampler)
     {
         auto sPtr = sampler.get();
         _samplers.push_back(std::move(sampler));
 
-        switch (sPtr->mode()) {
+        switch (sPtr->getMode()) {
         case IVolumeSampler::Mode::Additive:
             _additiveSamplers.push_back(sPtr);
             break;
@@ -116,6 +119,7 @@ public:
         return sPtr;
     }
 
+    // Clear storage of IVolumeSamplers.
     virtual void clear()
     {
         _samplers.clear();
@@ -123,18 +127,18 @@ public:
         _subtractiveSamplers.clear();
     }
 
-    glm::ivec3 size() const
+    glm::ivec3 getSize() const
     {
         return _size;
     }
 
-    std::size_t count() const
+    std::size_t getNumSamplers() const
     {
         return _samplers.size();
     }
 
     void setFuzziness(float ft) { _fuzziness = std::max<float>(ft, 0); }
-    float fuzziness() const { return _fuzziness; }
+    float getFuzziness() const { return _fuzziness; }
 
 protected:
     glm::ivec3 _size;
@@ -146,15 +150,15 @@ protected:
 class OctreeVolume : public BaseCompositeVolume {
 public:
     struct Node {
-        Node() = delete;
-        Node(const Node&) = delete;
-        Node(const Node&&) = delete;
         Node(const util::AABB bounds, int depth, int childIdx)
             : bounds(bounds)
             , depth(depth)
             , childIdx(childIdx)
         {
         }
+        Node() = delete;
+        Node(const Node&) = delete;
+        Node(const Node&&) = delete;
         ~Node() = default;
 
         /**
@@ -213,7 +217,6 @@ public:
 
     private:
         friend class OctreeVolume;
-
         std::vector<IVolumeSampler*> _additiveSamplersVec;
         std::vector<IVolumeSampler*> _subtractiveSamplersVec;
     };
@@ -236,6 +239,7 @@ public:
         clear(_root.get());
     }
 
+    // Gathers all nodes which contain IVolumeSampler instances.
     void collect(std::vector<Node*>& collector)
     {
         /*
@@ -246,6 +250,7 @@ public:
         collect(_root.get(), collector);
     }
 
+    // Recursively descend the octree, invoking visitor on each node.
     void walkOctree(std::function<bool(Node*)> visitor)
     {
         std::function<void(Node*)> walker = [&visitor, &walker](Node* node) {
@@ -286,7 +291,7 @@ public:
     /**
      * Get the bounds of this volume - no geometry will exceed this region
      */
-    util::AABB bounds() const
+    util::AABB getBounds() const
     {
         return _bounds;
     }
@@ -294,7 +299,7 @@ public:
     /**
      * Get the max octree node depth
      */
-    size_t depth() const
+    size_t getDepth() const
     {
         return _treeDepth;
     }

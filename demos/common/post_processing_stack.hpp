@@ -30,6 +30,7 @@ namespace detail {
     };
 }
 
+// Base class for filters to be processed by FilterStack.
 class Filter {
 public:
     Filter(const std::string& name)
@@ -82,11 +83,13 @@ private:
     glm::vec4 _clearColor;
 };
 
+// Represents a stack of Filter instances.
 class FilterStack {
 public:
     FilterStack();
     ~FilterStack();
 
+    // Add a filter to the end of the stack and takes ownership.
     template <class T>
     mc::util::unowned_ptr<T> push(std::unique_ptr<T>&& filter)
     {
@@ -95,11 +98,13 @@ public:
         return ptr;
     }
 
+    // Removes the filter at the end of the stack.
     void pop()
     {
         _filters.pop_back();
     }
 
+    // Removes the filter with the given name.
     void remove(const std::string& name)
     {
         _filters.erase(std::remove_if(
@@ -108,6 +113,7 @@ public:
             _filters.end());
     }
 
+    // Removes the specified filter.
     void remove(unowned_ptr<Filter> filter)
     {
         _filters.erase(std::remove_if(
@@ -116,16 +122,19 @@ public:
             _filters.end());
     }
 
+    // Clears the filter stack.
     void clear()
     {
         _filters.clear();
     }
 
+    // Returns true iff the stack is empty.
     bool isEmpty() const
     {
         return _filters.empty();
     }
 
+    // Get the fitler with the specified name.
     unowned_ptr<Filter> getFilter(const std::string& name) const
     {
         for (const auto& f : _filters) {
@@ -136,6 +145,7 @@ public:
         return nullptr;
     }
 
+    // Get the first filter of the specified class.
     template <typename T>
     unowned_ptr<T> getFilter()
     {
@@ -148,6 +158,7 @@ public:
         return nullptr;
     }
 
+    // Calls update(time) on each filter.
     void update(double time)
     {
         for (const auto& f : _filters) {
@@ -155,15 +166,15 @@ public:
         }
     }
 
-    /// Capture the render output of renderFunc, execute the installed filters,
-    /// and then draw the result to the active framebuffer
+    // Capture the render output of renderFunc, execute the installed filters,
+    // and then draw the result to the active framebuffer
     void execute(glm::ivec2 captureSize, std::function<void()> renderFunc)
     {
         execute(captureSize, captureSize, renderFunc);
     }
 
-    /// Capture the render output of renderFunc, execute the installed filters,
-    /// and then draw the result to the active framebuffer
+    // Capture the render output of renderFunc, execute the installed filters,
+    // and then draw the result to the active framebuffer
     void execute(glm::ivec2 captureSize, glm::ivec2 displaySize, std::function<void()> renderFunc);
 
 protected:

@@ -40,7 +40,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = vec3(volume->size());
+        auto size = vec3(volume->getSize());
         auto center = size / 2.0F;
 
         _rect = volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
@@ -69,7 +69,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = vec3(volume->size());
+        auto size = vec3(volume->getSize());
         _pos = size / 2.0F;
         _radius = 10;
 
@@ -99,7 +99,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = vec3(volume->size());
+        auto size = vec3(volume->getSize());
         auto center = size / 2.0F;
         _plane = volume->add(std::make_unique<mc::BoundedPlaneVolumeSampler>(
             center, planeNormal(mat4 { 1 }), 10, kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
@@ -128,7 +128,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = vec3(volume->size());
+        auto size = vec3(volume->getSize());
         auto center = size / 2.0F;
         _plane = volume->add(std::make_unique<mc::HalfspaceVolumeSampler>(
             center, planeNormal(mat4 { 1 }), kDefaultMaterial, mc::IVolumeSampler::Mode::Additive));
@@ -157,7 +157,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = volume->size();
+        auto size = volume->getSize();
         std::random_device rng;
         std::default_random_engine gen { static_cast<long unsigned int>(12345) };
 
@@ -290,7 +290,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = vec3(volume->size());
+        auto size = vec3(volume->getSize());
         auto center = size / 2.0F;
 
         volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
@@ -317,7 +317,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = vec3(volume->size());
+        auto size = vec3(volume->getSize());
         auto center = size / 2.0F;
 
         volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(
@@ -350,7 +350,7 @@ public:
 
     void build(mc::util::unowned_ptr<mc::BaseCompositeVolume> volume) override
     {
-        auto size = vec3(volume->size());
+        auto size = vec3(volume->getSize());
         auto center = size / 2.0F;
 
         volume->add(std::make_unique<mc::RectangularPrismVolumeSampler>(

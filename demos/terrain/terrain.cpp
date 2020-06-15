@@ -53,7 +53,7 @@ void TerrainChunk::setIndex(ivec2 index)
     }
 
     const auto xzOffset = getXZOffset();
-    const auto size = vec3(_volume->size());
+    const auto size = vec3(_volume->getSize());
     const auto sampleOffset = vec3(xzOffset.x, 0, xzOffset.y);
 
     // bounds are in world not local space
@@ -275,7 +275,7 @@ TerrainGrid::RaycastResult TerrainGrid::rayCast(const glm::vec3& origin, const g
         auto chunkWorldOrigin = currentChunk->getWorldOrigin();
         vec3 localSamplePoint = samplePoint - chunkWorldOrigin;
         if (clamp) {
-            localSamplePoint = volume->bounds().clamp(localSamplePoint);
+            localSamplePoint = volume->getBounds().clamp(localSamplePoint);
         }
 
         auto node = volume->findNode(localSamplePoint);

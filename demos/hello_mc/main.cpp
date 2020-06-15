@@ -84,7 +84,7 @@ public:
     void bind(const mat4& projection, const mat4& modelview)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _skyboxTex->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _skyboxTex->getId());
 
         glUseProgram(_program);
         glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, value_ptr(inverse(projection)));
@@ -149,10 +149,10 @@ public:
     void bind(const mat4& mvp, const mat4& model, const vec3& cameraPosition)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _lightprobe->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _lightprobe->getId());
 
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->getId());
 
         glUseProgram(_program);
         glUniformMatrix4fv(_uMVP, 1, GL_FALSE, value_ptr(mvp));
@@ -161,7 +161,7 @@ public:
         glUniform1i(_uLightprobeSampler, 0);
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
         glUniform1i(_uReflectionMapSampler, 1);
-        glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
+        glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->getMipLevels()));
         glUniform1f(_uShininess, _shininess);
     }
 };
@@ -201,7 +201,9 @@ public:
 class App {
 private:
     GLFWwindow* _window;
-    mc::util::FpsCalculator _fpsCalculator;
+    double _elapsedFrameTime = 0;
+    int _framesRendered = 0;
+    double _currentFps = 0;
 
     // render state
     std::unique_ptr<VolumeMaterial> _volumeMaterial;
@@ -298,8 +300,8 @@ public:
 #endif
 
         // enter run loop
-        _fpsCalculator.reset();
         double lastTime = glfwGetTime();
+        _elapsedFrameTime = 0;
         while (_running && !glfwWindowShouldClose(_window)) {
             glfwPollEvents();
 
@@ -310,10 +312,10 @@ public:
 
             double now = glfwGetTime();
             double elapsed = now - lastTime;
+            _elapsedFrameTime += elapsed;
             lastTime = now;
             step(static_cast<float>(now), static_cast<float>(elapsed));
 
-            _fpsCalculator.update();
             drawFrame();
             drawGui();
 
@@ -321,6 +323,13 @@ public:
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             glfwSwapBuffers(_window);
+
+            _framesRendered++;
+            if (_framesRendered >= 60) {
+                _currentFps = _framesRendered / _elapsedFrameTime;
+                _framesRendered = 0;
+                _elapsedFrameTime = 0;
+            }
         }
 
         // shutdown imgui
@@ -492,7 +501,7 @@ private:
         }
 
         _volume = make_unique<mc::OctreeVolume>(64, _fuzziness, 4, _threadPool, unownedTriangleConsumers);
-        _model = glm::translate(mat4 { 1 }, -vec3(_volume->bounds().center()));
+        _model = glm::translate(mat4 { 1 }, -vec3(_volume->getBounds().center()));
 
         _volume->walkOctree([this](mc::OctreeVolume::Node* node) {
             auto bounds = node->bounds;
@@ -623,7 +632,7 @@ private:
     {
         ImGui::Begin("Demo window");
 
-        ImGui::LabelText("FPS", "%2.1f", static_cast<float>(_fpsCalculator.getFps()));
+        ImGui::LabelText("FPS", "%03.0f", _currentFps);
         ImGui::LabelText("triangles", "%d", _marchStats.triangleCount);
 
         ImGui::Separator();
@@ -713,7 +722,7 @@ private:
 
     void marchVolume()
     {
-        _marchStats.reset(_volume->depth());
+        _marchStats.reset(_volume->getDepth());
         _octreeOccupiedAABBsLineSegmentStorage.clear();
 
         _volume->march([this](mc::OctreeVolume::Node* node) {
@@ -731,7 +740,7 @@ private:
         });
 
         for (const auto& tc : _triangleConsumers) {
-            _marchStats.triangleCount += tc->numTriangles();
+            _marchStats.triangleCount += tc->getNumTriangles();
         }
     }
 
@@ -740,7 +749,7 @@ private:
         using namespace mc::util::color;
         static std::vector<vec4> nodeColors;
 
-        auto depth = _volume->depth();
+        auto depth = _volume->getDepth();
         if (nodeColors.size() != depth) {
             nodeColors.clear();
             const float hueStep = 360.0F / depth;
@@ -756,7 +765,7 @@ private:
 
     void displayMarchStats()
     {
-        auto maxVoxels = static_cast<int>(_volume->bounds().volume());
+        auto maxVoxels = static_cast<int>(_volume->getBounds().volume());
         std::cout << "marched " << _marchStats.voxelsMarched << "/" << maxVoxels
                   << " voxels (" << (static_cast<float>(_marchStats.voxelsMarched) / static_cast<float>(maxVoxels)) << ")"
                   << " numTriangles: " << _marchStats.triangleCount
@@ -780,7 +789,7 @@ private:
         auto trackballZ = glm::vec3 { _trackballRotation[0][2], _trackballRotation[1][2], _trackballRotation[2][2] };
 
         if (_useOrthoProjection) {
-            auto bounds = _volume->bounds();
+            auto bounds = _volume->getBounds();
             auto size = length(bounds.size());
 
             auto scaleMin = 0.1F;
@@ -796,7 +805,7 @@ private:
 
             projection = glm::ortho(-width / 2, width / 2, -height / 2, height / 2, kNearPlane, kFarPlane);
         } else {
-            auto bounds = _volume->bounds();
+            auto bounds = _volume->getBounds();
             auto minDistance = 0.1F;
             auto maxDistance = length(bounds.size()) * 2;
 

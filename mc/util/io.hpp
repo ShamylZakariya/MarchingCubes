@@ -43,10 +43,10 @@ namespace util {
 
         ~Image();
 
-        const unsigned char* bytes() const { return _bytes; }
-        int width() const { return _width; }
-        int height() const { return _height; }
-        int channels() const { return _height; }
+        const unsigned char* getBytes() const { return _bytes; }
+        int getWidth() const { return _width; }
+        int getHeight() const { return _height; }
+        int getChannels() const { return _height; }
     };
 
     class TextureHandle {
@@ -72,11 +72,11 @@ namespace util {
             glDeleteTextures(1, &_id);
         }
 
-        GLuint id() const { return _id; }
-        GLenum target() const { return _target; }
-        int width() const { return _width; }
-        int height() const { return _height; }
-        int mipLevels() const { return _mipLevels; }
+        GLuint getId() const { return _id; }
+        GLenum getTarget() const { return _target; }
+        int getWidth() const { return _width; }
+        int getHeight() const { return _height; }
+        int getMipLevels() const { return _mipLevels; }
     };
 
     typedef std::shared_ptr<TextureHandle> TextureHandleRef;

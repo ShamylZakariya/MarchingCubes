@@ -137,7 +137,7 @@ public:
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<SphereVolumeSampler>(_position, _radius, _material, mode());
+        return std::make_unique<SphereVolumeSampler>(_position, _radius, _material, getMode());
     }
 
     bool intersects(util::AABB bounds) const override
@@ -239,7 +239,7 @@ public:
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<HalfspaceVolumeSampler>(_origin, _normal, _material, mode());
+        return std::make_unique<HalfspaceVolumeSampler>(_origin, _normal, _material, getMode());
     }
 
     bool intersects(util::AABB bounds) const override
@@ -317,7 +317,7 @@ public:
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<BoundedPlaneVolumeSampler>(_origin, _normal, _thickness, _material, mode());
+        return std::make_unique<BoundedPlaneVolumeSampler>(_origin, _normal, _thickness, _material, getMode());
     }
 
     bool intersects(util::AABB bounds) const override
@@ -379,7 +379,7 @@ public:
 
     std::unique_ptr<IVolumeSampler> copy() const override
     {
-        return std::make_unique<RectangularPrismVolumeSampler>(_origin, _halfExtents, _rotation, _material, mode());
+        return std::make_unique<RectangularPrismVolumeSampler>(_origin, _halfExtents, _rotation, _material, getMode());
     }
 
     bool intersects(util::AABB bounds) const override

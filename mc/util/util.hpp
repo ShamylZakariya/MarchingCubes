@@ -25,7 +25,6 @@
 
 #include "aabb.hpp"
 #include "color.hpp"
-#include "fps_calc.hpp"
 #include "io.hpp"
 #include "lines.hpp"
 #include "storage.hpp"

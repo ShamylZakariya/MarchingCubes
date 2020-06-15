@@ -7,6 +7,9 @@
 namespace mc {
 namespace util {
 
+    /**
+     * Convenience mechanism for drawing line segments.
+     */
     class LineSegmentBuffer {
     public:
         using vertex_type = VertexP3C4;
@@ -16,12 +19,14 @@ namespace util {
         LineSegmentBuffer(const LineSegmentBuffer&&) = delete;
         ~LineSegmentBuffer() = default;
 
+        // Clear the line segment storage. Subsequent calls to draw() will draw nothing.
         void clear()
         {
             _vertices.clear();
             _dirty = true;
         }
 
+        // Add a single line segment to the buffer.
         void add(const vertex_type& a, const vertex_type& b)
         {
             _vertices.push_back(a);
@@ -29,6 +34,7 @@ namespace util {
             _dirty = true;
         }
 
+        // Add an AABB to this line segment buffer.
         template <typename T, glm::qualifier Q>
         inline void add(const AABB_<T, Q>& bounds, const glm::vec4& color)
         {
@@ -53,6 +59,7 @@ namespace util {
             add(vertex_type { corners[3], color }, vertex_type { corners[7], color });
         }
 
+        // Add an XYZ axis (red, green, blue respectively) with specified position, rotation and size.
         void addAxis(const glm::mat4& basis, float size)
         {
             const auto X = glm::vec3 { basis[0][0], basis[1][0], basis[2][0] };
@@ -67,6 +74,7 @@ namespace util {
             add(vertex_type { pos, blue }, vertex_type { pos + Z * size, blue });
         }
 
+        // Adds a jack-like marker at the specified position and color.
         void addMarker(const glm::vec3& pos, float size, const glm::vec4& color)
         {
             add(vertex_type { pos, color }, vertex_type { pos + glm::vec3(-size, 0, 0), color });

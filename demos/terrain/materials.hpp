@@ -38,7 +38,7 @@ public:
     void bind(const mat4& projection, const mat4& modelview)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _skyboxTex->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _skyboxTex->getId());
 
         glUseProgram(_program);
         glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, value_ptr(inverse(projection)));
@@ -114,16 +114,16 @@ public:
     void bind(const vec3& modelTranslation, const mat4& view, const mat4& projection, const vec3& cameraPosition)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _lightprobe->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _lightprobe->getId());
 
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->getId());
 
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, _texture0->id());
+        glBindTexture(GL_TEXTURE_2D, _texture0->getId());
 
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, _texture1->id());
+        glBindTexture(GL_TEXTURE_2D, _texture1->getId());
 
         glUseProgram(_program);
         glUniformMatrix4fv(_uVP, 1, GL_FALSE, value_ptr(projection * view));
@@ -133,7 +133,7 @@ public:
         glUniform1i(_uLightprobeSampler, 0);
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
         glUniform1i(_uReflectionMapSampler, 1);
-        glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->mipLevels()));
+        glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->getMipLevels()));
         glUniform1i(_uTexture0Sampler, 2);
         glUniform1i(_uTexture1Sampler, 3);
         glUniform1f(_uTexture0Scale, _texture0Scale);

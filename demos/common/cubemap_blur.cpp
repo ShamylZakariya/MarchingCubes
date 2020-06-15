@@ -117,10 +117,10 @@ public:
     void bind(const mat4& projection, const mat4& model, const mat4& view)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _srcCubemap->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _srcCubemap->getId());
 
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, _kernel->id());
+        glBindTexture(GL_TEXTURE_2D, _kernel->getId());
 
         glUseProgram(_program);
         glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, value_ptr(inverse(projection)));

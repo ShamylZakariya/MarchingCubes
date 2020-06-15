@@ -10,6 +10,13 @@
 namespace mc {
 namespace util {
 
+    /**
+     * OperationQueue is a minimalist task queue.
+     * Add work items via add(), execute them via drain().
+     * It is expected that the main "app" will drain the
+     * MainThreadQueue periodically (i.e. at each iteration of the
+     * main loop).
+     */
     class OperationQueue {
     public:
         typedef std::function<void()> OperationFn;
@@ -41,7 +48,7 @@ namespace util {
 
     /**
      * Get the singleton OperationQueue meant for
-     * being processed by the app's main thread
+     * being processed by the app's main thread.
      */
     unowned_ptr<OperationQueue> MainThreadQueue();
 

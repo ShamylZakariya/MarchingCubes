@@ -30,7 +30,6 @@
 #include "camera.hpp"
 #include "filters.hpp"
 #include "materials.hpp"
-#include "spring.hpp"
 #include "terrain.hpp"
 
 using namespace glm;

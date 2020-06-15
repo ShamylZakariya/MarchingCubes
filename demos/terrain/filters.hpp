@@ -222,11 +222,11 @@ protected:
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, depthTex);
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _skybox->id());
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _skybox->getId());
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, _whiteNoise->id());
+        glBindTexture(GL_TEXTURE_2D, _whiteNoise->getId());
         glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, _blueNoise->id());
+        glBindTexture(GL_TEXTURE_2D, _blueNoise->getId());
 
         glUseProgram(_program);
 

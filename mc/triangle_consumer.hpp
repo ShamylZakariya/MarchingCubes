@@ -45,7 +45,15 @@ struct Triangle {
 };
 
 /*
- Consumes triangles and maintaining a non-indexed vertex storage
+ Consumes triangles with non-indexed storage. Usage:
+    consumer.clear();
+    for (...) {
+        auto tri = ...;
+        consumer.addTriangle(t);
+    }
+    consumer.finish();
+
+    consumer.draw();
  */
 template <class VertexType>
 class TriangleConsumer {
@@ -79,7 +87,7 @@ public:
         _gpuStorage.update(_vertices);
     }
 
-    size_t numTriangles() const { return _numTriangles; }
+    size_t getNumTriangles() const { return _numTriangles; }
 
     void draw() const
     {
@@ -93,8 +101,8 @@ public:
         _numTriangles = 0;
     }
 
-    const auto& storage() const { return _gpuStorage; }
-    auto& storage() { return _gpuStorage; }
+    const auto& getStorage() const { return _gpuStorage; }
+    auto& getStorage() { return _gpuStorage; }
 };
 
 } // namespace mc

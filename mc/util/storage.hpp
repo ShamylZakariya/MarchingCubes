@@ -89,8 +89,8 @@ namespace util {
             }
         }
 
-        std::size_t numVertices() const { return _numVertices; }
-        std::size_t vertexStoreSize() const { return _vertexStorageSize; }
+        std::size_t getNumVertices() const { return _numVertices; }
+        std::size_t getVertexStoreSize() const { return _vertexStorageSize; }
 
         void update(const std::vector<VertexType>& vertices)
         {

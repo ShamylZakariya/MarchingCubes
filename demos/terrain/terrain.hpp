@@ -16,11 +16,20 @@
 #include "FastNoise.h"
 #include "terrain_samplers.hpp"
 
+// Represents a source of "greeble" detail for a TerrainGrid. For example, this could be
+// used to add boulders, trees, etc to a TerrainGrid. Note: the added details should be small,
+// relative to the terrain.
 class GreebleSource {
 public:
+
+    // Represents a sample point in space with pseudorandom values.
+    // The GreebleSource must return identical value for a point in space.
     struct Sample {
+        // Probability of a greeble detail being added.
         float probability;
+        // A small positional offset to reduce appearance of grid sampling.
         glm::vec3 offset;
+        // A seed for an RNG.
         uint64_t seed;
     };
 
@@ -28,7 +37,14 @@ public:
     GreebleSource() = default;
     virtual ~GreebleSource() = default;
     virtual int sampleStepSize() const = 0;
+    // Return a Sample struct for this point in world space. The Sample struct should be fairly random,
+    // but repeated calls to sample() for the same point in space must always return the same value.
     virtual Sample sample(const vec3 world) const = 0;
+
+    // Evaluate a sample, and optionally return a volume sampler to add detail to the Terain.
+    // sample: The Sample to evaluate for possibly creating a greeble detail.
+    // local: The local coordinate system for the OctreeVolume the greeble detail will be added to.
+    // Return an IVolumeSampler to render greeble detail, or null if no detail should be added.
     virtual std::unique_ptr<mc::IVolumeSampler> evaluate(const Sample& sample, const vec3& local) const = 0;
 };
 
@@ -44,13 +60,18 @@ public:
     TerrainChunk(TerrainChunk&&) = delete;
     TerrainChunk& operator==(const TerrainChunk&) = delete;
 
+    // Sets the index of this TerrainChunk. The origin chunk has an index of (0,0). The
+    // next chunk on +x has an index of (1,0), and so on.
     void setIndex(glm::ivec2 index);
+
+    // Get the index, where the "origin" terrain chunk has an index of (0,0)
     glm::ivec2 getIndex() const { return _index; }
 
+    // Returns true of the contents of this TerrainChunk have changed, and it needs to be re-marched.
     bool needsMarch() const { return _needsMarch; }
 
     /**
-     * Kicks off geometry generation, calling onComplete when the
+     * Kicks off geometry generation, calling onComplete when the geometry has finished generation.
      */
     void march(std::function<void()> onComplete);
 
@@ -86,10 +107,15 @@ private:
     bool _isMarching = false;
 };
 
+/**
+ * Maintains a fixed NxN grid of TerrainChunk instances.
+ */
 class TerrainGrid {
 public:
     /**
-     * Create a terrain grid size*size
+     * Create a terrain grid composed of gridSize*gridSize TerrainChunks of size chunkSize.
+     * Applies the terrainSampleSource evaluator to the grid to produce a continuous terrain function,
+     * and applies the greebler evaluator to add detail to the terrain function.
      */
     TerrainGrid(int gridSize, int chunkSize,
         std::unique_ptr<TerrainSampler::SampleSource>&& terrainSampleSource,
@@ -116,12 +142,19 @@ public:
     /**
      * Shift the grid of terrain chunks by a given amount. For example, shifting by (1,0) means
      * "shift right" by 1. Which will move each tile to the right, and recycle the rightmost set of
-     * tiles to the left column, assign them the appriate indexes, and
+     * tiles to the left column, assign them the appriate indexes. After calling shift,
+     * call march() to regenerate terrain.
      */
     void shift(glm::ivec2 by);
 
+    /**
+     * Displays a simple debug listing of TerrainChunks to stdout.
+     */
     void print();
 
+    /**
+     *Invokes cb() on each TerrainChunk.
+     */
     void forEach(std::function<void(mc::util::unowned_ptr<TerrainChunk>)> cb)
     {
         for (const auto& chunk : _grid) {
@@ -129,6 +162,8 @@ public:
         }
     }
 
+    // Async march all dirty TerrainChunk instances, prioritizing chunks near viewPos,
+    // and those viewDir is facing.
     void march(const glm::vec3& viewPos, const glm::vec3& viewDir);
 
     int getGridSize() const { return _gridSize; }
