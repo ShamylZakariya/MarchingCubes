@@ -13,8 +13,17 @@ using namespace glm;
 using mc::util::AABB;
 using mc::util::iAABB;
 
+/**
+ * Generates a continuous volume for use by TerrainChunk. Very thin wrapper around IVolumeSampler,
+ * with the intent that several TerainChunk instances will each have TerrainSamplers, which each
+ * share a common TerrainSampler::SampleSource, to aid in generating a terrain continuous across
+ * adjacent TerrainChunk boundaries.
+ */
 class TerrainSampler : public mc::IVolumeSampler {
 public:
+    /**
+     * Samples the terrain function for a point in world units.
+     */
     class SampleSource {
     public:
         SampleSource() = default;
@@ -28,6 +37,11 @@ public:
     TerrainSampler(const TerrainSampler&) = delete;
     TerrainSampler(TerrainSampler&&) = delete;
 
+    /**
+     * Create a TerrainSampler which samples sampler, and lives at sampleOffset in world coordinates.
+     * Since IVolumeSamplers each live in the coordinate space of the owning OctreeVolume, the sampleOffset
+     * points to where in the "world" this TerrainSampler lives.
+     */
     TerrainSampler(mc::util::unowned_ptr<SampleSource> sampler, vec3 sampleOffset)
         : IVolumeSampler(IVolumeSampler::Mode::Additive)
         , _sampler(sampler)
@@ -69,6 +83,9 @@ private:
     float _height = 0;
 };
 
+/**
+ * Creates variations on tubes.
+ */
 class Tube : public mc::IVolumeSampler {
 public:
     struct Config {
