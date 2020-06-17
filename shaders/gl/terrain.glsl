@@ -17,8 +17,7 @@ out VS_OUT
     float shininess;
     float tex0Contribution;
     float tex1Contribution;
-}
-vs_out;
+} vs_out;
 
 uniform mat4 uVP;
 uniform vec3 uModelTranslation;
@@ -56,6 +55,8 @@ void main()
 fragment:
 #version 330
 
+#include "shaders/gl/sky.glsl"
+
 in VS_OUT
 {
     vec4 color;
@@ -65,8 +66,7 @@ in VS_OUT
     float shininess;
     float tex0Contribution;
     float tex1Contribution;
-}
-fs_in;
+} fs_in;
 
 uniform vec3 uAmbientLight;
 uniform vec3 uCameraPosition;
@@ -107,9 +107,11 @@ void main()
     vec3 I = normalize(fs_in.worldPosition - uCameraPosition);
     vec3 R = reflect(I, fs_in.worldNormal);
 
-    float mipLevel = mix(uReflectionMapMipLevels, 0, fs_in.shininess);
-    vec3 reflectionColor = textureLod(uReflectionMapSampler, R, mipLevel).rgb;
-    vec3 lightProbeLight = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
+    vec3 reflectionColor = sky(R, fs_in.shininess);
+    vec3 lightProbeLight = sky(fs_in.worldNormal, 0);
+    // float mipLevel = mix(uReflectionMapMipLevels, 0, fs_in.shininess);
+    // vec3 reflectionColor = textureLod(uReflectionMapSampler, R, mipLevel).rgb;
+    // vec3 lightProbeLight = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
 
 #if SHOW_NORMALS
     vec3 color = fs_in.worldNormal * 0.5 + 0.5;

@@ -279,6 +279,31 @@ namespace util {
             }
             return result;
         }
+
+        void process_includes(std::string &src) {
+            std::size_t includePos = src.find("#include");
+            while(includePos != std::string::npos) {
+                // advance to find the include path
+                std::size_t openQuotePos = includePos;
+                while (src[openQuotePos] != '\"' && src[openQuotePos] != '\n')  openQuotePos++;
+                if (src[openQuotePos] == '\n') {
+                    throw std::runtime_error("Expect \" after #include directive");
+                }
+                openQuotePos++;
+                std::size_t closeQuotePos = openQuotePos;
+                while (src[closeQuotePos] != '\"' && src[closeQuotePos] != '\n')  closeQuotePos++;
+                if (src[closeQuotePos] == '\n') {
+                    throw std::runtime_error("Expect cloding \" after #include directive");
+                }
+                std::string includePath = src.substr(openQuotePos, closeQuotePos - openQuotePos);
+                std::string includeDirective = src.substr(includePos, closeQuotePos + 1 - includePos);
+                replace(src, includeDirective, "");
+                src.insert(includePos, ReadFile(includePath));
+
+                // now that substitution has been performed, run again.
+                includePos = src.find("#include");
+            }
+        }
     }
 
     GLuint CreateProgramFromFile(const char* glslFile, const std::map<std::string, std::string>& substitutions)
@@ -311,7 +336,10 @@ namespace util {
             throw std::runtime_error("GLSL file \"" + std::string(glslFile) + "\" missing \"fragment:\" shader section");
         }
 
+        process_includes(vertex);
         apply_substitutions(vertex, substitutions);
+
+        process_includes(fragment);
         apply_substitutions(fragment, substitutions);
 
         return CreateProgram(

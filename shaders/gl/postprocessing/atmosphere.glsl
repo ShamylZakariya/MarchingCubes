@@ -1,15 +1,14 @@
 vertex:
 #version 330
 
-    layout(location = 0) in vec2 inPosition;
+layout(location = 0) in vec2 inPosition;
 layout(location = 1) in vec2 inTexCoord;
 
 out VS_OUT
 {
     vec2 texCoord;
     vec3 rayDir;
-}
-vs_out;
+} vs_out;
 
 uniform mat4 uProjectionInverse;
 uniform mat4 uViewInverse;
@@ -29,12 +28,13 @@ void main()
 fragment:
 #version 330
 
-    in VS_OUT
+#include "shaders/gl/sky.glsl"
+
+in VS_OUT
 {
     vec2 texCoord;
     vec3 rayDir;
-}
-fs_in;
+} fs_in;
 
 const float kGoldenRatioConjugate = 0.61803398875f; // also just fract(goldenRatio)
 
@@ -155,7 +155,7 @@ void main()
 {
     vec3 rayDir = normalize(fs_in.rayDir);
     vec3 sceneColor = texture(uColorSampler, fs_in.texCoord).rgb;
-    vec3 skyboxColor = texture(uSkyboxSampler, rayDir).rgb;
+    vec3 skyboxColor = sky(rayDir, 0);
     vec3 fragmentWorldPosition = getFragmentWorldPosition();
     float sceneDepth = distance(uCameraPosition, fragmentWorldPosition);
 
