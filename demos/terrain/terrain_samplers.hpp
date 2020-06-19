@@ -61,7 +61,6 @@ public:
     {
         // We know that the geometry will span [x,y] and be no taller than
         // the _height, so we can do an easy test
-        // TODO: query the perlin function?
         return bounds.min.y <= _height;
     }
 

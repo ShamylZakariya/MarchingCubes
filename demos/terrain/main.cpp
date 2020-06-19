@@ -335,7 +335,7 @@ private:
         _palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
             "Palettizer",
             ivec3(8, 8, 8),
-            PalettizeFilter::ColorSpace::YUV));
+            PalettizeFilter::ColorSpace::RGB));
         _palettizer->setAlpha(0);
 
         //
@@ -348,7 +348,7 @@ private:
         _fastNoise.SetFrequency(frequency);
         _fastNoise.SetFractalOctaves(3);
 
-        _atmosphere->setFog(terrainHeight * 0.75, vec4(0.9, 0.9, 0.92, 0.75));
+        _atmosphere->setFog(terrainHeight * 0.75, vec4(0.9, 0.9, 0.92, 0.25));
 
         //
         // build the terrain grid
@@ -670,7 +670,7 @@ private:
             _camera.rotateBy(+lookSpeed, 0);
         }
 
-        if (didMove) {
+        if (_cameraFollowsGround && didMove) {
             // send a raycast straight down and position camera 1 unit above that point.
             auto position = _camera.getPosition();
             auto result = _terrainGrid->rayCast(position, vec3(0, -1, 0),
