@@ -4,6 +4,7 @@
 #include <glm/ext.hpp>
 
 #include "../common/post_processing_stack.hpp"
+#include "materials.hpp"
 
 class GrayscaleFilter : public post_processing::Filter {
 public:
@@ -144,6 +145,7 @@ public:
         , _blueNoise(blueNoise)
     {
         _program = mc::util::CreateProgramFromFile("shaders/gl/postprocessing/atmosphere.glsl");
+        _skyMaterialProperties.init(_program);
 
         _uWhiteNoiseSampler = glGetUniformLocation(_program, "uWhiteNoiseSampler");
         _uBlueNoiseSampler = glGetUniformLocation(_program, "uBlueNoiseSampler");
@@ -209,6 +211,9 @@ public:
 
     float getWorldRadius() const { return _worldRadius; }
 
+    SkyMaterialProperties& getSkyMaterial() { return _skyMaterialProperties; }
+    const SkyMaterialProperties& getSkyMaterial() const { return _skyMaterialProperties; }
+
 protected:
     void _update(double deltaT) override
     {
@@ -229,6 +234,7 @@ protected:
         glBindTexture(GL_TEXTURE_2D, _blueNoise->getId());
 
         glUseProgram(_program);
+        _skyMaterialProperties.bind();
 
         glUniform1i(_uColorSampler, 0);
         glUniform1i(_uDepthSampler, 1);
@@ -295,6 +301,8 @@ private:
     glm::vec3 _groundFogWorldOffset { 0 };
     glm::vec3 _fogWindSpeed { 0 };
     int _frameCount = 0;
+
+    SkyMaterialProperties _skyMaterialProperties;
 };
 
 #endif

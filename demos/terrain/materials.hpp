@@ -6,69 +6,66 @@
 
 using namespace glm;
 
-struct SkydomeMaterial {
+struct SkyMaterialProperties {
+public:
+    SkyMaterialProperties()
+        : _lightDir(normalize(vec3(0.7, 0.3, 0)))
+        , _horizonColor(0.6, 0.8, 1)
+        , _spaceColor(0, 0.07, 0.4)
+        , _sunColor(1, 0.9, 0.7)
+        , _sunsetColor(1, 0.5, 0.67)
+    {
+    }
+
+    void init(GLuint program)
+    {
+        _program = program;
+        _uLightDir = glGetUniformLocation(program, "uLightDir");
+        _uHorizonColor = glGetUniformLocation(program, "uHorizonColor");
+        _uSpaceColor = glGetUniformLocation(program, "uSpaceColor");
+        _uSunColor = glGetUniformLocation(program, "uSunColor");
+        _uSunsetColor = glGetUniformLocation(program, "uSunsetColor");
+    }
+
+    void bind()
+    {
+        glUniform3fv(_uLightDir, 1, value_ptr(_lightDir));
+        glUniform3fv(_uHorizonColor, 1, value_ptr(_horizonColor));
+        glUniform3fv(_uSpaceColor, 1, value_ptr(_spaceColor));
+        glUniform3fv(_uSunColor, 1, value_ptr(_sunColor));
+        glUniform3fv(_uSunsetColor, 1, value_ptr(_sunsetColor));
+    }
+
+    void setLightDir(const vec3& lightDir) { _lightDir = normalize(lightDir); }
+    vec3 getLightDir() const { return _lightDir; }
+
+    void setHorizonColor(const vec3& horizonColor) { _horizonColor = horizonColor; }
+    vec3 getHorizonColor() const { return _horizonColor; }
+
+    void setSpaceColor(const vec3& spaceColor) { _spaceColor = spaceColor; }
+    vec3 getSpaceColor() const { return _spaceColor; }
+
+    void setSunColor(const vec3& sunColor) { _sunColor = sunColor; }
+    vec3 getSunColor() const { return _sunColor; }
+
+    void setSunsetColor(const vec3& sunsetColor) { _sunsetColor = sunsetColor; }
+    vec3 getSunsetColor() const { return _sunsetColor; }
+
 private:
     GLuint _program = 0;
-    GLint _uProjectionInverse = -1;
-    GLint _uModelViewInverse = -1;
-    GLint _uSkyboxSampler = -1;
-    mc::util::TextureHandleRef _skyboxTex;
-
-public:
-    SkydomeMaterial(mc::util::TextureHandleRef skybox)
-        : _skyboxTex(skybox)
-    {
-        using namespace mc::util;
-        _program = CreateProgramFromFile("shaders/gl/skydome.glsl");
-        _uProjectionInverse = glGetUniformLocation(_program, "uProjectionInverse");
-        _uModelViewInverse = glGetUniformLocation(_program, "uModelViewInverse");
-        _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
-    }
-
-    SkydomeMaterial(const SkydomeMaterial& other) = delete;
-    SkydomeMaterial(const SkydomeMaterial&& other) = delete;
-
-    ~SkydomeMaterial()
-    {
-        if (_program > 0) {
-            glDeleteProgram(_program);
-        }
-    }
-
-    void bind(const mat4& projection, const mat4& modelview)
-    {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _skyboxTex->getId());
-
-        glUseProgram(_program);
-        glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, value_ptr(inverse(projection)));
-        glUniformMatrix4fv(_uModelViewInverse, 1, GL_FALSE, value_ptr(inverse(modelview)));
-        glUniform1i(_uSkyboxSampler, 0);
-    }
+    GLint _uLightDir = -1;
+    GLint _uHorizonColor = -1;
+    GLint _uSpaceColor = -1;
+    GLint _uSunColor = -1;
+    GLint _uSunsetColor = -1;
+    vec3 _lightDir;
+    vec3 _horizonColor;
+    vec3 _spaceColor;
+    vec3 _sunColor;
+    vec3 _sunsetColor;
 };
 
 struct TerrainMaterial {
-private:
-    GLuint _program = 0;
-    GLint _uVP = -1;
-    GLint _uModelTranslation = -1;
-    GLint _uCameraPos = -1;
-    GLint _uLightprobeSampler = -1;
-    GLint _uTexture0Sampler = -1;
-    GLuint _uTexture0Scale = -1;
-    GLint _uTexture1Sampler = -1;
-    GLuint _uTexture1Scale = -1;
-    GLint _uAmbientLight;
-    GLint _uReflectionMapSampler = -1;
-    GLint _uReflectionMapMipLevels = -1;
-    GLint _uRoundWorldRadius = -1;
-
-    mc::util::TextureHandleRef _lightprobe, _reflectionMap, _texture0, _texture1;
-    float _roundWorldRadius = 0;
-    vec3 _ambientLight;
-    float _texture0Scale = 1;
-    float _texture1Scale = 1;
-
 public:
     TerrainMaterial(
         float roundWorldRadius, vec3 ambientLight,
@@ -99,6 +96,8 @@ public:
         _uTexture0Scale = glGetUniformLocation(_program, "uTexture0Scale");
         _uTexture1Sampler = glGetUniformLocation(_program, "uTexture1Sampler");
         _uTexture1Scale = glGetUniformLocation(_program, "uTexture1Scale");
+
+        _skyMaterialProperties.init(_program);
     }
 
     TerrainMaterial(const TerrainMaterial& other) = delete;
@@ -126,6 +125,8 @@ public:
         glBindTexture(GL_TEXTURE_2D, _texture1->getId());
 
         glUseProgram(_program);
+        _skyMaterialProperties.bind();
+
         glUniformMatrix4fv(_uVP, 1, GL_FALSE, value_ptr(projection * view));
         glUniform3fv(_uModelTranslation, 1, value_ptr(modelTranslation));
         glUniform3fv(_uCameraPos, 1, value_ptr(cameraPosition));
@@ -142,13 +143,35 @@ public:
 
     void setWorldRadius(float radius) { _roundWorldRadius = std::max(radius, 0.0F); }
     float getWorldRadius() const { return _roundWorldRadius; }
+
+    SkyMaterialProperties &getSkyMaterial() { return _skyMaterialProperties; }
+    const SkyMaterialProperties &getSkyMaterial() const { return _skyMaterialProperties; }
+
+private:
+    GLuint _program = 0;
+    GLint _uVP = -1;
+    GLint _uModelTranslation = -1;
+    GLint _uCameraPos = -1;
+    GLint _uLightprobeSampler = -1;
+    GLint _uTexture0Sampler = -1;
+    GLuint _uTexture0Scale = -1;
+    GLint _uTexture1Sampler = -1;
+    GLuint _uTexture1Scale = -1;
+    GLint _uAmbientLight;
+    GLint _uReflectionMapSampler = -1;
+    GLint _uReflectionMapMipLevels = -1;
+    GLint _uRoundWorldRadius = -1;
+
+    mc::util::TextureHandleRef _lightprobe, _reflectionMap, _texture0, _texture1;
+    float _roundWorldRadius = 0;
+    vec3 _ambientLight;
+    float _texture0Scale = 1;
+    float _texture1Scale = 1;
+
+    SkyMaterialProperties _skyMaterialProperties;
 };
 
 struct LineMaterial {
-private:
-    GLuint _program = 0;
-    GLint _uMVP = -1;
-
 public:
     LineMaterial()
     {
@@ -170,6 +193,10 @@ public:
         glUseProgram(_program);
         glUniformMatrix4fv(_uMVP, 1, GL_FALSE, value_ptr(mvp));
     }
+
+private:
+    GLuint _program = 0;
+    GLint _uMVP = -1;
 };
 
 #endif
