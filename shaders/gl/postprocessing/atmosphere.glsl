@@ -42,7 +42,6 @@ out vec4 fragColor;
 
 uniform sampler2D uColorSampler;
 uniform sampler2D uDepthSampler;
-uniform samplerCube uSkyboxSampler;
 uniform sampler2D uWhiteNoiseSampler;
 uniform sampler2D uBlueNoiseSampler;
 

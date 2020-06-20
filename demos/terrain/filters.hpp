@@ -138,9 +138,8 @@ private:
 
 class AtmosphereFilter : public post_processing::Filter {
 public:
-    AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef skybox, mc::util::TextureHandleRef whiteNoise, mc::util::TextureHandleRef blueNoise)
+    AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef whiteNoise, mc::util::TextureHandleRef blueNoise)
         : Filter(name)
-        , _skybox(skybox)
         , _whiteNoise(whiteNoise)
         , _blueNoise(blueNoise)
     {
@@ -151,7 +150,6 @@ public:
         _uBlueNoiseSampler = glGetUniformLocation(_program, "uBlueNoiseSampler");
         _uColorSampler = glGetUniformLocation(_program, "uColorSampler");
         _uDepthSampler = glGetUniformLocation(_program, "uDepthSampler");
-        _uSkyboxSampler = glGetUniformLocation(_program, "uSkyboxSampler");
 
         _uProjectionInverse = glGetUniformLocation(_program, "uProjectionInverse");
         _uViewInverse = glGetUniformLocation(_program, "uViewInverse");
@@ -227,10 +225,8 @@ protected:
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, depthTex);
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _skybox->getId());
-        glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, _whiteNoise->getId());
-        glActiveTexture(GL_TEXTURE4);
+        glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, _blueNoise->getId());
 
         glUseProgram(_program);
@@ -238,9 +234,8 @@ protected:
 
         glUniform1i(_uColorSampler, 0);
         glUniform1i(_uDepthSampler, 1);
-        glUniform1i(_uSkyboxSampler, 2);
-        glUniform1i(_uWhiteNoiseSampler, 3);
-        glUniform1i(_uBlueNoiseSampler, 4);
+        glUniform1i(_uWhiteNoiseSampler, 2);
+        glUniform1i(_uBlueNoiseSampler, 3);
 
         glUniformMatrix4fv(_uProjectionInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_projection)));
         glUniformMatrix4fv(_uViewInverse, 1, GL_FALSE, glm::value_ptr(glm::inverse(_view)));
@@ -269,7 +264,6 @@ private:
     // TODO: Transition to Uniform Buffer Object to make this one struct
     GLint _uColorSampler = -1;
     GLint _uDepthSampler = -1;
-    GLint _uSkyboxSampler = -1;
     GLint _uWhiteNoiseSampler = -1;
     GLint _uBlueNoiseSampler = -1;
     GLint _uProjectionInverse = -1;
@@ -285,7 +279,6 @@ private:
     GLint _uGroundFogWorldOffset = -1;
     GLint _uFrameCount;
 
-    mc::util::TextureHandleRef _skybox;
     mc::util::TextureHandleRef _whiteNoise;
     mc::util::TextureHandleRef _blueNoise;
     glm::mat4 _projection;

@@ -275,8 +275,6 @@ private:
         };
 
         const auto ambientLight = vec3(0.1, 0.1, 0.1);
-        const auto skyboxTexture = mc::util::LoadTextureCube("textures/sky", ".jpg");
-        const mc::util::TextureHandleRef lightprobeTex = BlurCubemap(skyboxTexture, radians<float>(90), 8);
         const auto terrainTexture0 = mc::util::LoadTexture2D("textures/granite.jpg", mipmappedTextureSetup);
         const auto terrainTexture0Scale = 30;
         const auto terrainTexture1 = mc::util::LoadTexture2D("textures/cracked-asphalt.jpg", mipmappedTextureSetup);
@@ -286,7 +284,6 @@ private:
         _terrainMaterial = std::make_unique<TerrainMaterial>(
             kWindowHeight,
             ambientLight,
-            lightprobeTex, skyboxTexture,
             terrainTexture0, terrainTexture0Scale,
             terrainTexture1, terrainTexture1Scale);
 
@@ -326,7 +323,7 @@ private:
 
         const auto bluenoiseTexture = mc::util::LoadTexture2D("textures/blue.png", nonMipmappedTextureSetup);
         const auto noiseTexture = mc::util::LoadTexture2D("textures/noise.png", mipmappedTextureSetup);
-        _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", skyboxTexture, noiseTexture, bluenoiseTexture));
+        _atmosphere = _postProcessingFilters->push(std::make_unique<AtmosphereFilter>("Atmosphere", noiseTexture, bluenoiseTexture));
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
         _atmosphere->setWorldRadius(kWorldRadius);

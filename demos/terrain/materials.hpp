@@ -69,13 +69,9 @@ struct TerrainMaterial {
 public:
     TerrainMaterial(
         float roundWorldRadius, vec3 ambientLight,
-        mc::util::TextureHandleRef lightProbe,
-        mc::util::TextureHandleRef reflectionMap,
         mc::util::TextureHandleRef texture0, float tex0Scale,
         mc::util::TextureHandleRef texture1, float tex1Scale)
-        : _lightprobe(lightProbe)
-        , _reflectionMap(reflectionMap)
-        , _texture0(texture0)
+        : _texture0(texture0)
         , _texture1(texture1)
         , _roundWorldRadius(roundWorldRadius)
         , _ambientLight(ambientLight)
@@ -88,10 +84,7 @@ public:
         _uModelTranslation = glGetUniformLocation(_program, "uModelTranslation");
         _uCameraPos = glGetUniformLocation(_program, "uCameraPosition");
         _uRoundWorldRadius = glGetUniformLocation(_program, "uRoundWorldRadius");
-        _uLightprobeSampler = glGetUniformLocation(_program, "uLightprobeSampler");
         _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
-        _uReflectionMapSampler = glGetUniformLocation(_program, "uReflectionMapSampler");
-        _uReflectionMapMipLevels = glGetUniformLocation(_program, "uReflectionMapMipLevels");
         _uTexture0Sampler = glGetUniformLocation(_program, "uTexture0Sampler");
         _uTexture0Scale = glGetUniformLocation(_program, "uTexture0Scale");
         _uTexture1Sampler = glGetUniformLocation(_program, "uTexture1Sampler");
@@ -113,15 +106,9 @@ public:
     void bind(const vec3& modelTranslation, const mat4& view, const mat4& projection, const vec3& cameraPosition)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _lightprobe->getId());
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, _reflectionMap->getId());
-
-        glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, _texture0->getId());
 
-        glActiveTexture(GL_TEXTURE3);
+        glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, _texture1->getId());
 
         glUseProgram(_program);
@@ -131,12 +118,9 @@ public:
         glUniform3fv(_uModelTranslation, 1, value_ptr(modelTranslation));
         glUniform3fv(_uCameraPos, 1, value_ptr(cameraPosition));
         glUniform1f(_uRoundWorldRadius, _roundWorldRadius);
-        glUniform1i(_uLightprobeSampler, 0);
         glUniform3fv(_uAmbientLight, 1, value_ptr(_ambientLight));
-        glUniform1i(_uReflectionMapSampler, 1);
-        glUniform1f(_uReflectionMapMipLevels, static_cast<float>(_reflectionMap->getMipLevels()));
-        glUniform1i(_uTexture0Sampler, 2);
-        glUniform1i(_uTexture1Sampler, 3);
+        glUniform1i(_uTexture0Sampler, 0);
+        glUniform1i(_uTexture1Sampler, 1);
         glUniform1f(_uTexture0Scale, _texture0Scale);
         glUniform1f(_uTexture1Scale, _texture1Scale);
     }
@@ -152,17 +136,14 @@ private:
     GLint _uVP = -1;
     GLint _uModelTranslation = -1;
     GLint _uCameraPos = -1;
-    GLint _uLightprobeSampler = -1;
     GLint _uTexture0Sampler = -1;
     GLuint _uTexture0Scale = -1;
     GLint _uTexture1Sampler = -1;
     GLuint _uTexture1Scale = -1;
     GLint _uAmbientLight;
-    GLint _uReflectionMapSampler = -1;
-    GLint _uReflectionMapMipLevels = -1;
     GLint _uRoundWorldRadius = -1;
 
-    mc::util::TextureHandleRef _lightprobe, _reflectionMap, _texture0, _texture1;
+    mc::util::TextureHandleRef _texture0, _texture1;
     float _roundWorldRadius = 0;
     vec3 _ambientLight;
     float _texture0Scale = 1;

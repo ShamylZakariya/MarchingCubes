@@ -70,9 +70,6 @@ in VS_OUT
 
 uniform vec3 uAmbientLight;
 uniform vec3 uCameraPosition;
-uniform samplerCube uLightprobeSampler;
-uniform samplerCube uReflectionMapSampler;
-uniform float uReflectionMapMipLevels;
 
 uniform sampler2D uTexture0Sampler;
 uniform float uTexture0Scale;
@@ -109,9 +106,6 @@ void main()
 
     vec3 reflectionColor = sky(R, fs_in.shininess);
     vec3 lightProbeLight = sky(fs_in.worldNormal, 0);
-    // float mipLevel = mix(uReflectionMapMipLevels, 0, fs_in.shininess);
-    // vec3 reflectionColor = textureLod(uReflectionMapSampler, R, mipLevel).rgb;
-    // vec3 lightProbeLight = texture(uLightprobeSampler, fs_in.worldNormal).rgb;
 
 #if SHOW_NORMALS
     vec3 color = fs_in.worldNormal * 0.5 + 0.5;
