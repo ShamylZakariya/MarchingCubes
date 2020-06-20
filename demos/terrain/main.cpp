@@ -335,6 +335,9 @@ private:
             PalettizeFilter::ColorSpace::RGB));
         _palettizer->setAlpha(0);
 
+        // mid afternoon
+        setSunPosition(0.3);
+
         //
         // build a volume
         //
@@ -609,6 +612,11 @@ private:
             _palettizer->setAlpha(paletteAlpha);
         }
 
+        float sunPos = _sunPosition;
+        if (ImGui::SliderFloat("Sun Position", &sunPos, -1, 1)) {
+            setSunPosition(sunPos);
+        }
+
         ImGui::Checkbox("Camera Follows Ground", &_cameraFollowsGround);
 
         ImGui::End();
@@ -687,6 +695,15 @@ private:
     }
 
 private:
+
+    void setSunPosition(float newPosition) {
+        _sunPosition = clamp<float>(newPosition, -1, 1);
+        float sunAngle = mix<float>(0, pi<float>(), (_sunPosition + 1) / 2);
+        vec3 lightDir{cos(sunAngle),sin(sunAngle),0};
+        _terrainMaterial->getSkyMaterial().setLightDir(lightDir);
+        _atmosphere->getSkyMaterial().setLightDir(lightDir);
+    }
+
     // app state
     GLFWwindow* _window;
     double _elapsedFrameTime = 0;
@@ -714,6 +731,7 @@ private:
     bool _drawOctreeAABBs = false;
     bool _drawMarkers = false;
     bool _cameraFollowsGround = true;
+    float _sunPosition = 0; // [-1,1] representing arc of sun across sky horizon to horizon
 
     // demo state
     std::unique_ptr<TerrainGrid> _terrainGrid;
