@@ -1,9 +1,11 @@
 # MarchingCubes
-Just a simple marching cubes experiment
+Just a simple marching cubes experiment.
 
-![example](README_assets/terrain.png)
+This started as an experiment in writing a multi-threaded marching cubes implementation, and spiralled slowly, inexoribly into an [LV-426](https://alienanthology.fandom.com/wiki/Acheron_(LV-426)) simulator, and *I couldn't be happier*.
 
-## Linux
+![example](README_assets/lv_426.png)
+
+## Building
 
 Marching Cubes depends on [libepoxy](https://github.com/anholt/libepoxy), [glfw3](https://www.glfw.org/) and [glm](https://glm.g-truc.net/)
 
@@ -32,3 +34,7 @@ Note, since the VSCode build task depends on `build/compile_commands.json` it's 
 From here, the default build task is **ctrl-shift-b** and debugging via **F5** works as expected.
 
 If using `gcc`, use `(gdb) Launch`, and if using `clang`, use `(CodeLLDB) Launch`. The latter requires the `CodeLLDB` extension to be installed.´
+
+## Running
+
+The build specifies two targets, `hello_mc` which is a simple exploratory playground, and `terrain` which is an "infinite" procedural world.
