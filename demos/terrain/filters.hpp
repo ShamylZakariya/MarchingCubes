@@ -153,18 +153,18 @@ public:
         _uRollSpeed = glGetUniformLocation(_program, "uRollSpeed");
 
         // static
-        _uStaticAmount = glGetUniformLocation(_program, "uStaticAmount");
+        _uStaticMix = glGetUniformLocation(_program, "uStaticMix");
         _uStaticSize = glGetUniformLocation(_program, "uStaticSize");
 
         // rgb shift
-        _uRgbShiftAmount = glGetUniformLocation(_program, "uRgbShiftAmount");
+        _uRgbShiftMix = glGetUniformLocation(_program, "uRgbShiftMix");
         _uRgbShiftAngle = glGetUniformLocation(_program, "uRgbShiftAngle");
 
         // crt scanline effect
-        _uCrtAmount = glGetUniformLocation(_program, "uCrtAmount");
-        _uCrtScanlineAmount = glGetUniformLocation(_program, "uCrtScanlineAmount");
+        _uCrtMix = glGetUniformLocation(_program, "uCrtMix");
+        _uCrtScanlineMix = glGetUniformLocation(_program, "uCrtScanlineMix");
         _uCrtScanlineCount = glGetUniformLocation(_program, "uCrtScanlineCount");
-        _uCrtVignetteAmount = glGetUniformLocation(_program, "uCrtVignetteAmount");
+        _uCrtVignetteMix = glGetUniformLocation(_program, "uCrtVignetteMix");
     }
 
 protected:
@@ -191,18 +191,18 @@ protected:
         glUniform1f(_uRollSpeed, alpha * _rollSpeed);
 
         // static
-        glUniform1f(_uStaticAmount, alpha * _staticAmount);
-        glUniform1f(_uStaticSize, alpha * _staticSize);
+        glUniform1f(_uStaticMix, alpha * _staticMix);
+        glUniform1f(_uStaticSize, _staticSize);
 
         // rgb shift
-        glUniform1f(_uRgbShiftAmount, alpha * _rgbShiftAmount);
-        glUniform1f(_uRgbShiftAngle, alpha * _rgbShiftAngle);
+        glUniform1f(_uRgbShiftMix, alpha * _rgbShiftMix);
+        glUniform1f(_uRgbShiftAngle, _rgbShiftAngle);
 
         // crt scanlines
-        glUniform1f(_uCrtAmount, alpha * _crtAmount);
-        glUniform1f(_uCrtScanlineAmount, alpha * _crtScanlineAmount);
-        glUniform1f(_uCrtScanlineCount, alpha * _crtScanlineCount);
-        glUniform1f(_uCrtVignetteAmount, alpha * _crtVignetteAmount);
+        glUniform1f(_uCrtMix, alpha * _crtMix);
+        glUniform1f(_uCrtScanlineMix, alpha * _crtScanlineMix);
+        glUniform1f(_uCrtScanlineCount, _crtScanlineCount);
+        glUniform1f(_uCrtVignetteMix, alpha * _crtVignetteMix);
 
         clipspaceQuad.draw();
         glUseProgram(0);
@@ -219,32 +219,32 @@ private:
     GLint _uRollSpeed = -1;
 
     // static
-    GLint _uStaticAmount = -1;
+    GLint _uStaticMix = -1;
     GLint _uStaticSize = -1;
 
     // rgb distortion
-    GLint _uRgbShiftAmount = -1;
+    GLint _uRgbShiftMix = -1;
     GLint _uRgbShiftAngle = -1;
 
     // crt effect
-    GLint _uCrtAmount = -1;
-    GLint _uCrtScanlineAmount = -1;
+    GLint _uCrtMix = -1;
+    GLint _uCrtScanlineMix = -1;
     GLint _uCrtScanlineCount = -1;
-    GLint _uCrtVignetteAmount = -1;
+    GLint _uCrtVignetteMix = -1;
 
     float _time = 0;
     float _distortion = 3;
     float _distortion2 = 5;
     float _speed = 0.2;
     float _rollSpeed = 0;
-    float _staticAmount = 0.125;
+    float _staticMix = 0.125;
     float _staticSize = 4.0;
-    float _rgbShiftAmount = 0.005;
+    float _rgbShiftMix = 0.005;
     float _rgbShiftAngle = 0;
-    float _crtAmount = 0.5;
-    float _crtScanlineAmount = 0.5;
+    float _crtMix = 0.5;
+    float _crtScanlineMix = 0.5;
     float _crtScanlineCount = 4096;
-    float _crtVignetteAmount = 0.35;
+    float _crtVignetteMix = 0.35;
 };
 
 class AtmosphereFilter : public post_processing::Filter {

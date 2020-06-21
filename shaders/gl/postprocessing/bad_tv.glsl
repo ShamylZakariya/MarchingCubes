@@ -36,18 +36,18 @@ uniform float uSpeed;
 uniform float uRollSpeed;
 
 // static
-uniform float uStaticAmount;
+uniform float uStaticMix;
 uniform float uStaticSize;
 
 // rgb shift
-uniform float uRgbShiftAmount;
+uniform float uRgbShiftMix;
 uniform float uRgbShiftAngle;
 
 // crt effect
-uniform float uCrtAmount;
-uniform float uCrtScanlineAmount;
+uniform float uCrtMix;
+uniform float uCrtScanlineMix;
 uniform float uCrtScanlineCount;
-uniform float uCrtVignetteAmount;
+uniform float uCrtVignettMix;
 
 float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
@@ -104,7 +104,7 @@ float snoise(vec2 v)
 }
 
 vec4 rgbshift(sampler2D colorTex, vec2 coord) {
-    vec2 offset = uRgbShiftAmount * vec2( cos(uRgbShiftAngle), sin(uRgbShiftAngle));
+    vec2 offset = uRgbShiftMix * vec2( cos(uRgbShiftAngle), sin(uRgbShiftAngle));
     vec4 cr = texture2D(colorTex, coord + offset);
     vec4 cga = texture2D(colorTex, coord);
     vec4 cb = texture2D(colorTex, coord - offset);
@@ -124,9 +124,9 @@ vec4 crt(vec4 color) {
     vec2 sc = vec2( sin( fs_in.texCoord.y * uCrtScanlineCount ), cos( fs_in.texCoord.y * uCrtScanlineCount ) );
 
     // add scanlines
-    outColor += color.rgb * vec3( sc.x, sc.y, sc.x ) * uCrtScanlineAmount;
+    outColor += color.rgb * vec3( sc.x, sc.y, sc.x ) * uCrtScanlineMix;
 
-    outColor = mix(color.rgb, outColor, uCrtAmount);
+    outColor = mix(color.rgb, outColor, uCrtMix);
     return vec4(outColor, 1);
 }
 
@@ -153,11 +153,11 @@ void main()
     // apply static
     float xs = floor(gl_FragCoord.x / uStaticSize);
     float ys = floor(gl_FragCoord.y / uStaticSize);
-    vec4 snow = vec4(rand(vec2(xs * uTime, ys * uTime)) * uStaticAmount);
+    vec4 snow = vec4(rand(vec2(xs * uTime, ys * uTime)) * uStaticMix);
     color += snow;
 
     // crt effect
-    color = vignette(crt(color), uCrtVignetteAmount);
+    color = vignette(crt(color), uCrtVignettMix);
 
     fragColor = color;
 }
