@@ -175,6 +175,8 @@ protected:
 
     void _render(const glm::ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<post_processing::detail::VertexP2T2>& clipspaceQuad) override
     {
+        const float alpha = getAlpha();
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, colorTex);
 
@@ -183,24 +185,24 @@ protected:
         glUniform1f(_uTime, _time);
 
         // distortion
-        glUniform1f(_uDistortion, _distortion);
-        glUniform1f(_uDistortion2, _distortion2);
-        glUniform1f(_uSpeed, _speed);
-        glUniform1f(_uRollSpeed, _rollSpeed);
+        glUniform1f(_uDistortion, alpha * _distortion);
+        glUniform1f(_uDistortion2, alpha * _distortion2);
+        glUniform1f(_uSpeed, alpha * _speed);
+        glUniform1f(_uRollSpeed, alpha * _rollSpeed);
 
         // static
-        glUniform1f(_uStaticAmount, _staticAmount);
-        glUniform1f(_uStaticSize, _staticSize);
+        glUniform1f(_uStaticAmount, alpha * _staticAmount);
+        glUniform1f(_uStaticSize, alpha * _staticSize);
 
         // rgb shift
-        glUniform1f(_uRgbShiftAmount, _rgbShiftAmount);
-        glUniform1f(_uRgbShiftAngle, _rgbShiftAngle);
+        glUniform1f(_uRgbShiftAmount, alpha * _rgbShiftAmount);
+        glUniform1f(_uRgbShiftAngle, alpha * _rgbShiftAngle);
 
         // crt scanlines
-        glUniform1f(_uCrtAmount, _crtAmount);
-        glUniform1f(_uCrtScanlineAmount, _crtScanlineAmount);
-        glUniform1f(_uCrtScanlineCount, _crtScanlineCount);
-        glUniform1f(_uCrtVignetteAmount, _crtVignetteAmount);
+        glUniform1f(_uCrtAmount, alpha * _crtAmount);
+        glUniform1f(_uCrtScanlineAmount, alpha * _crtScanlineAmount);
+        glUniform1f(_uCrtScanlineCount, alpha * _crtScanlineCount);
+        glUniform1f(_uCrtVignetteAmount, alpha * _crtVignetteAmount);
 
         clipspaceQuad.draw();
         glUseProgram(0);

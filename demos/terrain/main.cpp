@@ -329,12 +329,6 @@ private:
         _atmosphere->setWorldRadius(kWorldRadius);
         _atmosphere->setAlpha(1);
 
-        _palettizer = _postProcessingFilters->push(std::make_unique<PalettizeFilter>(
-            "Palettizer",
-            ivec3(8, 8, 8),
-            PalettizeFilter::ColorSpace::RGB));
-        _palettizer->setAlpha(0);
-
         _badTv = _postProcessingFilters->push(std::make_unique<BadTvFilter>("BadTv"));
         _badTv->setAlpha(1);
 
@@ -351,7 +345,7 @@ private:
         _fastNoise.SetFrequency(frequency);
         _fastNoise.SetFractalOctaves(3);
 
-        _atmosphere->setFog(terrainHeight * 0.75, vec4(0.9, 0.9, 0.92, 0.25));
+        _atmosphere->setFog(terrainHeight * 0.75, vec4(0.9, 0.9, 0.92, 0.45));
 
         //
         // build the terrain grid
@@ -610,9 +604,9 @@ private:
             _atmosphere->setAlpha(drawAtmosphere ? 1 : 0);
         }
 
-        float paletteAlpha = _palettizer->getAlpha();
-        if (ImGui::SliderFloat("Palettize", &paletteAlpha, 0, 1, "%.2f")) {
-            _palettizer->setAlpha(paletteAlpha);
+        float badTvAlpha = _badTv->getAlpha();
+        if (ImGui::SliderFloat("BadTV", &badTvAlpha, 0, 1, "%.2f")) {
+            _badTv->setAlpha(badTvAlpha);
         }
 
         float sunPos = _sunPosition;
@@ -727,7 +721,6 @@ private:
     mc::util::LineSegmentBuffer _axisMarker;
     std::unique_ptr<post_processing::FilterStack> _postProcessingFilters;
     mc::util::unowned_ptr<AtmosphereFilter> _atmosphere;
-    mc::util::unowned_ptr<PalettizeFilter> _palettizer;
     mc::util::unowned_ptr<BadTvFilter> _badTv;
 
     // user input state
