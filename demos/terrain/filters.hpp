@@ -149,7 +149,7 @@ public:
         // distortion
         _uDistortion = glGetUniformLocation(_program, "uDistortion");
         _uDistortion2 = glGetUniformLocation(_program, "uDistortion2");
-        _uSpeed = glGetUniformLocation(_program, "uSpeed");
+        _uDistortionSpeed = glGetUniformLocation(_program, "uDistortionSpeed");
         _uRollSpeed = glGetUniformLocation(_program, "uRollSpeed");
 
         // static
@@ -163,9 +163,45 @@ public:
         // crt scanline effect
         _uCrtMix = glGetUniformLocation(_program, "uCrtMix");
         _uCrtScanlineMix = glGetUniformLocation(_program, "uCrtScanlineMix");
-        _uCrtScanlineCount = glGetUniformLocation(_program, "uCrtScanlineCount");
+        _uCrtScanlineFrequency = glGetUniformLocation(_program, "uCrtScanlineFrequency");
         _uCrtVignetteMix = glGetUniformLocation(_program, "uCrtVignetteMix");
     }
+
+    void setDistortion(float distortion) { _distortion = distortion; }
+    float getDistortion() const { return _distortion; }
+
+    void setDistortion2(float distortion2) { _distortion2 = distortion2; }
+    float getDistortion2() const { return _distortion2; }
+
+    void setDistortionSpeed(float distortionSpeed) { _distortionSpeed = distortionSpeed; }
+    float getDistortionSpeed() const { return _distortionSpeed; }
+
+    void setRollSpeed(float rollSpeed) { _rollSpeed = rollSpeed; }
+    float getRollSpeed() const { return _rollSpeed; }
+
+    void setStaticMix(float mix) { _staticMix = clamp<float>(mix, 0, 1); }
+    float getStaticMix() const { return _staticMix; }
+
+    void setStaticSize(float size) { _staticSize = max<float>(size, 0); }
+    float getStaticSize() const { return _staticSize; }
+
+    void setRgbShiftMix(float mix) { _rgbShiftMix = clamp<float>(mix, 0, 1); }
+    float getRgbShiftMix() const { return _rgbShiftMix; }
+
+    void setRgbShiftAngle(float angleRads) { _rgbShiftAngle = angleRads; }
+    float getRgbShiftAngle() { return _rgbShiftAngle; }
+
+    void setCrtMix(float mix) { _crtMix = clamp<float>(mix, 0, 1); }
+    float getCrtMix() const { return _crtMix; }
+
+    void setCrtScanlineMix(float mix) { _crtScanlineMix = clamp<float>(mix, 0, 1); }
+    float getCrtScanlineMix() const { return _crtScanlineMix; }
+
+    void setCrtScanlineFrequency(float frequency) { _crtScanlineFrequency = max<float>(frequency, 0); }
+    float getCrtScanlineFrequency() const { return _crtScanlineFrequency; }
+
+    void setCrtVignetteMix(float mix) { _crtVignetteMix = clamp<float>(mix, 0, 1); }
+    float getCrtVignetteMix() const { return _crtVignetteMix; }
 
 protected:
     void _update(double deltaT) override
@@ -187,7 +223,7 @@ protected:
         // distortion
         glUniform1f(_uDistortion, alpha * _distortion);
         glUniform1f(_uDistortion2, alpha * _distortion2);
-        glUniform1f(_uSpeed, alpha * _speed);
+        glUniform1f(_uDistortionSpeed, alpha * _distortionSpeed);
         glUniform1f(_uRollSpeed, alpha * _rollSpeed);
 
         // static
@@ -201,7 +237,7 @@ protected:
         // crt scanlines
         glUniform1f(_uCrtMix, alpha * _crtMix);
         glUniform1f(_uCrtScanlineMix, alpha * _crtScanlineMix);
-        glUniform1f(_uCrtScanlineCount, _crtScanlineCount);
+        glUniform1f(_uCrtScanlineFrequency, _crtScanlineFrequency);
         glUniform1f(_uCrtVignetteMix, alpha * _crtVignetteMix);
 
         clipspaceQuad.draw();
@@ -215,7 +251,7 @@ private:
     // distortion
     GLint _uDistortion = -1;
     GLint _uDistortion2 = -1;
-    GLint _uSpeed = -1;
+    GLint _uDistortionSpeed = -1;
     GLint _uRollSpeed = -1;
 
     // static
@@ -229,13 +265,13 @@ private:
     // crt effect
     GLint _uCrtMix = -1;
     GLint _uCrtScanlineMix = -1;
-    GLint _uCrtScanlineCount = -1;
+    GLint _uCrtScanlineFrequency = -1;
     GLint _uCrtVignetteMix = -1;
 
     float _time = 0;
     float _distortion = 3;
     float _distortion2 = 5;
-    float _speed = 0.2;
+    float _distortionSpeed = 0.2;
     float _rollSpeed = 0;
     float _staticMix = 0.125;
     float _staticSize = 4.0;
@@ -243,7 +279,7 @@ private:
     float _rgbShiftAngle = 0;
     float _crtMix = 0.5;
     float _crtScanlineMix = 0.5;
-    float _crtScanlineCount = 4096;
+    float _crtScanlineFrequency = 800;
     float _crtVignetteMix = 0.35;
 };
 

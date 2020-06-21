@@ -32,7 +32,7 @@ uniform float uTime;
 // distortion
 uniform float uDistortion;
 uniform float uDistortion2;
-uniform float uSpeed;
+uniform float uDistortionSpeed;
 uniform float uRollSpeed;
 
 // static
@@ -46,7 +46,7 @@ uniform float uRgbShiftAngle;
 // crt effect
 uniform float uCrtMix;
 uniform float uCrtScanlineMix;
-uniform float uCrtScanlineCount;
+uniform float uCrtScanlineFrequency;
 uniform float uCrtVignettMix;
 
 float rand(vec2 co){
@@ -121,7 +121,7 @@ vec4 crt(vec4 color) {
     vec3 outColor = color.rgb + color.rgb * clamp( 0.1 + dx * 100.0, 0.0, 1.0 );
 
     // get us a sine and cosine
-    vec2 sc = vec2( sin( fs_in.texCoord.y * uCrtScanlineCount ), cos( fs_in.texCoord.y * uCrtScanlineCount ) );
+    vec2 sc = vec2( sin( fs_in.texCoord.y * uCrtScanlineFrequency ), cos( fs_in.texCoord.y * uCrtScanlineFrequency ) );
 
     // add scanlines
     outColor += color.rgb * vec3( sc.x, sc.y, sc.x ) * uCrtScanlineMix;
@@ -139,7 +139,7 @@ vec4 vignette(vec4 color, float amt) {
 void main()
 {
     vec2 p = fs_in.texCoord;
-    float ty = uTime * uSpeed;
+    float ty = uTime * uDistortionSpeed;
     float yt = p.y - ty;
     //smooth distortion
     float offset = snoise(vec2(yt * 3.0, 0.0)) * 0.2;
