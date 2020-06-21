@@ -136,6 +136,111 @@ private:
     int _pixelSize;
 };
 
+// https://github.com/felixturner/bad-tv-shader
+class BadTvFilter : public post_processing::Filter {
+public:
+    BadTvFilter(const std::string& name)
+        : Filter(name)
+    {
+        _program = mc::util::CreateProgramFromFile("shaders/gl/postprocessing/bad_tv.glsl");
+        _uColorTexSampler = glGetUniformLocation(_program, "uColorTexSampler");
+        _uTime = glGetUniformLocation(_program, "uTime");
+
+        // distortion
+        _uDistortion = glGetUniformLocation(_program, "uDistortion");
+        _uDistortion2 = glGetUniformLocation(_program, "uDistortion2");
+        _uSpeed = glGetUniformLocation(_program, "uSpeed");
+        _uRollSpeed = glGetUniformLocation(_program, "uRollSpeed");
+
+        // static
+        _uStaticAmount = glGetUniformLocation(_program, "uStaticAmount");
+        _uStaticSize = glGetUniformLocation(_program, "uStaticSize");
+
+        // rgb shift
+        _uRgbShiftAmount = glGetUniformLocation(_program, "uRgbShiftAmount");
+        _uRgbShiftAngle = glGetUniformLocation(_program, "uRgbShiftAngle");
+
+        // crt scanline effect
+        _uCrtNoiseAmount = glGetUniformLocation(_program, "uCrtNoiseAmount");
+        _uCrtScanlineAmount = glGetUniformLocation(_program, "uCrtScanlineAmount");
+        _uCrtScanlineCount = glGetUniformLocation(_program, "uCrtScanlineCount");
+    }
+
+protected:
+    void _update(double deltaT) override
+    {
+        _time += deltaT;
+    }
+
+    void _render(const glm::ivec2& size, GLuint colorTex, GLuint depthTex, const mc::TriangleConsumer<post_processing::detail::VertexP2T2>& clipspaceQuad) override
+    {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorTex);
+
+        glUseProgram(_program);
+        glUniform1i(_uColorTexSampler, 0);
+        glUniform1f(_uTime, _time);
+
+        // distortion
+        glUniform1f(_uDistortion, _distortion);
+        glUniform1f(_uDistortion2, _distortion2);
+        glUniform1f(_uSpeed, _speed);
+        glUniform1f(_uRollSpeed, _rollSpeed);
+
+        // static
+        glUniform1f(_uStaticAmount, _staticAmount);
+        glUniform1f(_uStaticSize, _staticSize);
+
+        // rgb shift
+        glUniform1f(_uRgbShiftAmount, _rgbShiftAmount);
+        glUniform1f(_uRgbShiftAngle, _rgbShiftAngle);
+
+        // crt scanlines
+        glUniform1f(_uCrtNoiseAmount, _crtNoiseAmount);
+        glUniform1f(_uCrtScanlineAmount, _crtScanlineAmount);
+        glUniform1f(_uCrtScanlineCount, _crtScanlineCount);
+
+        clipspaceQuad.draw();
+        glUseProgram(0);
+    }
+
+private:
+    GLuint _program = 0;
+    GLuint _uColorTexSampler = 0;
+    GLint _uTime = -1;
+    // distortion
+    GLint _uDistortion = -1;
+    GLint _uDistortion2 = -1;
+    GLint _uSpeed = -1;
+    GLint _uRollSpeed = -1;
+
+    // static
+    GLint _uStaticAmount = -1;
+    GLint _uStaticSize = -1;
+
+    // rgb distortion
+    GLint _uRgbShiftAmount = -1;
+    GLint _uRgbShiftAngle = -1;
+
+    // crt effect
+    GLint _uCrtNoiseAmount = -1;
+    GLint _uCrtScanlineAmount = -1;
+    GLint _uCrtScanlineCount = -1;
+
+    float _time = 0;
+    float _distortion = 3;
+    float _distortion2 = 5;
+    float _speed = 0.2;
+    float _rollSpeed = 0;
+    float _staticAmount = 0.125;
+    float _staticSize = 4.0;
+    float _rgbShiftAmount = 0.005;
+    float _rgbShiftAngle = 0;
+    float _crtNoiseAmount = 0.5;
+    float _crtScanlineAmount = 0.05;
+    float _crtScanlineCount = 4096;
+};
+
 class AtmosphereFilter : public post_processing::Filter {
 public:
     AtmosphereFilter(const std::string& name, mc::util::TextureHandleRef whiteNoise, mc::util::TextureHandleRef blueNoise)

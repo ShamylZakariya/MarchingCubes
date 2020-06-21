@@ -335,6 +335,9 @@ private:
             PalettizeFilter::ColorSpace::RGB));
         _palettizer->setAlpha(0);
 
+        _badTv = _postProcessingFilters->push(std::make_unique<BadTvFilter>("BadTv"));
+        _badTv->setAlpha(1);
+
         // mid afternoon
         setSunPosition(0.3);
 
@@ -725,6 +728,7 @@ private:
     std::unique_ptr<post_processing::FilterStack> _postProcessingFilters;
     mc::util::unowned_ptr<AtmosphereFilter> _atmosphere;
     mc::util::unowned_ptr<PalettizeFilter> _palettizer;
+    mc::util::unowned_ptr<BadTvFilter> _badTv;
 
     // user input state
     int _pixelScale = 2;
