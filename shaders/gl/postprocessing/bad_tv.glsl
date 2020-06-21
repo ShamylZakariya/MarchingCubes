@@ -44,9 +44,10 @@ uniform float uRgbShiftAmount;
 uniform float uRgbShiftAngle;
 
 // crt effect
-uniform float uCrtNoiseAmount;
+uniform float uCrtAmount;
 uniform float uCrtScanlineAmount;
 uniform float uCrtScanlineCount;
+uniform float uCrtVignetteAmount;
 
 float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
@@ -125,10 +126,14 @@ vec4 crt(vec4 color) {
     // add scanlines
     outColor += color.rgb * vec3( sc.x, sc.y, sc.x ) * uCrtScanlineAmount;
 
-    // interpolate between source and result by intensity
-    outColor = color.rgb + clamp( uCrtNoiseAmount, 0.0,1.0 ) * ( outColor - color.rgb );
-
+    outColor = mix(color.rgb, outColor, uCrtAmount);
     return vec4(outColor, 1);
+}
+
+vec4 vignette(vec4 color, float amt) {
+    float r = distance(fs_in.texCoord, vec2(0.5, 0.5));
+    float d = r / 0.5;
+    return mix(color, vec4(0,0,0,1), amt * d);
 }
 
 void main()
@@ -143,8 +148,7 @@ void main()
     //add fine grain distortion
     offset += snoise(vec2(yt * 50.0, 0.0)) * uDistortion2 * 0.001;
     //combine distortion on X with roll on Y
-    vec4 color = rgbshift(uColorTexSampler, vec2(fract(p.x + offset), fract(p.y - uTime * uRollSpeed)));
-    // vec4 color = texture2D(uColorTexSampler, vec2(fract(p.x + offset), fract(p.y - uTime * uRollSpeed)));
+    vec4 color = rgbshift(uColorTexSampler, vec2(p.x + offset, fract(p.y - uTime * uRollSpeed)));
 
     // apply static
     float xs = floor(gl_FragCoord.x / uStaticSize);
@@ -153,7 +157,7 @@ void main()
     color += snow;
 
     // crt effect
-    color = crt(color);
+    color = vignette(crt(color), uCrtVignetteAmount);
 
     fragColor = color;
 }

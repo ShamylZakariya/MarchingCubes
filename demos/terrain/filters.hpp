@@ -161,9 +161,10 @@ public:
         _uRgbShiftAngle = glGetUniformLocation(_program, "uRgbShiftAngle");
 
         // crt scanline effect
-        _uCrtNoiseAmount = glGetUniformLocation(_program, "uCrtNoiseAmount");
+        _uCrtAmount = glGetUniformLocation(_program, "uCrtAmount");
         _uCrtScanlineAmount = glGetUniformLocation(_program, "uCrtScanlineAmount");
         _uCrtScanlineCount = glGetUniformLocation(_program, "uCrtScanlineCount");
+        _uCrtVignetteAmount = glGetUniformLocation(_program, "uCrtVignetteAmount");
     }
 
 protected:
@@ -196,9 +197,10 @@ protected:
         glUniform1f(_uRgbShiftAngle, _rgbShiftAngle);
 
         // crt scanlines
-        glUniform1f(_uCrtNoiseAmount, _crtNoiseAmount);
+        glUniform1f(_uCrtAmount, _crtAmount);
         glUniform1f(_uCrtScanlineAmount, _crtScanlineAmount);
         glUniform1f(_uCrtScanlineCount, _crtScanlineCount);
+        glUniform1f(_uCrtVignetteAmount, _crtVignetteAmount);
 
         clipspaceQuad.draw();
         glUseProgram(0);
@@ -223,9 +225,10 @@ private:
     GLint _uRgbShiftAngle = -1;
 
     // crt effect
-    GLint _uCrtNoiseAmount = -1;
+    GLint _uCrtAmount = -1;
     GLint _uCrtScanlineAmount = -1;
     GLint _uCrtScanlineCount = -1;
+    GLint _uCrtVignetteAmount = -1;
 
     float _time = 0;
     float _distortion = 3;
@@ -236,9 +239,10 @@ private:
     float _staticSize = 4.0;
     float _rgbShiftAmount = 0.005;
     float _rgbShiftAngle = 0;
-    float _crtNoiseAmount = 0.5;
-    float _crtScanlineAmount = 0.05;
+    float _crtAmount = 0.5;
+    float _crtScanlineAmount = 0.5;
     float _crtScanlineCount = 4096;
+    float _crtVignetteAmount = 0.35;
 };
 
 class AtmosphereFilter : public post_processing::Filter {
