@@ -115,7 +115,7 @@ vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDi
     float lengthIncrement = rayLength / steps;
 
     vec3 color = skyboxColor;
-    vec3 fogColor = uAmbientLight + uGroundFogColor.rgb;
+    vec3 fogColor = uAmbientLight * uGroundFogColor.rgb;
     float totalContribution = 0;
     for (int i = 0; i < steps; i++) {
         // sample fog at march position
@@ -140,7 +140,7 @@ vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDi
 
                 // fade fog color to skybox color when it approaches far render distance
                 float skyboxMixFactor = rayLength / uFarRenderDistance;
-                vec3 contribution = mix(fogColor, skyboxColor, skyboxMixFactor);
+                vec3 contribution = mix(fogColor + skyboxColor, skyboxColor, skyboxMixFactor);
                 color = mix(color, contribution, c);
             }
         }
