@@ -308,6 +308,7 @@ public:
 
         _uWorldRadius = glGetUniformLocation(_program, "uWorldRadius");
         _uGroundFogMaxHeight = glGetUniformLocation(_program, "uGroundFogMaxHeight");
+        _uAmbientLight = glGetUniformLocation(_program, "uAmbientLight");
         _uGroundFogColor = glGetUniformLocation(_program, "uGroundFogColor");
         _uGroundFogWorldOffset = glGetUniformLocation(_program, "uGroundFogWorldOffset");
 
@@ -341,6 +342,12 @@ public:
     }
 
     glm::vec3 getFogWindSpeed() const { return _fogWindSpeed; }
+
+    void setAmbientLight(glm::vec3 ambient) {
+        _ambientLight = ambient;
+    }
+
+    glm::vec3 getAmbientLight() const { return _ambientLight; }
 
     void setGroundFogWorldOffset(glm::vec3 offset)
     {
@@ -394,6 +401,7 @@ protected:
 
         glUniform1f(_uWorldRadius, _worldRadius);
         glUniform1f(_uGroundFogMaxHeight, _groundFogMaxHeight);
+        glUniform3fv(_uAmbientLight, 1, glm::value_ptr(_ambientLight));
         glUniform4fv(_uGroundFogColor, 1, glm::value_ptr(_groundFogColor));
         glUniform3fv(_uGroundFogWorldOffset, 1, glm::value_ptr(_groundFogWorldOffset));
 
@@ -422,6 +430,7 @@ private:
     GLint _uFarPlane = -1;
     GLint _uGroundFogMaxHeight = -1;
     GLint _uWorldRadius = -1;
+    GLint _uAmbientLight = -1;
     GLint _uGroundFogColor = -1;
     GLint _uGroundFogWorldOffset = -1;
     GLint _uFrameCount;
@@ -437,6 +446,7 @@ private:
     float _farRenderDistance = 0;
     float _groundFogMaxHeight = 0;
     float _worldRadius = 0;
+    glm::vec3 _ambientLight{ 0.2 };
     glm::vec4 _groundFogColor { 1, 1, 1, 0.5 };
     glm::vec3 _groundFogWorldOffset { 0 };
     glm::vec3 _fogWindSpeed { 0 };

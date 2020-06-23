@@ -58,6 +58,7 @@ uniform float uWorldRadius;
 uniform float uGroundFogMaxHeight;
 uniform vec4 uGroundFogColor;
 uniform vec3 uGroundFogWorldOffset;
+uniform vec3 uAmbientLight;
 uniform int uFrameCount;
 
 float noise(in vec3 x)
@@ -114,6 +115,7 @@ vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDi
     float lengthIncrement = rayLength / steps;
 
     vec3 color = skyboxColor;
+    vec3 fogColor = uAmbientLight + uGroundFogColor.rgb;
     float totalContribution = 0;
     for (int i = 0; i < steps; i++) {
         // sample fog at march position
@@ -138,8 +140,7 @@ vec4 getFogContribution(float sceneDepth, vec3 fragmentWorldPosition, vec3 rayDi
 
                 // fade fog color to skybox color when it approaches far render distance
                 float skyboxMixFactor = rayLength / uFarRenderDistance;
-                skyboxMixFactor *= skyboxMixFactor * skyboxMixFactor;
-                vec3 contribution = mix(uGroundFogColor.rgb, skyboxColor, skyboxMixFactor);
+                vec3 contribution = mix(fogColor, skyboxColor, skyboxMixFactor);
                 color = mix(color, contribution, c);
             }
         }
@@ -155,6 +156,7 @@ void main()
     vec3 rayDir = normalize(fs_in.rayDir);
     vec3 sceneColor = texture(uColorSampler, fs_in.texCoord).rgb;
     vec3 skyboxColor = sky(rayDir, 0);
+    vec3 skyboxFogColor = mix(skyboxColor, sky(-rayDir, 0), 0.5);
     vec3 fragmentWorldPosition = getFragmentWorldPosition();
     float sceneDepth = distance(uCameraPosition, fragmentWorldPosition);
 
@@ -162,7 +164,7 @@ void main()
     float distanceFogContribution = smoothstep(uNearRenderDistance, uFarRenderDistance, sceneDepth);
     sceneColor = mix(sceneColor, skyboxColor, distanceFogContribution);
 
-    vec4 fog = getFogContribution(sceneDepth, fragmentWorldPosition, rayDir, skyboxColor);
+    vec4 fog = getFogContribution(sceneDepth, fragmentWorldPosition, rayDir, skyboxFogColor);
     sceneColor = mix(sceneColor, fog.rgb, fog.a);
     fragColor = vec4(sceneColor, 1);
 }

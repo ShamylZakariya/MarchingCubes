@@ -327,6 +327,7 @@ private:
         _atmosphere->setRenderDistance(renderDistance * 0.5, renderDistance);
         _atmosphere->setFogWindSpeed(vec3(10, 0, 5));
         _atmosphere->setWorldRadius(kWorldRadius);
+        _atmosphere->setAmbientLight(ambientLight);
         _atmosphere->setAlpha(1);
 
         _badTv = _postProcessingFilters->push(std::make_unique<BadTvFilter>("BadTv"));
