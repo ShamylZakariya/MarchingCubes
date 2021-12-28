@@ -8,21 +8,21 @@
             "name": "hello_mc (clang/lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/builddir/demos/hello_mc/hello_mc",
+            "program": "${workspaceFolder}/builddir/meson-out/hello_mc",
             "preLaunchTask": "Build"
         },
         {
             "name": "terrain (clang/lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/builddir/demos/terrain/terrain",
+            "program": "${workspaceFolder}/builddir/meson-out/terrain",
             "preLaunchTask": "Build"
         },
         {
             "name": "hello_mc (gcc/gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/builddir/demos/hello_mc/hello_mc",
+            "program": "${workspaceFolder}/builddir/meson-out/hello_mc",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -42,7 +42,7 @@
             "name": "terrain (gcc/gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/builddir/demos/terrain/terrain",
+            "program": "${workspaceFolder}/builddir/meson-out/terrain",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
