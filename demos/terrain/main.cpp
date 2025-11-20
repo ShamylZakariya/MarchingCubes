@@ -331,7 +331,7 @@ private:
         _atmosphere->setAlpha(1);
 
         _badTv = _postProcessingFilters->push(std::make_unique<BadTvFilter>("BadTv"));
-        _badTv->setAlpha(1);
+        _badTv->setAlpha(0.2);
 
         // mid afternoon
         setSunPosition(0.3);
@@ -693,11 +693,11 @@ private:
     }
 
 private:
-
-    void setSunPosition(float newPosition) {
+    void setSunPosition(float newPosition)
+    {
         _sunPosition = clamp<float>(newPosition, -1, 1);
         float sunAngle = mix<float>(0, pi<float>(), (_sunPosition + 1) / 2);
-        vec3 lightDir{cos(sunAngle),sin(sunAngle),0};
+        vec3 lightDir { cos(sunAngle), sin(sunAngle), 0 };
         _terrainMaterial->getSkyMaterial().setLightDir(lightDir);
         _atmosphere->getSkyMaterial().setLightDir(lightDir);
     }

@@ -1,18 +1,22 @@
 setup-release:
 	export CC=clang
 	export CXX=clang++
-	meson setup --wipe --buildtype release --layout flat builddir
+	meson setup --buildtype release build
 
-setup-debug:
+setup:
 	export CC=clang
 	export CXX=clang++
-	meson setup --wipe --buildtype debug --layout flat builddir
+	meson setup --buildtype debug build_dbg
 
-build:
-	ninja -C builddir
+build-release: setup-release
+	meson compile -C build
+
+build: setup
+	meson compile -C build_dbg
+
 
 run-hello: build
-	./builddir/meson-out/hello_mc
+	./build_dbg/demos/hello_mc/hello_mc
 
-run-terrain: build
-	./builddir/meson-out/terrain
+run: build
+	./build_dbg/demos/terrain/terrain
