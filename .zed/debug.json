@@ -1,12 +1,23 @@
 [
   {
-    "label": "Debug",
+    "label": "Debug Terrain",
     "build": {
       "command": "meson",
       "args": ["compile", "-C", "build"],
       "cwd": "$ZED_WORKTREE_ROOT",
     },
     "program": "$ZED_WORKTREE_ROOT/build/demos/terrain/terrain",
+    "request": "launch",
+    "adapter": "CodeLLDB",
+  },
+  {
+    "label": "Debug Marching Cubes",
+    "build": {
+      "command": "meson",
+      "args": ["compile", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT",
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/demos/hello_mc/hello_mc",
     "request": "launch",
     "adapter": "CodeLLDB",
   },

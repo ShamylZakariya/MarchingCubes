@@ -256,7 +256,7 @@ private:
         void reset(int maxDepth)
         {
             nodesMarched = 0;
-            nodesMarchedByDepth = std::vector<int>(maxDepth, 0);
+            nodesMarchedByDepth = std::vector<int>(maxDepth + 1, 0);
             voxelsMarched = 0;
             triangleCount = 0;
         }
