@@ -6,17 +6,17 @@ setup-release:
 setup:
 	export CC=clang
 	export CXX=clang++
-	meson setup --buildtype debug build_dbg
+	meson setup --buildtype debug build
 
 build-release: setup-release
 	meson compile -C build
 
 build: setup
-	meson compile -C build_dbg
+	meson compile -C build
 
 
 run-hello: build
-	./build_dbg/demos/hello_mc/hello_mc
+	./build/demos/hello_mc/hello_mc
 
 run: build
-	./build_dbg/demos/terrain/terrain
+	./build/demos/terrain/terrain

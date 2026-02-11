@@ -64,6 +64,8 @@ DerivedData/
 # meson build stuff
 build/
 build_dbg/
+builddir/
+.cache
 
 # fonts - since we don't own them
 fonts/

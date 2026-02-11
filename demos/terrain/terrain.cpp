@@ -3,7 +3,6 @@
 #include <glm/ext.hpp>
 #include <glm/gtc/noise.hpp>
 
-#include "materials.hpp"
 #include "terrain_samplers.hpp"
 
 using namespace glm;
