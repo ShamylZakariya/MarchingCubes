@@ -10,30 +10,28 @@ This started as an experiment in writing a multi-threaded marching cubes impleme
 Marching Cubes depends on [libepoxy](https://github.com/anholt/libepoxy), [glfw3](https://www.glfw.org/) and [glm](https://glm.g-truc.net/)
 
 ```bash
-#linux
+#linux (Debian/Ubuntu)
 sudo apt-get install libepoxy-dev libglfw3-dev libglm-dev
 
 ```
 
-The VSCode project depends on meson building into `build`
+The Zed project depends on meson building into `build`
 ```bash
 # manually
-CC=clang CXX=clang++ meson setup --layout flat build
+CC=clang CXX=clang++ meson setup --buildtype debug build
 
-# or alternately
-./setup.sh
+# or alternately, using the justfile
+just setup
 ```
 
-Then you can open the project in VSCode
+Then you can open the project in Zed
 ```build
-code .
+zed .
 ```
 
-Note, since the VSCode build task depends on `build/compile_commands.json` it's recommended to run `meson setup build` once before opening the project in VSCode.
+Note, since the Zed code completion and whatnot depends on `build/compile_commands.json` it's recommended to run `just setup` once before opening the project in Zed.
 
-From here, the default build task is **ctrl-shift-b** and debugging via **F5** works as expected.
-
-If using `gcc`, use `(gdb) Launch`, and if using `clang`, use `(CodeLLDB) Launch`. The latter requires the `CodeLLDB` extension to be installed.´
+From here, launching and debugging via **F5** works as expected. Note: `CodeLLDB` is required.
 
 ## Running
 
